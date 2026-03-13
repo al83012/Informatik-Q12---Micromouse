@@ -37,6 +37,9 @@ Raspberry Pi
   - Falls Maus noch nicht an ist --> Commands gehen ins Leere --> Muss vermieden werden
     - Sobald der ESP32 aktiv / verbunden ist muss eine Startup-Nachricht geschickt werden
 - Separate Receive und Control Threads --> Messages sollen nicht blocken --> Kommunikation über Channels
+- Rust:
+  - rumqttc https://github.com/bytebeamio/rumqtt/tree/main/rumqttc --> Async Client ! NEVER BLOCK POLLING --> NECESSARY FOR EVENT LOOP PROGRESS
+  - Kann Verbindung über IP-Adresse aufbauen --> Muss nur zu Broker connecten --> 192.168.4.1
 
 ESP32
 - Netzwerk-namen konfigurieren, auto-connect, etc
