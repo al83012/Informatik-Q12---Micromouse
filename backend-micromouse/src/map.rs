@@ -175,7 +175,6 @@ impl<const N: usize> Map<N> {
         }
 
         if hit_wall_at_end {
-
             let x_pos = from_pos.x as i64 + dx * no_walls_up_to_depth as i64;
             let y_pos = from_pos.y as i64 + dy * no_walls_up_to_depth as i64;
 
@@ -199,7 +198,10 @@ impl<const N: usize> Map<N> {
         }
 
         if !inconsistencies.is_empty() {
-            return Err(MapInconsistencyError::Conflicting(*measurement, inconsistencies));
+            return Err(MapInconsistencyError::Conflicting(
+                *measurement,
+                inconsistencies,
+            ));
         }
 
         Ok(())
