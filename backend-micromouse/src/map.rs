@@ -85,7 +85,7 @@ impl<const N: usize> Map<N> {
             }
             Direction::NegY => {
                 if position.y > 0 {
-                    Some(&self.wall_discovery_status[x][y - 1].0)
+                    Some(&self.wall_discovery_status[x][y - 1].1)
                 } else {
                     None
                 }
@@ -117,7 +117,7 @@ impl<const N: usize> Map<N> {
             }
             Direction::NegY => {
                 if position.y > 0 {
-                    Some(&mut self.wall_discovery_status[x][y - 1].0)
+                    Some(&mut self.wall_discovery_status[x][y - 1].1)
                 } else {
                     None
                 }
