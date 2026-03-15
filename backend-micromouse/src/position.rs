@@ -1,4 +1,4 @@
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Position{x: usize, y: usize}
+pub struct Position{pub x: u32, pub y: u32}

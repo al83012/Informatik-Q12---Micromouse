@@ -8,12 +8,12 @@ pub enum Direction {
 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct DirectionAngle(f32);
+pub struct DirectionAngle(pub f32);
 
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DirectionNormalizedVector{x: i8, y: i8}
+pub struct DirectionNormalizedVector{pub x: i8,pub y: i8}
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
