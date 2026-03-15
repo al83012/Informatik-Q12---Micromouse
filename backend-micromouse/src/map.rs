@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::{
     direction::{Direction, DirectionNormalizedVector},
     measurement::Measurement,
@@ -211,5 +213,28 @@ impl<const N: usize> Map<N> {
 impl<const N: usize> Default for Map<N> {
     fn default() -> Self {
         Map::new()
+    }
+}
+
+impl<const N: usize> Display for Map<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let dim = self.cell_discovery_status.len();
+        let mut visuals = vec![
+            vec![' '; (dim * 4) + 1]; (dim * 2) + 1];
+
+        for x in 0..dim + 1  {
+            for y in 0..dim + 1 {
+                visuals[y * 2][x * 4] = '+'
+            }
+        }
+
+        for line in visuals {
+            for c in line {
+                write!(f, "{}", c)?;
+            }
+            writeln!(f)?;
+        }
+
+        Ok(())
     }
 }
