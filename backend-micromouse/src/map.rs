@@ -40,7 +40,9 @@ pub enum MapInconsistencyError {
 impl<const N: usize> Map<N> {
     pub fn new() -> Self {
         let cell_discovery_status = [[CellDiscoveryStatus::default(); N]; N];
-        let mut wall_discovery_status = [[(
+        let mut wall_discovery_status = [
+            //Column
+            [(
             WallDiscoveryStatus::default(),
             WallDiscoveryStatus::default(),
         ); N]; N];
@@ -53,7 +55,7 @@ impl<const N: usize> Map<N> {
         }
 
         // Setting the entire right (pos x)'s pos-x-wall to exist (bounds)
-        for y in 0..(N - 1) {
+        for y in 0..N {
             wall_discovery_status[dim - 1][y].0 = WallDiscoveryStatus::Exists(true);
         }
 
@@ -127,6 +129,30 @@ impl<const N: usize> Map<N> {
         }
     }
 
+    pub fn cell(&self, position: &Position) -> Option<&CellDiscoveryStatus> {
+        let x: usize = position.x.try_into().expect("POSITION is u32 to be const size across devices, number should be well in bounds for usize-conversion though");
+
+        let y: usize = position.y.try_into().expect("POSITION is u32 to be const size across devices, number should be well in bounds for usize-conversion though");
+
+        if x >= N || y >= N {
+            return None;
+        }
+
+        Some(&self.cell_discovery_status[x][y])
+    }
+
+    pub fn cell_mut(&mut self, position: &Position) -> Option<&mut CellDiscoveryStatus> {
+        let x: usize = position.x.try_into().expect("POSITION is u32 to be const size across devices, number should be well in bounds for usize-conversion though");
+
+        let y: usize = position.y.try_into().expect("POSITION is u32 to be const size across devices, number should be well in bounds for usize-conversion though");
+
+        if x >= N || y >= N {
+            return None;
+        }
+
+        Some(&mut self.cell_discovery_status[x][y])
+    }
+
     pub fn update_discovery(
         &mut self,
         measurement: &Measurement,
@@ -134,6 +160,15 @@ impl<const N: usize> Map<N> {
         let direction = measurement.direction;
         let value = measurement.value;
         let from_pos = measurement.position;
+
+        let cell_status = self
+            .cell_mut(&from_pos)
+            .ok_or(MapInconsistencyError::OutsideBounds {
+                x: from_pos.x as i64,
+                y: from_pos.y as i64,
+            })?;
+
+        *cell_status = CellDiscoveryStatus::Visited;
 
         let (no_walls_up_to_depth, hit_wall_at_end) = match value {
             crate::measurement::MeasurementValue::OutsideRange { at_least_cells } => {
@@ -147,6 +182,10 @@ impl<const N: usize> Map<N> {
         let dy = dir_norm_vec.y as i64;
 
         let mut inconsistencies = vec![];
+
+
+
+        // INFO: going through all the cells (at least none) that were passed over by the vision-ray
 
         for i in 0..no_walls_up_to_depth as i64 {
             let x_offset = dx * i;
@@ -164,6 +203,18 @@ impl<const N: usize> Map<N> {
                 y: y_pos as u32,
             };
 
+            let cell_status = self
+                .cell_mut(&pos)
+                .ok_or(MapInconsistencyError::OutsideBounds {
+                    x: pos.x as i64,
+                    y: pos.y as i64,
+                })?;
+
+            if *cell_status == CellDiscoveryStatus::Undiscovered {
+                // println!("aksdhfö {:#?}",  pos);
+                *cell_status = CellDiscoveryStatus::Discovered;
+            }
+
             let wall = self
                 .wall_mut(&pos, &direction)
                 .ok_or(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos })?;
@@ -176,19 +227,35 @@ impl<const N: usize> Map<N> {
             *wall = WallDiscoveryStatus::Exists(false);
         }
 
+
+        // INFO: Last cell before measurement-end (either reached wall or measurement limit),
+        // either way: cell was discovered
+
+        let x_pos = from_pos.x as i64 + dx * no_walls_up_to_depth as i64;
+        let y_pos = from_pos.y as i64 + dy * no_walls_up_to_depth as i64;
+
+        if x_pos < 0 || y_pos < 0 {
+            return Err(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos });
+        }
+
+        let pos = Position {
+            x: x_pos as u32,
+            y: y_pos as u32,
+        };
+
+        let cell_status = self
+            .cell_mut(&pos)
+            .ok_or(MapInconsistencyError::OutsideBounds {
+                x: pos.x as i64,
+                y: pos.y as i64,
+            })?;
+
+        if *cell_status == CellDiscoveryStatus::Undiscovered {
+            // println!("aksdhfö {:#?}",  pos);
+            *cell_status = CellDiscoveryStatus::Discovered;
+        }
+
         if hit_wall_at_end {
-            let x_pos = from_pos.x as i64 + dx * no_walls_up_to_depth as i64;
-            let y_pos = from_pos.y as i64 + dy * no_walls_up_to_depth as i64;
-
-            if x_pos < 0 || y_pos < 0 {
-                return Err(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos });
-            }
-
-            let pos = Position {
-                x: x_pos as u32,
-                y: y_pos as u32,
-            };
-
             let wall = self
                 .wall_mut(&pos, &direction)
                 .ok_or(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos })?;
@@ -219,12 +286,55 @@ impl<const N: usize> Default for Map<N> {
 impl<const N: usize> Display for Map<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let dim = self.cell_discovery_status.len();
-        let mut visuals = vec![
-            vec![' '; (dim * 4) + 1]; (dim * 2) + 1];
+        let mut visuals = vec![vec![' '; (dim * 4) + 1]; (dim * 2) + 1];
 
-        for x in 0..dim + 1  {
+        for x in 0..dim + 1 {
             for y in 0..dim + 1 {
-                visuals[y * 2][x * 4] = '+'
+                visuals[y * 2][x * 4] = '+';
+            }
+        }
+
+        for x in 0..dim {
+            let start = x * 4 + 1;
+            for x_i in 0..3 {
+                visuals[0][x_i + start] = '-';
+            }
+        }
+        for y in 0..dim {
+            visuals[y * 2 + 1][0] = '|';
+        }
+
+        for x in 0..dim as u32 {
+            for y in 0..dim as u32 {
+                let pos = Position { x, y };
+                let wall_right = self.wall(&pos, &Direction::PosX).unwrap();
+                let wall_down = self.wall(&pos, &Direction::PosY).unwrap();
+
+                visuals[y as usize * 2 + 1][(x as usize + 1) * 4] = match wall_right {
+                    WallDiscoveryStatus::Undiscovered => '?',
+                    WallDiscoveryStatus::Exists(true) => '|',
+                    _ => ' ',
+                };
+
+                match wall_down {
+                    WallDiscoveryStatus::Undiscovered => {
+                        visuals[(y as usize + 1) * 2][x as usize * 4 + 2] = '?';
+                    }
+                    WallDiscoveryStatus::Exists(true) => {
+                        let start = x as usize * 4 + 1;
+                        for x_i in 0..3 {
+                            visuals[(y as usize + 1) * 2][x_i + start] = '-';
+                        }
+                    }
+                    _ => {}
+                }
+
+                let cell_discovery_status = self.cell(&pos).unwrap();
+                visuals[(y as usize) * 2 + 1][(x as usize) * 4 + 2] = match cell_discovery_status {
+                    CellDiscoveryStatus::Undiscovered => ' ',
+                    CellDiscoveryStatus::Discovered => '·',
+                    CellDiscoveryStatus::Visited => '□',
+                };
             }
         }
 
