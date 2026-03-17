@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    direction::{Direction, DirectionNormalizedVector},
-    measurement::Measurement,
-    position::Position,
+    comm::website::DiscoveryMessage, direction::{Direction, DirectionNormalizedVector}, measurement::Measurement, position::Position
 };
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq)]
@@ -14,7 +14,7 @@ pub struct Map<const N: usize> {
     wall_discovery_status: [[(WallDiscoveryStatus, WallDiscoveryStatus); N]; N],
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Eq, Default)]
+#[derive(Copy, Clone, PartialEq, Debug, Eq, Default, Serialize, Deserialize, Hash)]
 pub enum CellDiscoveryStatus {
     #[default]
     Undiscovered, //No information about the Cell whatsoever
@@ -22,12 +22,27 @@ pub enum CellDiscoveryStatus {
     Visited,    //Mouse was within cell
 }
 
-#[derive(Copy, Clone, PartialEq, Debug, Eq, Default)]
+#[derive(Copy, Clone, PartialEq, Debug, Eq, Default, Serialize, Deserialize, Hash)]
 pub enum WallDiscoveryStatus {
     #[default]
     Undiscovered,
     Exists(bool),
 }
+
+#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WallDiscovery {
+    pub new_status: WallDiscoveryStatus,
+    pub from_cell: Position,
+    pub in_direction: Direction,
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CellDiscovery {
+    pub new_status: CellDiscoveryStatus,
+    pub at_cell: Position
+}
+
+
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MapInconsistencyError {
@@ -156,7 +171,7 @@ impl<const N: usize> Map<N> {
     pub fn update_discovery(
         &mut self,
         measurement: &Measurement,
-    ) -> Result<(), MapInconsistencyError> {
+    ) ->  Result<DiscoveryMessage, MapInconsistencyError> {
         let direction = measurement.direction;
         let value = measurement.value;
         let from_pos = measurement.position;
@@ -182,6 +197,11 @@ impl<const N: usize> Map<N> {
         let dy = dir_norm_vec.y as i64;
 
         let mut inconsistencies = vec![];
+
+        let mut wall_discoveries: Vec<WallDiscovery> = vec![];
+        let mut cell_discoveries: Vec<CellDiscovery> = vec![];
+
+        todo!("Update Discoveries");
 
 
 
@@ -226,6 +246,7 @@ impl<const N: usize> Map<N> {
             }
             *wall = WallDiscoveryStatus::Exists(false);
         }
+
 
 
         // INFO: Last cell before measurement-end (either reached wall or measurement limit),
@@ -273,7 +294,7 @@ impl<const N: usize> Map<N> {
             ));
         }
 
-        Ok(())
+        todo!("Ok(())")
     }
 }
 
