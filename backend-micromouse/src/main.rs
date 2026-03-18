@@ -19,7 +19,7 @@ pub mod tests;
 async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("Creating new channel...");
-    let mut channel = WifiChannel::new_on_port(9001, comm::wifi_channel::WifiConnConfig::Any).await;
+    let mut channel = WifiChannel::new_on_port(9001, comm::wifi_channel::WifiConnConfig::BindToFirst).await;
     info!("Connection found: {}", channel.peer_addr());
 
     let mut interval = time::interval(Duration::from_secs(1));

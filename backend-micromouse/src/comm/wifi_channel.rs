@@ -1,6 +1,6 @@
 use std::{
     io::{Error, ErrorKind},
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
@@ -40,7 +40,7 @@ impl From<Error> for WifiConnError {
 
 #[derive(Debug)]
 pub enum WifiConnConfig {
-    Expect(SocketAddr),
+    Expect(IpAddr),
     BindToFirst,
     Any,
     Once,
@@ -86,14 +86,14 @@ impl WifiChannel {
             .expect("Could not reconnect");
 
         match self.conn_config {
-            WifiConnConfig::Expect(socket_addr) => {
-                if new_connection_addr != socket_addr {
-                    info!("Found new connection ({}), which does not match the expected connection ({})", new_connection_addr, socket_addr);
+            WifiConnConfig::Expect(ip_addr) => {
+                if new_connection_addr.ip() != ip_addr {
+                    info!("Found new connection ({}), which does not match the expected connection ({})", new_connection_addr, ip_addr);
                     return Err(WifiConnError::RejectedConnection(new_connection_addr));
                 }
             }
             WifiConnConfig::BindToFirst => {
-                if new_connection_addr != self.remote_peer_addr {
+                if new_connection_addr.ip() != self.remote_peer_addr.ip() {
                     info!("Found new connection ({}), which does not match the previous connection ({})", new_connection_addr, self.remote_peer_addr);
                     return Err(WifiConnError::RejectedConnection(new_connection_addr));
                 }
