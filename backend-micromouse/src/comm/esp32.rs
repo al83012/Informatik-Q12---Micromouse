@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use log::info;
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, Lines},
     net::{
@@ -37,6 +38,7 @@ impl From<Error> for WifiConnError {
     }
 }
 
+#[derive(Debug)]
 pub enum WifiConnConfig {
     Expect(SocketAddr),
     BindToFirst,
@@ -46,15 +48,18 @@ pub enum WifiConnConfig {
 
 impl WifiChannel {
     pub async fn new_on_port(port: u16, conn_config: WifiConnConfig) -> Self {
+        info!("port = {}, conn_config = {:?}", port, conn_config);
         let channel_listener = TcpListener::bind(("0.0.0.0", port))
             .await
             .expect("Connection not successful");
 
+        info!("    awaiting connection...");
         let (tcp_stream, remote_peer_addr) = channel_listener
             .accept()
             .await
             .expect("Could not find peer");
 
+        info!("    found connection");
         let (reader, writer) = tcp_stream.into_split();
         let reader = BufReader::new(reader).lines();
         let writer = BufWriter::new(writer);
@@ -68,7 +73,12 @@ impl WifiChannel {
         }
     }
 
+    pub fn peer_addr(&self) -> &SocketAddr {
+        &self.remote_peer_addr
+    }
+
     pub async fn reconnect(&mut self) -> Result<(), WifiConnError> {
+        info!("Attempting to reconnect: Awaiting connection");
         let (tcp_stream, new_connection_addr) = self
             .channel_listener
             .accept()
@@ -78,17 +88,24 @@ impl WifiChannel {
         match self.conn_config {
             WifiConnConfig::Expect(socket_addr) => {
                 if new_connection_addr != socket_addr {
+                    info!("Found new connection ({}), which does not match the expected connection ({})", new_connection_addr, socket_addr);
                     return Err(WifiConnError::RejectedConnection(new_connection_addr));
                 }
             }
             WifiConnConfig::BindToFirst => {
                 if new_connection_addr != self.remote_peer_addr {
+                    info!("Found new connection ({}), which does not match the previous connection ({})", new_connection_addr, self.remote_peer_addr);
                     return Err(WifiConnError::RejectedConnection(new_connection_addr));
                 }
             }
-            WifiConnConfig::Once => return Err(WifiConnError::ChannelClosed),
+            WifiConnConfig::Once => {
+                info!("Reconnection aborted: Was set to only connect once");
+                return Err(WifiConnError::ChannelClosed);
+            }
             WifiConnConfig::Any => {}
         }
+
+        info!("Accepted reconnect: {}", new_connection_addr);
 
         let (reader, writer) = tcp_stream.into_split();
         let reader = BufReader::new(reader).lines();
@@ -107,14 +124,24 @@ impl WifiChannel {
     pub async fn next_line(&mut self) -> Result<String, WifiConnError> {
         loop {
             match self.reader.next_line().await {
-                Ok(Some(msg)) => return Ok(msg),
-                Ok(None) => self.reconnect().await?,
-                Err(e) => self.handle_recoverable_io_error(e).await?,
+                Ok(Some(msg)) => {
+                    info!("NL --> return msg");
+                    return Ok(msg);
+                }
+                Ok(None) => {
+                    info!("NL --> Connection closed with EOF --> check, whether disconnect was permitted");
+                    self.reconnect().await?
+                }
+                Err(e) => {
+                    info!("Connection error: {e} --> Might be recoverable");
+                    self.handle_recoverable_io_error(e).await?
+                }
             }
         }
     }
 
     async fn handle_recoverable_io_error(&mut self, error: Error) -> Result<(), WifiConnError> {
+        info!("Test for recoverable error");
         match error.kind() {
             ErrorKind::ConnectionReset
             | ErrorKind::ConnectionAborted
@@ -122,9 +149,14 @@ impl WifiChannel {
             | ErrorKind::UnexpectedEof
             | ErrorKind::TimedOut => {
                 // Try reconnect
+
+                info!("Error recoverable --> try reconnect");
                 self.reconnect().await
             }
-            _ => Err(WifiConnError::from(error)),
+            _ => {
+                info!("Non-recoverable io-Error: {error}");
+                Err(WifiConnError::from(error))
+            }
         }
     }
 
@@ -136,7 +168,10 @@ impl WifiChannel {
 
             match write_res {
                 Ok(bytes) => return Ok(bytes),
-                Err(e) => self.handle_recoverable_io_error(e).await?,
+                Err(e) => {
+                    info!("IO-Error while writing: Might be recoverable: {e}");
+                    self.handle_recoverable_io_error(e).await?
+                }
             }
         }
     }

@@ -1,12 +1,10 @@
-
-
 use std::time::Duration;
 
+use env_logger::Env;
+use log::{info, warn};
 use tokio::time;
 
-use crate::
-    comm::esp32::{ WifiChannel}
-;
+use crate::comm::esp32::WifiChannel;
 
 pub mod comm;
 pub mod direction;
@@ -19,34 +17,38 @@ pub mod tests;
 
 #[tokio::main]
 async fn main() {
-
-
-
+    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+    info!("Creating new channel...");
     let mut channel = WifiChannel::new_on_port(9001, comm::esp32::WifiConnConfig::Any).await;
+    info!("Connection found: {}", channel.peer_addr());
 
     let mut interval = time::interval(Duration::from_secs(1));
 
     loop {
+        info!("STEP");
         tokio::select! {
-        res = channel.next_line() => {
-            match res {
-                Ok(msg) => {
-                    println!("Received: {}", msg);
-                    break;
+            res = channel.next_line() => {
+                info!("STEP --> Next line read");
+                match res {
+                    Ok(msg) => {
+                        info!("Received: {}", msg);
+                    }
+                    Err(e) => {
+                        warn!("Read error: {:?}", e);
+                        break;
+                    }
                 }
-                Err(e) => {
-                    println!("Read error: {:?}", e);
+            }
+
+            _ = interval.tick() => {
+
+                info!("STEP --> Tried sending message");
+                if let Err(e) = channel.send("Msg from Laptop").await {
+                    warn!("Write error: {:?}", e);
                     break;
                 }
             }
         }
-
-        _ = interval.tick() => {
-            if let Err(e) = channel.send("Msg from Laptop").await {
-                println!("Write error: {:?}", e);
-                break;
-            }
-        }    }
     }
 
     // channels_to("9001").await;

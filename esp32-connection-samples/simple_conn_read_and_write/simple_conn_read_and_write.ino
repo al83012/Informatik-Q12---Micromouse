@@ -1,16 +1,67 @@
-#include <Wifi.h>
+/*
+  Example from WiFi > WiFiScan
+  Complete details at https://RandomNerdTutorials.com/esp32-useful-wi-fi-functions-arduino/
+*/
 
-#define LED_PIN 2
+#include "WiFi.h"
 
 void setup() {
-  // put your setup code here, to run once:
-  pinMode(LED_PIN, OUTPUT);
+  Serial.begin(115200);
+
+  delay(3000);
+
+  while(!Serial) {}
+
+  Serial.println("BOOT OK");
+  
+
+  // Set WiFi to station mode and disconnect from an AP if it was previously connected
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+
+  Serial.println("Setup done");
+
+  initWiFi();
 }
 
+WiFiClient client;
+uint16_t port = 9001;
+
 void loop() {
-  // put your main code here, to run repeatedly:
-  digitalWrite(LED_PIN, HIGH);
-  delay(500);
-  digitalWrite(LED_PIN, LOW);
+  serverConnection();
+}
+
+void initWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin("HOTSPOT-TEST", "12345678");
+  Serial.print("Connecting to WiFi ..");
+  while (WiFi.status() != WL_CONNECTED) {
+    Serial.print('.');
+    delay(1000);
+  }
+  WiFi.setAutoReconnect(true); 
+  WiFi.persistent(true); 
+  Serial.println(WiFi.localIP());
+  Serial.println(WiFi.gatewayIP());
+}
+
+void serverConnection() {
+  if(!client.connected()) {
+    client.connect(WiFi.gatewayIP(), port);
+    Serial.println("Not connected");
+    delay(5000);
+    return;
+  }
+  Serial.println("CONN");
+  String str = "ECHO: ";
+  while(client.available()) {
+    char c = client.read();
+    Serial.print("Read: '");
+    Serial.print(c);
+    Serial.println("'");
+    str += c;
+  }
+  client.println(str);
   delay(500);
 }
