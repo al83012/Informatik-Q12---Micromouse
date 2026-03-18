@@ -162,18 +162,37 @@ impl WifiChannel {
 
     // Tries to reconnect, if the channel was not allowed to disconnect and did so (even if it was
     // graceful) or if the channel returns a recoverable connection error
-    pub async fn send(&mut self, msg: &str) -> Result<usize, WifiConnError> {
+    pub async fn send(&mut self, msg: &str) -> Result<(), WifiConnError> {
         loop {
-            let write_res = self.writer.write(msg.as_bytes()).await;
-
-            match write_res {
-                Ok(bytes) => return Ok(bytes),
-                Err(e) => {
-                    info!("IO-Error while writing: Might be recoverable: {e}");
-                    self.handle_recoverable_io_error(e).await?
+            let r = self.writer.write_all(msg.as_bytes()).await;
+            match r {
+                Ok(_) => {
+                    break;
                 }
+                Err(e) => self.handle_recoverable_io_error(e).await?,
             }
         }
+        loop {
+            let r = self.writer.write_all(b"\n").await;
+
+            match r {
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => self.handle_recoverable_io_error(e).await?,
+            }
+        }
+        loop {
+            let r = self.writer.flush().await;
+            match r {
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => self.handle_recoverable_io_error(e).await?,
+            }
+        }
+
+        Ok(())
     }
 }
 

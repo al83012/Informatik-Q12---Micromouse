@@ -10,10 +10,10 @@ void setup() {
 
   delay(3000);
 
-  while(!Serial) {}
+  while (!Serial) {}
 
   Serial.println("BOOT OK");
-  
+
 
   // Set WiFi to station mode and disconnect from an AP if it was previously connected
   WiFi.mode(WIFI_STA);
@@ -40,28 +40,43 @@ void initWiFi() {
     Serial.print('.');
     delay(1000);
   }
-  WiFi.setAutoReconnect(true); 
-  WiFi.persistent(true); 
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
   Serial.println(WiFi.localIP());
   Serial.println(WiFi.gatewayIP());
 }
 
+int n = 0;
 void serverConnection() {
-  if(!client.connected()) {
-    client.connect(WiFi.gatewayIP(), port);
+
+  if (!client.connected()) {
     Serial.println("Not connected");
+    client.connect(WiFi.gatewayIP(), port);
+
     delay(5000);
     return;
   }
+
+  if (n % 10 == 9) {
+    client.stop();
+    Serial.println("STOPPED");
+    n += 1;
+    return;
+  }
+  n += 1;
+
   Serial.println("CONN");
   String str = "ECHO: ";
-  while(client.available()) {
+  bool readMsg = false;
+  while (client.available()) {
+    readMsg = true;
     char c = client.read();
     Serial.print("Read: '");
     Serial.print(c);
     Serial.println("'");
     str += c;
   }
-  client.println(str);
-  delay(500);
+  if (readMsg) {
+    client.println(str);
+  }
 }
