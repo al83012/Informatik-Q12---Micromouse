@@ -3,6 +3,7 @@ const app = express();
 const port = 8080;
 
 const PkgActions = require('./Actions.js');
+const { BackendManager } = require('./BackendManager.js');
 
 let actions = [];
 
