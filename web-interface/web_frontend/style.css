@@ -40,6 +40,7 @@ body {
     border-width: 1px;
     border-style: solid;
     border-color: gray;
+    box-shadow: darkgray 0 0 4px 0;
 }
 
 /*.header_small_container {
@@ -168,7 +169,7 @@ body {
     justify-content: left;
     flex-direction: column;
     width: 300px;
-    height: 100px;
+    height: 250px;
     background-color: #0a0e1a;
     border-radius: 5px;
     border-style: solid;
@@ -188,6 +189,7 @@ body {
     border-style: solid;
     border-radius: 5px;
     border-color: darkgray;
+    box-shadow: darkgray 0 0 3px 0;
 }
 
 .maze_header {
@@ -218,6 +220,7 @@ body {
     justify-content: center;
     background-color: red;
     margin: 55px;
+    box-shadow: darkslategray 0 0 5px 5px;
 }
 
 .maze_row {
