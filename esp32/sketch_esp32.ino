@@ -14,9 +14,6 @@ int lastCMD_ID = -1;
 int currCMD_ID = -1;
 
 
-
-
-
 const char* ssid= "SSID";
 const char* password="PASSWORD";
 
@@ -48,19 +45,6 @@ void setup() {
   handleCommand("RANDOMSTUFF");
   handleCommand("RANDOM #1 3$");
 
-
-}
-
-
-void forward(int cells, bool interruptOnSpace) {
-
-  for(int i = 0; i < cells; i++) {
-    if(interruptOnSpace) {
-
-    } else {
-
-    }
-  }
 
 }
 
@@ -169,7 +153,7 @@ void debug(String message) {
 }
 
 void finishedAll(){
-  String message = "# CMD-FINISHED #";
+  String message = "CMD-FINISHED #";
   Serial.println("# DONE > SRV");
   message = message + currCMD_ID;
   message = message + "$";
@@ -243,11 +227,7 @@ void handleCommand(String message) {
             } else {
               Serial.println("UNKWN CMD!!");
               debug("UNKWN CMD!!");
-            } 
-
-            
-
-            
+            }
 
 
         } else {
