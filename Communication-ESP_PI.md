@@ -50,3 +50,53 @@ ESP32
   - Mit Broker verbinden
   - Subscriptions --> Vllt. mit Statusleuchte für verschiedene Verbindungs-zustände
   - Falls Broker noch nicht aktiv: In loop warten, bis das der Fall ist --> Statusleuchte
+ 
+### Kommunikationsprotokoll
+- Es gibt keinen guten Weg, Verbindungsabbruch durch ausschalten des ESP32 festzustellen --> Man braucht periodische Nachrichten, die erkennen, wann die Verbindung abbricht
+- Es ist nicht sicher, dass Nachrichten ankommen --> Alle Informationen, die für eine Nachricht wichtig sind müssen in dieser Nachricht sein
+- Der PI muss sicher Nachrichten an den ESP32 schicken können andersherum ist es nicht so dramatisch --> Die Nachrichten des PI müssen nummeriert werden
+- Der PI braucht acknowledgements für alle Bewegungen
+- Separate Komponenten der Befehle sollten für die einfache Erkennbarkeit durch einfache leerzeichen getrennt werden
+#### CMD (vom PI)
+- <CMD_ID> ist ein u32
+- Bewegungsbefehl: `MOVE #<CMD_ID> <N>$` --> N Felder Forwärts; N ist ein u8
+- Bewegungsbefehl mit Messungen:
+  `MOVE #<CMD_ID> <N> MEASURE <Measurement_Tasks>$`
+- <Measurement_Task>s (Nur als Teil eines Bewegungs-Befehls):
+  `<N>_<L/R/F>_<CONTINUE/STOP_IF_OPEN/STOP_IF_BLOCKED>` --> Beim Nten Teilschritt der Bewegung links, rechts oder forwärts Distanz prüfen und schicken; Falls Continue --> Einfach weiterfahren, sonst entweder stoppen, weil dort direkt eine Wand ist, oder, weil dort keine Wand ist
+- Drehungsbefehl: `TURN #<CMD_ID> <X>$` --> 0 = Keine Drehung; X = Ganzzahl => Zahl * 90° links (neg. = rechts)
+
+#### DBG (vom ESP32)
+- `DBG <Nachricht>$` --> Wird an Frontend weitergeleitet, darf keine $ enthalten --> würden Nachricht frühzeitig beenden
+
+#### MEASUREMENT (vom ESP32)
+- Wird immer geschickt, bevor das zu einer Bewegung gehörende Bewegungs-Ack kommt
+- <CMD_ID> ist derselbe u32, der vorher bei der Bewegungs-Anweisung geschickt wurde, die zu der Messung geführt hat
+- `MEASUREMENT #<CMD_ID> <N>_<L/R/F> <DEPTH>$` --> DEPTH ist 0, falls direkt eine Wand ist, je 1 größer, wenn 1 Zelle weiter leer ist
+- `MEASUREMENT #<CMD_ID> <N>_<L/R/F> <DEPTH> SENSORLIMIT$` --> Mindestens die Tiefe wurde erreicht, Sensor kann nicht zuverlässig weiter schauen
+
+#### CMD_FINISHED (vom ESP32)
+- <CMD_ID> wieder derselbe von davor
+- CMD_FINISHED wird immer nach jedem MEASUREMENT geschickt, der von einem CMD verursacht wird
+- `CMD_FINISHED #<CMD_ID>$` --> Befehl vollständig ausgeführt
+- `CMD_FINISHED #<CMD_ID> <N>_<L/R/F>_<STOP_IF_OPEN/STOP_IF_BLOCKED>$` --> Frühzeitig beendeter Befehl + Begründung
+
+#### DESYNC (vom ESP32)
+- Geschickt, falls eine CMD_ID nicht in 1er-Schritten hochzählt --> eine Nachricht wurde nicht empfangen
+- `DESYNC #<CMD_ID> #<CMD_ID> ...$` --> Gibt alle CMD_IDs an, die Übersprungen wurden
+- Falls ein DESYNC passiert, soll der ESP32 den frühzeitig geschickten Befehl nicht ausführen und stattdessen darauf warten, dass die verlorenen Commands geschickt werden (ohne Garantie für Reihenfolge diesmal, soll einfach warten, bis alle von ihnen da sind)
+
+#### ALIVE (vom PI)
+- `ALIVE <Timestamp>$' --> Alle paar Sekunden --> sagt verbundenem ESP32, dass die Verbindung zum PI immer noch aktiv ist --> <Timestamp> ist eine Zeit in Sekunden seit start
+
+#### CONFIRM_ALIVE (vom ESP32)
+- 'CONFIRM_ALIVE <Timestamp>$' --> Wie Echo, schickt Timestamp von ALIVE-Nachricht zurück; Soll das so bald wie möglich machen, auch falls z.B. andere Pakete fehlen
+
+#### STOP (vom ESP32)
+- 'STOP' --> Knopf oder ähnliches an ESP32 wurde gedrückt --> Pathfinding beendet, jetzt kann man die micromouse wieder manuell an den Start setzen
+
+#### RESTART (vom ESP32)
+- 'RESTART' --> Knopf oder ähnliches nochmal gedrückt --> Nutzer garantiert, dass sich die micromouse wieder am Start befindet
+
+#### BATTERY (vom ESP32)
+- 'BATTERY <X>' --> X= pos. Ganzzahl zwischen 0 und 100 --> Batterie in Prozent
