@@ -130,3 +130,12 @@ ESP32
 > CMD_FINISHED #2$
 > CMD_FINISHED #3$
 ```
+
+#### Simple Bewegungen mit Measurements
+
+```msgs
+< MOVE #0 4 MEASURE 1_L_CONTINUE 2_R_CONTINUE$
+> MEASUREMENT #0 1_L 2$
+> MEASUREMENT #0 2_R 3 SENSORLIMIT$
+> CMD_FINISHED #0$
+```
