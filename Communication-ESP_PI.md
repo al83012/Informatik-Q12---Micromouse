@@ -87,16 +87,16 @@ ESP32
 - Falls ein DESYNC passiert, soll der ESP32 den frühzeitig geschickten Befehl nicht ausführen und stattdessen darauf warten, dass die verlorenen Commands geschickt werden (ohne Garantie für Reihenfolge diesmal, soll einfach warten, bis alle von ihnen da sind)
 
 #### ALIVE (vom PI)
-- `ALIVE <Timestamp>$' --> Alle paar Sekunden --> sagt verbundenem ESP32, dass die Verbindung zum PI immer noch aktiv ist --> <Timestamp> ist eine Zeit in Sekunden seit start
+- `ALIVE <Timestamp>$` --> Alle paar Sekunden --> sagt verbundenem ESP32, dass die Verbindung zum PI immer noch aktiv ist --> <Timestamp> ist eine Zeit in Sekunden seit start
 
 #### CONFIRM_ALIVE (vom ESP32)
-- 'CONFIRM_ALIVE <Timestamp>$' --> Wie Echo, schickt Timestamp von ALIVE-Nachricht zurück; Soll das so bald wie möglich machen, auch falls z.B. andere Pakete fehlen
+- `CONFIRM_ALIVE <Timestamp>$` --> Wie Echo, schickt Timestamp von ALIVE-Nachricht zurück; Soll das so bald wie möglich machen, auch falls z.B. andere Pakete fehlen
 
 #### STOP (vom ESP32)
-- 'STOP' --> Knopf oder ähnliches an ESP32 wurde gedrückt --> Pathfinding beendet, jetzt kann man die micromouse wieder manuell an den Start setzen
+- `STOP$` --> Knopf oder ähnliches an ESP32 wurde gedrückt --> Pathfinding beendet, jetzt kann man die micromouse wieder manuell an den Start setzen
 
 #### RESTART (vom ESP32)
-- 'RESTART' --> Knopf oder ähnliches nochmal gedrückt --> Nutzer garantiert, dass sich die micromouse wieder am Start befindet
+- `RESTART$` --> Knopf oder ähnliches nochmal gedrückt --> Nutzer garantiert, dass sich die micromouse wieder am Start befindet
 
 #### BATTERY (vom ESP32)
-- 'BATTERY <X>' --> X= pos. Ganzzahl zwischen 0 und 100 --> Batterie in Prozent
+- `BATTERY <X>$` --> X= pos. Ganzzahl zwischen 0 und 100 --> Batterie in Prozent
