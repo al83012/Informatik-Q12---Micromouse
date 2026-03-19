@@ -16,10 +16,9 @@ int currCMD_ID = -1;
 
 
 
-//const char* ssid= "GB-SCHULE";
-//const char* password="GtnStrt25/26!";
-const char* ssid= "WLAN_GUEST";
-const char* password="Guest@HOME00";
+
+const char* ssid= "SSID";
+const char* password="PASSWORD";
 
 char serverName[] = "172.13.1.1";
 
