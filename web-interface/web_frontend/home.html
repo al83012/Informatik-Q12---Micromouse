@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html lang="de" style="height: 100%">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebInterface</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style_animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="./module/index.js" type="module"></script>
+
+    <script type="module">
+        import { Index } from './module/index.js';
+
+        window.onload = () => Index.eventLoad();
+
+        document.getElementsByClassName("button_function_start_stop")[0].onclick = () => Index.buttonStartStop();
+    </script>
+</head>
+<body class="con_script_body">
+
+    <div class="header_container">
+            <h1 class="header_text">Micromouse WebInterface</h1>
+            <div class="header_status">
+                <h4 class="header_text">v1.0.0</h4>
+                <div class="header_status_pill">
+                    <div class="header_status_pill_dot"></div>
+                    <t23 class="header_status_pill_text">offline</t23>
+                </div>
+            </div>
+    </div>
+
+    <div class="body_container">
+        <div class="maze_container">
+            <div class="maze_header">
+                <h2 class="maze_header_text">Maze</h2>
+            </div>
+            <div class="maze_square">
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+                <div class="maze_tile"></div>
+            </div>
+            <div class="maze_row">
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+        </div>
+            <div class="maze_row">
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+        </div>
+            <div class="maze_row">
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+        </div>
+            <div class="maze_row">
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+        </div>
+            <div class="maze_row">
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+            <div class="maze_tile"></div>
+        </div>
+        </div>
+        </div>
+
+
+        <div class="right_container">
+            <div class="debug_console_container">
+                <div class="debug_console_header">
+                    <div class="debug_console_header_dot"></div>
+                    <h2 class="debug_console_header_text">Console</h2>
+                </div>
+                <div class="debug_console"></div>
+            </div>
+
+            <div class="control_container">
+                <div class="control_container_inner">
+                    <div class="control_row">
+                        <div class="button_container">
+                            <div class="button_start_stop button_function_start_stop">
+                                <p class="unselectable">START</p>
+                            </div>
+                        </div>
+
+                        <div class="button_container">
+                            <div class="button_pause">
+                                <p class="unselectable">PAUSE</p>
+                            </div>
+                        </div>
+
+                        <div class="button_container">
+                            <div class="button_reset">
+                                <p class="unselectable">RESET</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

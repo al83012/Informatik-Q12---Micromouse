@@ -1,0 +1,312 @@
+t23 {
+    font-size: 1.3rem;
+    margin: .79em 0;
+    font-weight: bold;
+}
+
+:root {
+    --bg: #0a0c12;
+    --square_size: 30px;
+    --square_size_full: calc(var(--square_size) + var(--square_border_size)*2);
+    --square_border_size: 1px;
+}
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background-image:
+            radial-gradient(ellipse 80% 60% at 50% -20%, rgba(0,212,255,0.05) 0%, transparent 70%),
+            radial-gradient(ellipse 60% 40% at 80% 100%, rgba(123,79,255,0.05) 0%, transparent 60%);
+    margin: 0;
+    overflow-x: hidden;
+}
+
+
+.header_container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-direction: row;
+    margin-top: 0;
+    padding-top: 0;
+    margin-bottom: 4px;
+    width: 100%;
+    /*background-image: linear-gradient(to right, #074fba, #0644a1);*/
+    background: var(--bg);
+    border-width: 1px;
+    border-style: solid;
+    border-color: gray;
+}
+
+/*.header_small_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    margin: 0;
+    padding: 0;
+    width: 50%;
+    /*background-image: linear-gradient(to right, #074fba, #0644a1);*/
+    /*background: var(--bg);
+    border-width: 0;
+    border-style: solid;
+    border-color: darkblue;
+}*/
+
+.header_text {
+    color:#001e4a;
+    margin-left: 20px;
+    margin-right: 20px;
+}
+
+.header_status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+}
+
+.header_status_pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: fit-content;
+    flex-direction: row;
+    border-width: 1px;
+    border-radius: 30px;
+    border-style: solid;
+    border-color: darkgray;
+    background-color: #0c0c0d;
+}
+
+.header_status_pill_dot {
+    width: 0px;
+    height: 0px;
+    border-width: 2px;
+    border-style: solid;
+    border-color: red;
+    border-radius: 30px;
+    margin-left: 4px;
+    animation: blink 2s infinite;
+}
+
+.header_status_pill_text {
+    color:#001e4a;
+    margin-top: 3px;
+    margin-bottom: 0;
+    margin-left: 4px;
+    margin-right: 4px;
+}
+
+.body_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    margin-top: 40px;
+    width: 100%;
+    height: 100%;
+}
+.right_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+}
+
+.debug_console_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+
+    border-color: darkgray;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 5px;
+    margin: 15px;
+}
+
+.debug_console_header {
+    display: flex;
+    align-items: center;
+    justify-content: left;
+    flex-direction: row;
+    width: 100%;
+    height: fit-content;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: darkgray;
+    margin-top: 1px;
+}
+
+.debug_console_header_dot {
+    margin-left: 6px;
+    border-radius: 30px;
+    border: 4px solid darkblue;
+    box-shadow: 0 0 2px 2px darkblue;
+    animation: fade 4s infinite;
+}
+
+.debug_console_header_text {
+    color: #416080;
+    margin-top: 2px;
+    margin-left: 7px;
+    margin-bottom: 2px;
+}
+
+.debug_console {
+    display: flex;
+    justify-content: left;
+    flex-direction: column;
+    width: 300px;
+    height: 100px;
+    background-color: #0a0e1a;
+    border-radius: 5px;
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+}
+
+.maze_container {
+    display: flex;
+    width: fit-content;/*calc(var(--square_size_full)*16);*/
+    height: fit-content;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background-color: #0f1119;
+    border-width: 1px;
+    border-style: solid;
+    border-radius: 5px;
+    border-color: darkgray;
+}
+
+.maze_header {
+    display: flex;
+    align-items: center;
+    justify-content: left;
+    flex-direction: row;
+    width: 100%;
+    height: fit-content;
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: darkgray;
+}
+
+.maze_header_text {
+    color: #416080;
+    height: 15px;
+    margin-top: 7px;
+    margin-left: 15px;
+}
+
+.maze_square {
+    display: flex;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+    align-items: center;
+    justify-content: center;
+    background-color: red;
+    margin: 55px;
+}
+
+.maze_row {
+    display: flex;
+    flex-direction: row;
+    width: fit-content;
+    height: fit-content;
+}
+
+.maze_tile {
+    width: 30px;
+    height: 30px;
+    background-color: #0a0e1a;
+    border-width: 1px;
+    border-style: dashed;
+    border-color: black;
+}
+
+.unselectable {
+    cursor: default;
+}
+
+.control_container {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+    margin: 1rem 0;
+}
+
+.control_container_inner {
+    padding: 0 2rem;
+}
+
+.control_row {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    width: fit-content;
+    height: fit-content;
+}
+
+.button_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.button_start_stop {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: linear-gradient(to right, cyan, cornflowerblue);
+    border-radius: 20px;
+    corner-shape: round;
+    padding-top: -20px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.button_pause {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: linear-gradient(to right, cyan, cornflowerblue);
+    border-radius: 20px;
+    corner-shape: round;
+    padding-top: -20px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.button_reset {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-image: linear-gradient(to right, cyan, cornflowerblue);
+    border-radius: 20px;
+    corner-shape: round;
+    padding-top: -20px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+@keyframes animButtonAvailable {
+    from {background-image: linear-gradient(to right, darkgray, lightgray);}
+    to {background-image: linear-gradient(to right, cyan, cornflowerblue);}
+}
