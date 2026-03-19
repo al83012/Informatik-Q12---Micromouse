@@ -100,3 +100,33 @@ ESP32
 
 #### BATTERY (vom ESP32)
 - `BATTERY <X>$` --> X= pos. Ganzzahl zwischen 0 und 100 --> Batterie in Prozent
+
+### Bsp
+
+(`<` bedeutet zu dem ESP32, `>` bedeutet zu dem PI)
+
+#### Simple Bewegungen, nacheinander
+
+```msgs
+< MOVE #0 2$
+> CMD_FINISHED #0$
+< TURN #1 1$
+> CMD_FINISHED #1$
+< MOVE #2 1$
+> CMD_FINISHED #2$
+< TURN #3 -1$
+> CMD_FINISHED #3$
+```
+
+#### Simple Bewegungen, batched
+
+```msgs
+< MOVE #0 2$
+< TURN #1 1$
+< MOVE #2 1$
+< TURN #3 -1$
+> CMD_FINISHED #0$
+> CMD_FINISHED #1$
+> CMD_FINISHED #2$
+> CMD_FINISHED #3$
+```
