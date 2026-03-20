@@ -11,6 +11,53 @@ export class Animation {
     execute() {};
 }
 
+export class AnimFadeOut extends Animation {
+    constructor(duration, object, on_finished) {
+        super(duration, object);
+        this.on_finished = on_finished;
+    }
+
+    execute() {
+        if(this.finished) {
+            return;
+        }
+
+        this.object.style.opacity = (this.remaining_duration / this.duration) + "";
+
+        this.remaining_duration--;
+        if (this.remaining_duration === 0) {
+            this.object.style.opacity = 0;
+            this.finished = true;
+            this.on_finished(this.object);
+        }
+    };
+}
+
+export class AnimFadeIn extends Animation {
+    constructor(duration, object, on_start) {
+        super(duration, object);
+        this.on_start = on_start;
+    }
+
+    execute() {
+        if (this.remaining_duration === this.duration) {
+            this.on_start(this.object);
+        }
+
+        if(this.finished) {
+            return;
+        }
+
+        this.object.style.opacity = ((this.remaining_duration / this.duration)-1)*(-1) + "";
+
+        this.remaining_duration--;
+        if (this.remaining_duration === 0) {
+            this.object.style.opacity = 1;
+            this.finished = true;
+        }
+    };
+}
+
 export class AnimBorderOuter extends Animation {
     constructor(duration, object, factor) {
         super(duration, object);

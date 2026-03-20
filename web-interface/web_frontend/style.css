@@ -7,7 +7,8 @@ t23 {
 :root {
     --controll_disabled: #52544D;
     --win_bg: #0f1119;
-    --bg: #181F10;
+    /*--bg: #181F10;*/
+    --bg: #0f0f12;
     --bg_old: #0a0c12;
     --text-color: #7F3D41/*#6B2737;*/;
     --button-text-color: #D9C5B2;
@@ -173,20 +174,79 @@ body {
     height: fit-content;
 }
 
-.current_algorithm {
+.algo_current {
     color: var(--text-color);
     font-weight: bold;
-    padding: 0;
     margin-top: 10px;
     margin-bottom: 10px;
     margin-left: 15px;
     font-size: 1.5rem;
+
+    border: darkgray 1px solid;
+    border-radius: 7px;
+
+    padding-left: 7px;
+    padding-right: 30px;
+    padding-bottom: 3px;
+    padding-top: 3px;
+
+    box-shadow: darkgray 0 0 2px 0;
+}
+
+.pop_window_algorithm_group {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 1;
 }
 
 .pop_window_algorithm_container {
     display: block;
     position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -400px;
+    margin-top: -250px;
+    width: 800px;
+    height: 500px;
+    background-color: var(--win_bg);
 
+    z-index: 100;
+
+    border: gray 2px solid;
+    border-radius: 15px;
+    box-shadow: darkgray 0 0 4px 2px;
+}
+
+.pop_window_algorithm_dimmer {
+    display: block;
+    position: absolute;
+    z-index: 99;
+    width: 100%;
+    height: 100%;
+
+    background-color: var(--win_bg);
+
+    opacity: 0.6;
+}
+
+.pop_window_algorithm_header {
+    display: flex;
+    align-items: center;
+    justify-content: left;
+    flex-direction: row;
+
+    border-bottom: darkgray 1px solid;
+    width: 100%;
+    height: fit-content;
+}
+
+.pop_window_algorithm_header_text {
+    color: var(--text-color);
+    font-weight: bold;
+    font-size: 1.5rem;
+    margin-left: 15px;
 }
 
 .debug_console_container {

@@ -5,7 +5,7 @@ let current_state = ["reset", "finished"];
 let goal = [15, 15]; //the coords for going somewhere (cmd point)
 
 
-import { Animation, AnimationHandler, AnimBorderOuter, AnimBorderInner, AnimGroup, AnimBorderColor } from "./Animation.js"
+import { Animation, AnimationHandler, AnimFadeIn, AnimFadeOut, AnimBorderOuter, AnimBorderInner, AnimGroup, AnimBorderColor } from "./Animation.js"
 import { StyleAdder } from "./style_adder.js";
 
 export class Index {
@@ -83,6 +83,18 @@ export class Index {
         request.addEventListener("load", function () {console.log(this.responseText);});
         request.open("GET", document.location.origin + "/update");
         request.send();
+    }
+
+    static openPopAlgo() {
+        console.log("OpenPopAlgo");
+        let obj = document.getElementsByClassName("pop_window_algorithm_group")[0];
+        Index.animHandler.add(new AnimFadeIn(20, obj, (o) => {o.style.opacity = "0";o.style.display = "block";}));
+        //document.getElementsByClassName("pop_window_algorithm_group")[0].style.animation = "fade-in 0.2s";
+    }
+
+    static closePopAlgo() {
+        let obj = document.getElementsByClassName("pop_window_algorithm_group")[0];
+        Index.animHandler.add(new AnimFadeOut(20, obj, (o) => {o.style.display = "none";}));
     }
 }
 
