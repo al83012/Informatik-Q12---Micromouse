@@ -113,7 +113,9 @@ function unselect_square(square) {
     updateControls();
 }
 
-function updateControls() {
+function updateControls() {}
+
+function updateControls_disalbed() {
     let buttonStart = document.getElementsByClassName("button_start_stop")[0];
     let buttonPause = document.getElementsByClassName("button_pause")[0];
     let buttonReset = document.getElementsByClassName("button_reset")[0];

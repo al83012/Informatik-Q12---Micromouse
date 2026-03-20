@@ -25,6 +25,10 @@ app.get('/update', (req, res) => {
     actions = [];
 });
 
+app.get('/', (req, res) => {
+    res.redirect("/home.html");
+})
+
 app.listen(port, () => console.log(`Example app listening on port ${port}!`));
 
 //setup connection with backend_server
