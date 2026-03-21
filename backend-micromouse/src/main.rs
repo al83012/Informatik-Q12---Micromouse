@@ -23,7 +23,7 @@ async fn main() {
         WifiChannel::new_on_port(9001, comm::wifi_channel::WifiConnConfig::BindToFirst).await;
     info!(target: "prog", "FOUND new conn: {}", channel.peer_addr());
 
-    let mut interval = time::interval(Duration::from_secs(1));
+    let mut interval = time::interval(Duration::from_millis(250));
 
     let mut msg = 0;
 
@@ -50,7 +50,7 @@ async fn main() {
 
                 info!(target: "comm", "SEND \"{msg}\"");
 
-                if let Err(e) = channel.send(&send_str, DELIM).await {
+                if let Err(e) = channel.send(&send_str, DELIM, Duration::from_millis(1000)).await {
 
                     warn!("SEND ERR: {e:?}");
                     break;

@@ -55,7 +55,6 @@ void serverConnection() {
     Serial.println("Not connected");
     client.connect(WiFi.gatewayIP(), port);
 
-    delay(5000);
     return;
   }
 

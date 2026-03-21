@@ -1,5 +1,11 @@
 use std::{
-    collections::VecDeque, io::{Error, ErrorKind}, net::{IpAddr, SocketAddr}, str::Utf8Error, string::FromUtf8Error, sync::{Arc, atomic::AtomicBool}, time::Duration
+    collections::VecDeque,
+    io::{Error, ErrorKind},
+    net::{IpAddr, SocketAddr},
+    str::Utf8Error,
+    string::FromUtf8Error,
+    sync::{atomic::AtomicBool, Arc},
+    time::Duration,
 };
 
 use futures_util::FutureExt;
@@ -136,7 +142,10 @@ impl WifiChannel {
     // graceful) or if the channel returns a recoverable connection error
     pub async fn read_until_delim(&mut self, delim: u8) -> Result<String, WifiConnError> {
         if !self.read_test_buffer.is_empty() {
-            let fi = self.read_test_buffer.pop_front().expect("Buffer should not be empty");
+            let fi = self
+                .read_test_buffer
+                .pop_front()
+                .expect("Buffer should not be empty");
             return fi.map_err(|e| e.into());
         }
         loop {
@@ -180,25 +189,29 @@ impl WifiChannel {
         }
     }
 
-    pub async fn test_read_reconnect(&mut self, delim: u8) -> Result<(), WifiConnError> {
+    pub async fn test_read_reconnect(
+        &mut self,
+        delim: u8,
+        error_search_time: Duration,
+    ) -> Result<(), WifiConnError> {
         // Checking, whether there is a read available right now
         let mut buf = vec![];
-        match self.reader.read_until(delim, &mut buf).now_or_never() {
-            Some(Ok(0)) => {
+        match tokio::time::timeout(error_search_time, self.reader.read_until(delim, &mut buf)).await {
+            Ok(Ok(0)) => {
                 warn!(target: "comm", "TEST READ 0 bytes --> RECONNECT?");
                 self.reconnect().await?;
             }
-            Some(Ok(x)) => {
+            Ok(Ok(x)) => {
                 info!(target: "comm", "TEST OK READ {x} bytes --> BUFFER");
                 // Added to the message-buffer to be handled later on
                 self.read_test_buffer.push_back(String::from_utf8(buf));
             }
-            Some(Err(e)) => {
+            Ok(Err(e)) => {
                 error!(target: "comm", "TEST READ ERROR --> RECONNECT?");
                 self.handle_recoverable_io_error(e).await?
             }
-            None => {
-                info!(target: "comm", "TEST OK");
+            Err(e) => {
+                info!(target: "comm", "TEST NO SERVER DISCONNECT AFTER {e}");
                 // Channel open, no problem immediately obvious
             }
         }
@@ -208,12 +221,12 @@ impl WifiChannel {
         return Ok(());
     }
 
-    pub async fn send(&mut self, msg: &str, test_read_delim: u8) -> Result<(), WifiConnError> {
+    pub async fn send(&mut self, msg: &str, test_read_delim: u8, error_search_time: Duration) -> Result<(), WifiConnError> {
         info!(target: "comm", "SEND TEST CONN");
 
         // Trying to read a message at the start to check whether the connection is still alive and
         // maybe reconnecting, while still in the send-portion of the thing
-        self.test_read_reconnect(test_read_delim).await?;
+        self.test_read_reconnect(test_read_delim, error_search_time).await?;
 
         loop {
             let r = self.writer.write_all(msg.as_bytes()).await;
