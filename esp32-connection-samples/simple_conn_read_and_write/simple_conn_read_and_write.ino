@@ -58,15 +58,14 @@ void serverConnection() {
     return;
   }
 
-  if (n % 1000 == 999) {
+  /*if (n % 1000 == 999) {
     client.stop();
     Serial.println("STOPPED");
     n += 1;
     return;
-  }
-  n += 1;
+  }*/
 
-  Serial.println("CONN");
+  //Serial.println("CONN");
   String str = "ECHO: ";
   bool readMsg = false;
   while (client.available()) {
@@ -76,10 +75,12 @@ void serverConnection() {
     Serial.println("'");
     str += c;
     if( c == '$') {
-      if str.contains("ALIVE") {
-        client.print("CONFIRM-ALIVE");
+      if (str.indexOf("ALIVE") > 0) {
+        Serial.println("CONFIRM-ALIVE$");
+        client.print("CONFIRM-ALIVE$");
       } else {
-      client.print(str);
+        Serial.println(str);
+        client.print(str);
       }
       str = "";
       return;

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{thread, time::Duration};
 
 use env_logger::Env;
 use log::{info, warn};
@@ -35,10 +35,11 @@ async fn main() {
     {
         let heartbeat_channel =
             HeartbeatWifiChannel::new(channel, HeartbeatWifiChannelConfig::default());
-        std::thread::sleep(Duration::from_secs(10));
+        thread::sleep(Duration::from_secs(60));
     }
 
-    std::thread::sleep(Duration::from_secs(5));
+    thread::sleep(Duration::from_secs(1));
+
 
     // loop {
     //     tokio::select! {

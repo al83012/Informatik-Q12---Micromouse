@@ -8,15 +8,21 @@ use std::{
 
 use futures_util::lock::Mutex;
 use log::{error, info};
-use tokio::{select, sync::mpsc::Receiver, time::Instant};
+use tokio::{
+    select,
+    sync::mpsc::{Receiver, Sender},
+    time::{self, interval_at, Instant},
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::comm::wifi_channel::{WifiChannel, WifiConnError};
 
 pub struct HeartbeatWifiChannel {
-    channel: Arc<Mutex<WifiChannel>>,
-    received_ack: Arc<AtomicBool>,
-    read_channel: Receiver<Result<String, WifiConnError>>,
+    // There is no specific read-request, as we are reading continuously
+    read_response: Receiver<Result<String, WifiConnError>>,
+    send_request: Sender<String>,
+    send_response: Receiver<Result<(), WifiConnError>>,
+
     cancellation_token: CancellationToken,
 }
 
@@ -57,8 +63,8 @@ impl HeartbeatWifiChannelConfig {
 impl Default for HeartbeatWifiChannelConfig {
     fn default() -> Self {
         Self {
-            send_interval: Duration::from_millis(1000),
-            valid_response_interval: Duration::from_millis(100),
+            send_interval: Duration::from_millis(3000),
+            valid_response_interval: Duration::from_millis(1000),
             msg_to: "ALIVE".to_owned(),
             expected_response: "CONFIRM-ALIVE".to_owned(),
             delim: b'$',
@@ -68,119 +74,149 @@ impl Default for HeartbeatWifiChannelConfig {
 }
 
 impl HeartbeatWifiChannel {
-    pub fn new(channel: WifiChannel, config: HeartbeatWifiChannelConfig) -> Self {
-        let cancellation_token = tokio_util::sync::CancellationToken::new();
-        let periodic_writer_token = cancellation_token.clone();
-        let reader_token = cancellation_token.clone();
+    pub fn new(mut channel: WifiChannel, config: HeartbeatWifiChannelConfig) -> Self {
+        // let (read_request, read_request_recv) = tokio::sync::mpsc::channel(config.buffer_size);
+        let (read_response_sender, read_response) = tokio::sync::mpsc::channel(config.buffer_size);
 
-        let channel = Arc::new(Mutex::new(channel));
-        let last_send = Arc::new(Mutex::new(Instant::now()));
-        let last_send_writer = last_send.clone();
-        let last_send_reader = last_send.clone();
+        let (send_request, mut send_request_recv) =
+            tokio::sync::mpsc::channel::<String>(config.buffer_size);
+        let (send_response_sender, send_response) =
+            tokio::sync::mpsc::channel::<Result<(), WifiConnError>>(config.buffer_size);
 
-        let interval_send_channel = channel.clone();
-        let greedy_read_channel = channel.clone();
+        let cancellation_token = CancellationToken::new();
 
-        let received_ack = Arc::new(AtomicBool::new(false));
-        let received_ack_completer = received_ack.clone();
+        let cancellation_token_recv = cancellation_token.clone();
 
-        let (read_sender, read_receiver) = tokio::sync::mpsc::channel(config.buffer_size);
+        let mut send_interval = time::interval(config.send_interval);
 
-        let error_sender = read_sender.clone();
+        // let (sync_send, sync_recv) = tokio::sync::mpsc::channel(2);
 
-        tokio::spawn(async move {
-            loop {
-                {
-                    let mut channel = interval_send_channel.lock().await;
-                    if let Err(e) = unsafe { channel.send_maybe_disconnect(&config.msg_to).await } {
-                        error_sender
-                            .send(Err(e))
-                            .await
-                            .expect("Error while writing to mpsc channel");
-                        return;
-                    }
+        let mut last_send = Instant::now();
+        let mut recv_ack = true;
 
-                    *last_send_writer.lock().await = Instant::now();
-                    // sync_sender.send(0).await.expect("Error while writing to mpsc channel");
-                    info!(target: "comm", "ALIVE");
+        let alive_msg = format!(
+            "{}{}",
+            config.msg_to,
+            String::from_utf8(vec![config.delim]).unwrap()
+        );
 
-                    select! {
-                        _ = tokio::time::sleep(config.send_interval) => {},
-                        _ = periodic_writer_token.cancelled() => {
-                            info!(target: "comm", "KILLED periodic writer");
-                            break;}
-                    }
-                }
-            }
-        });
+        let expected_resp_msg = format!(
+            "{}{}",
+            config.expected_response,
+            String::from_utf8(vec![config.delim]).unwrap()
+        );
 
         tokio::spawn(async move {
             loop {
-                if reader_token.is_cancelled() {
-                    info!(target: "comm", "KILLED reader");
-                    break;
-                }
-                info!(target: "comm", "CONSTANT READ");
+                info!(target: "comm", ">>>>>>>>>>>>>>> Processing loop");
+                tokio::select! {
 
-                let mut channel = greedy_read_channel.lock().await;
+                    // Ending the loop if the associated object is dropped
+                    _ = cancellation_token_recv.cancelled() => {
+                        info!(target: "comm", "KILLED HEARTBEAT CHANNEL");
+                        break;
+                    },
 
-                let read = channel.read_until_delim(config.delim).await;
+                    // Sending the heartbeat at intervals
+                    _ = send_interval.tick() => {
 
-                if let Ok(msg) = &read {
-                    if msg == &config.expected_response {
-                        received_ack_completer.store(true, Ordering::Relaxed);
-                        info!(target: "comm", "RECV ALIVE ACK");
-                    }
-                }
+                        info!(target: "comm", "HEARTBEAT TICK");
+                        let elapsed = last_send.elapsed();
+                        if !recv_ack && elapsed > config.valid_response_interval {
+                            error!(target: "comm", "HEARTBEAT TOO LATE (next tick) ({elapsed:?})");
+                            // WARN: Cannot actually reconnect if current connection is still alive
+                            /*if let Err(e) = channel.reconnect().await {
+                                send_response_sender.send(Err(e)).await.expect("Error while sending via mpsc channel");
+                            }*/
+                        }
+                        info!(target: "comm", "SENT ALIVE \"{alive_msg}\"");
+                        if let Err(e) = unsafe {channel.send_maybe_disconnect(&alive_msg).await} {
+                            send_response_sender.send(Err(e)).await.expect("Error while sending via mpsc channel");
+                            continue;
+                        }
+                        last_send = Instant::now();
+                        recv_ack = false;
 
-                read_sender
-                    .send(read)
-                    .await
-                    .expect("Error while writing to mpsc channel");
+                    },
 
-                if received_ack_completer.load(Ordering::Relaxed)
-                    && last_send_reader.lock().await.elapsed() > config.valid_response_interval
-                {
-                    error!(target: "comm", "DISCONNECTED Heartbeat not received on time");
-                    if let Err(e) = channel.reconnect().await {
-                        read_sender
-                            .send(Err(e))
-                            .await
-                            .expect("Error while writing to mpsc channel");
-                    }
+
+                    // Always reading if there is nothing else to do
+                    read_res = channel.read_until_delim(config.delim) => {
+                        info!(target: "comm", "READ TICK");
+                        match read_res {
+                            Ok(msg) => {
+                                info!(target: "comm", "READ MSG = {msg}");
+                                if msg == expected_resp_msg {
+                                    let elapsed = last_send.elapsed();
+
+                                        info!(target: "comm", "HEARTBEAT RECEIVED ({elapsed:?})");
+                                    if elapsed > config.valid_response_interval {
+
+                                        error!(target: "comm", "HEARTBEAT TOO LATE");
+
+                                        // WARN: Cannot actually reconnect if current connection is still alive
+                                        /*if let Err(e) = channel.reconnect().await {
+                                            read_response_sender.send(Err(e)).await.expect("Error while sending via mpsc channel");
+                                        }*/
+                                    }
+                                    recv_ack = true;
+                                }
+                            },
+                            Err(e) => read_response_sender.send(Err(e)).await.expect("Error while sendig via mpsc channel"),
+                        }
+                    },
+                    send_task = send_request_recv.recv() => {
+                        info!(target: "comm", "SEND TICK");
+                        let elapsed = last_send.elapsed();
+                        if !recv_ack && elapsed > config.valid_response_interval {
+                            error!(target: "comm", "HEARTBEAT TOO LATE (next tick) ({elapsed:?})");
+
+                            // WARN: Cannot actually reconnect if current connection is still alive
+                            /*if let Err(e) = channel.reconnect().await {
+                                send_response_sender.send(Err(e)).await.expect("Error while sending via mpsc channel");
+                            }*/
+                        }
+                        if send_task.is_none() {
+                            continue;
+                        }
+                        if let Err(e) = unsafe {channel.send_maybe_disconnect(&send_task.unwrap()).await}{
+                            send_response_sender.send(Err(e)).await.expect("Error while sending via mpsc channel");
+                        }
+
+                    },
                 }
             }
         });
 
         Self {
-            channel,
-            received_ack,
-            read_channel: read_receiver,
+            read_response,
+            send_response,
             cancellation_token,
+            send_request,
         }
     }
 
     pub async fn read(&mut self) -> Result<String, WifiConnError> {
-        self.read_channel
+        self.read_response
             .recv()
             .await
             .expect("Error while reading from mpsc channel")
     }
 
-    pub async fn send(
-        &mut self,
-        msg: &str,
-        test_read_delim: u8,
-        error_search_time: Duration,
-    ) -> Result<(), WifiConnError> {
-        self.channel
-            .lock()
-            .await
-            .send(msg, test_read_delim, error_search_time)
-            .await
-    }
-
     pub async unsafe fn send_maybe_disconnect(&mut self, msg: &str) -> Result<(), WifiConnError> {
-        self.channel.lock().await.send_maybe_disconnect(msg).await
+        self.send_request
+            .send(msg.to_owned())
+            .await
+            .expect("Error while sending via mpsc channel");
+        self.send_response
+            .recv()
+            .await
+            .expect("Error while reading from mpsc channel")
+    }
+}
+
+impl Drop for HeartbeatWifiChannel {
+    fn drop(&mut self) {
+        self.cancellation_token.cancel();
     }
 }
