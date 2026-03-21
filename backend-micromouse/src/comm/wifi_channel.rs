@@ -92,7 +92,7 @@ impl WifiChannel {
         &self.remote_peer_addr
     }
 
-    async fn reconnect(&mut self) -> Result<(), WifiConnError> {
+    pub async fn reconnect(&mut self) -> Result<(), WifiConnError> {
         if self.conn_config == WifiConnConfig::Once {
             error!(target: "comm", "RECONNECT INVALID --> Channel closed, only open ONCE");
             return Err(WifiConnError::ChannelClosed);
@@ -253,6 +253,20 @@ impl WifiChannel {
         Ok(())
     }
 
+    /// .
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the connection is closed in such a way, that an
+    /// IO-Error is thrown, which is not recoverable; This should generally not happen (since
+    /// connection issues due to the peer leaving the channel are more likely)
+    ///
+    /// # Safety
+    /// The function generally works without any undefined behaviour, however: It does not even
+    /// attempt to check for connectivity, which means that any reconnect is only noticed once
+    /// there is a read-operation (and the sufficient time ellapsed)
+    ///
+    /// .
     // Tries to reconnect, if the channel was not allowed to disconnect and did so (even if it was
     // graceful) or if the channel returns a recoverable connection error
     pub async unsafe fn send_maybe_disconnect(&mut self, msg: &str) -> Result<(), WifiConnError> {

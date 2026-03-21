@@ -76,7 +76,11 @@ void serverConnection() {
     Serial.println("'");
     str += c;
     if( c == '$') {
+      if str.contains("ALIVE") {
+        client.print("CONFIRM-ALIVE");
+      } else {
       client.print(str);
+      }
       str = "";
       return;
     }
