@@ -58,7 +58,7 @@ void serverConnection() {
     return;
   }
 
-  if (n % 10 == 9) {
+  if (n % 1000 == 999) {
     client.stop();
     Serial.println("STOPPED");
     n += 1;
