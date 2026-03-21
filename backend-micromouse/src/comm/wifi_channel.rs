@@ -1,11 +1,9 @@
 use std::{
-    io::{Error, ErrorKind},
-    net::{IpAddr, SocketAddr},
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
+    collections::VecDeque, io::{Error, ErrorKind}, net::{IpAddr, SocketAddr}, str::Utf8Error, string::FromUtf8Error, sync::{Arc, atomic::AtomicBool}, time::Duration
 };
 
-use log::info;
+use futures_util::FutureExt;
+use log::{error, info, warn};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, Lines},
     net::{
@@ -15,7 +13,7 @@ use tokio::{
 };
 
 type WifiWriter = BufWriter<OwnedWriteHalf>;
-type WifiReader = Lines<BufReader<OwnedReadHalf>>;
+type WifiReader = BufReader<OwnedReadHalf>;
 
 pub struct WifiChannel {
     channel_listener: TcpListener,
@@ -23,6 +21,9 @@ pub struct WifiChannel {
     reader: WifiReader,
     remote_peer_addr: SocketAddr,
     conn_config: WifiConnConfig,
+    // read-operation is used for checking whether the connection is still alive -->
+    // Send-operations may read single utf8s --> need to be stored and appended to next msg
+    read_test_buffer: VecDeque<Result<String, FromUtf8Error>>,
 }
 
 #[derive(Debug)]
@@ -30,6 +31,7 @@ pub enum WifiConnError {
     ChannelClosed,
     RejectedConnection(SocketAddr),
     IoError(Error),
+    MalformedUtf8(FromUtf8Error),
 }
 
 impl From<Error> for WifiConnError {
@@ -38,7 +40,13 @@ impl From<Error> for WifiConnError {
     }
 }
 
-#[derive(Debug)]
+impl From<FromUtf8Error> for WifiConnError {
+    fn from(value: FromUtf8Error) -> Self {
+        Self::MalformedUtf8(value)
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub enum WifiConnConfig {
     Expect(IpAddr),
     BindToFirst,
@@ -48,20 +56,20 @@ pub enum WifiConnConfig {
 
 impl WifiChannel {
     pub async fn new_on_port(port: u16, conn_config: WifiConnConfig) -> Self {
-        info!("port = {}, conn_config = {:?}", port, conn_config);
+        info!(target: "comm", "SEARCHING with port = {}, conn_config = {:?}", port, conn_config);
         let channel_listener = TcpListener::bind(("0.0.0.0", port))
             .await
             .expect("Connection not successful");
 
-        info!("    awaiting connection...");
+        info!(target: "comm", "AWAIT first conn");
         let (tcp_stream, remote_peer_addr) = channel_listener
             .accept()
             .await
             .expect("Could not find peer");
 
-        info!("    found connection");
+        info!(target: "comm", "FOUND first conn");
         let (reader, writer) = tcp_stream.into_split();
-        let reader = BufReader::new(reader).lines();
+        let reader = BufReader::new(reader);
         let writer = BufWriter::new(writer);
 
         WifiChannel {
@@ -70,6 +78,7 @@ impl WifiChannel {
             writer,
             remote_peer_addr,
             conn_config,
+            read_test_buffer: VecDeque::new(),
         }
     }
 
@@ -77,8 +86,12 @@ impl WifiChannel {
         &self.remote_peer_addr
     }
 
-    pub async fn reconnect(&mut self) -> Result<(), WifiConnError> {
-        info!("Attempting to reconnect: Awaiting connection");
+    async fn reconnect(&mut self) -> Result<(), WifiConnError> {
+        if self.conn_config == WifiConnConfig::Once {
+            error!(target: "comm", "RECONNECT INVALID --> Channel closed, only open ONCE");
+            return Err(WifiConnError::ChannelClosed);
+        }
+        info!(target: "comm", "RECONNECT searching...");
         let (tcp_stream, new_connection_addr) = self
             .channel_listener
             .accept()
@@ -88,27 +101,27 @@ impl WifiChannel {
         match self.conn_config {
             WifiConnConfig::Expect(ip_addr) => {
                 if new_connection_addr.ip() != ip_addr {
-                    info!("Found new connection ({}), which does not match the expected connection ({})", new_connection_addr, ip_addr);
+                    error!(target: "comm", "FOUND CONN --> {new_connection_addr} != EXPECT({ip_addr})");
                     return Err(WifiConnError::RejectedConnection(new_connection_addr));
                 }
             }
             WifiConnConfig::BindToFirst => {
                 if new_connection_addr.ip() != self.remote_peer_addr.ip() {
-                    info!("Found new connection ({}), which does not match the previous connection ({})", new_connection_addr, self.remote_peer_addr);
+                    error!(target: "comm", "FOUND CONN --> {new_connection_addr} != BIND_TO_FIRST({})", self.remote_peer_addr);
                     return Err(WifiConnError::RejectedConnection(new_connection_addr));
                 }
             }
             WifiConnConfig::Once => {
-                info!("Reconnection aborted: Was set to only connect once");
+                error!(target: "comm", "FOUND CONN --> Not expected (ONCE)");
                 return Err(WifiConnError::ChannelClosed);
             }
             WifiConnConfig::Any => {}
         }
 
-        info!("Accepted reconnect: {}", new_connection_addr);
+        info!(target: "comm", "RECONNECT ACCEPTED ({new_connection_addr})");
 
         let (reader, writer) = tcp_stream.into_split();
-        let reader = BufReader::new(reader).lines();
+        let reader = BufReader::new(reader);
         let writer = BufWriter::new(writer);
 
         self.reader = reader;
@@ -121,19 +134,26 @@ impl WifiChannel {
     // Tries to read next line
     // Tries to reconnect, if the channel was not allowed to disconnect and did so (even if it was
     // graceful) or if the channel returns a recoverable connection error
-    pub async fn next_line(&mut self) -> Result<String, WifiConnError> {
+    pub async fn read_until_delim(&mut self, delim: u8) -> Result<String, WifiConnError> {
+        if !self.read_test_buffer.is_empty() {
+            let fi = self.read_test_buffer.pop_front().expect("Buffer should not be empty");
+            return fi.map_err(|e| e.into());
+        }
         loop {
-            match self.reader.next_line().await {
-                Ok(Some(msg)) => {
-                    info!("NL --> return msg");
-                    return Ok(msg);
-                }
-                Ok(None) => {
-                    info!("NL --> Connection closed with EOF --> check, whether disconnect was permitted");
+            let mut buf = vec![];
+            match self.reader.read_until(delim, &mut buf).await {
+                // 0 bytes read --> Connection closed
+                Ok(0) => {
+                    warn!(target: "comm", "READ 0 bytes --> RECONNECT?");
                     self.reconnect().await?
                 }
+                // Some positive number of bytes read
+                Ok(x) => {
+                    info!(target: "comm", "READ {x} bytes");
+                    return Ok(String::from_utf8(buf)?);
+                }
                 Err(e) => {
-                    info!("Connection error: {e} --> Might be recoverable");
+                    error!(target: "comm", "READ ERROR --> RECONNECT?");
                     self.handle_recoverable_io_error(e).await?
                 }
             }
@@ -141,7 +161,7 @@ impl WifiChannel {
     }
 
     async fn handle_recoverable_io_error(&mut self, error: Error) -> Result<(), WifiConnError> {
-        info!("Test for recoverable error");
+        info!(target: "comm", "HANDLE ERROR? ({error})");
         match error.kind() {
             ErrorKind::ConnectionReset
             | ErrorKind::ConnectionAborted
@@ -150,19 +170,51 @@ impl WifiChannel {
             | ErrorKind::TimedOut => {
                 // Try reconnect
 
-                info!("Error recoverable --> try reconnect");
+                info!(target: "comm", "RECOVERABLE --> RECONNECT");
                 self.reconnect().await
             }
             _ => {
-                info!("Non-recoverable io-Error: {error}");
+                error!(target: "comm", "NON RECOVERABLE");
                 Err(WifiConnError::from(error))
             }
         }
     }
 
-    // Tries to reconnect, if the channel was not allowed to disconnect and did so (even if it was
-    // graceful) or if the channel returns a recoverable connection error
-    pub async fn send(&mut self, msg: &str) -> Result<(), WifiConnError> {
+    pub async fn test_read_reconnect(&mut self, delim: u8) -> Result<(), WifiConnError> {
+        // Checking, whether there is a read available right now
+        let mut buf = vec![];
+        match self.reader.read_until(delim, &mut buf).now_or_never() {
+            Some(Ok(0)) => {
+                warn!(target: "comm", "TEST READ 0 bytes --> RECONNECT?");
+                self.reconnect().await?;
+            }
+            Some(Ok(x)) => {
+                info!(target: "comm", "TEST OK READ {x} bytes --> BUFFER");
+                // Added to the message-buffer to be handled later on
+                self.read_test_buffer.push_back(String::from_utf8(buf));
+            }
+            Some(Err(e)) => {
+                error!(target: "comm", "TEST READ ERROR --> RECONNECT?");
+                self.handle_recoverable_io_error(e).await?
+            }
+            None => {
+                info!(target: "comm", "TEST OK");
+                // Channel open, no problem immediately obvious
+            }
+        }
+
+        info!(target: "comm", "TEST current buf = {:?}", self.read_test_buffer);
+
+        return Ok(());
+    }
+
+    pub async fn send(&mut self, msg: &str, test_read_delim: u8) -> Result<(), WifiConnError> {
+        info!(target: "comm", "SEND TEST CONN");
+
+        // Trying to read a message at the start to check whether the connection is still alive and
+        // maybe reconnecting, while still in the send-portion of the thing
+        self.test_read_reconnect(test_read_delim).await?;
+
         loop {
             let r = self.writer.write_all(msg.as_bytes()).await;
             match r {
@@ -172,9 +224,27 @@ impl WifiChannel {
                 Err(e) => self.handle_recoverable_io_error(e).await?,
             }
         }
-        loop {
-            let r = self.writer.write_all(b"\n").await;
 
+        loop {
+            let r = self.writer.flush().await;
+            match r {
+                Ok(_) => {
+                    break;
+                }
+                Err(e) => self.handle_recoverable_io_error(e).await?,
+            }
+        }
+
+        info!(target: "comm", "SEND SUCCESSFUL");
+
+        Ok(())
+    }
+
+    // Tries to reconnect, if the channel was not allowed to disconnect and did so (even if it was
+    // graceful) or if the channel returns a recoverable connection error
+    async unsafe fn send_maybe_disconnect(&mut self, msg: &str) -> Result<(), WifiConnError> {
+        loop {
+            let r = self.writer.write_all(msg.as_bytes()).await;
             match r {
                 Ok(_) => {
                     break;
@@ -191,6 +261,7 @@ impl WifiChannel {
                 Err(e) => self.handle_recoverable_io_error(e).await?,
             }
         }
+        info!(target: "comm", "SEND MAYBE SUCCESSFUL");
 
         Ok(())
     }

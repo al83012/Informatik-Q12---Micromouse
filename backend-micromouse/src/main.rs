@@ -17,27 +17,28 @@ pub mod tests;
 
 #[tokio::main]
 async fn main() {
-    env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    info!("Creating new channel...");
-    let mut channel = WifiChannel::new_on_port(9001, comm::wifi_channel::WifiConnConfig::BindToFirst).await;
-    info!("Connection found: {}", channel.peer_addr());
+    env_logger::Builder::from_env(Env::default().default_filter_or("comm=info")).init();
+    info!(target: "prog", "SEARCHING new conn...");
+    let mut channel =
+        WifiChannel::new_on_port(9001, comm::wifi_channel::WifiConnConfig::BindToFirst).await;
+    info!(target: "prog", "FOUND new conn: {}", channel.peer_addr());
 
     let mut interval = time::interval(Duration::from_secs(1));
 
     let mut msg = 0;
 
+    const DELIM: u8 = b'$';
+
     loop {
-        info!("\n\n\n");
-        info!("STEP");
         tokio::select! {
-            res = channel.next_line() => {
-                info!("STEP --> Next line read");
+            res = channel.read_until_delim(DELIM) => {
+                info!(target: "comm", "READ");
                 match res {
                     Ok(msg) => {
-                        info!("Received: {}", msg);
+                        info!(target: "comm", "READ OK {msg}");
                     }
                     Err(e) => {
-                        warn!("Read error: {:?}", e);
+                        warn!("READ ERR: {e:?}");
                         break;
                     }
                 }
@@ -45,11 +46,13 @@ async fn main() {
 
             _ = interval.tick() => {
 
-                info!("STEP --> Tried sending message");
-                info!("MSG: {}", msg);
-                if let Err(e) = channel.send(&format!("Msg from Laptop {}", msg)).await {
+                let send_str = format!("message({msg})$");
 
-                    warn!("Write error: {:?}", e);
+                info!(target: "comm", "SEND \"{msg}\"");
+
+                if let Err(e) = channel.send(&send_str, DELIM).await {
+
+                    warn!("SEND ERR: {e:?}");
                     break;
                 }
                     msg += 1;

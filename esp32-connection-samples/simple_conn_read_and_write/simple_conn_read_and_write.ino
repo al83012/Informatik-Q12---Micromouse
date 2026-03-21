@@ -47,6 +47,8 @@ void initWiFi() {
 }
 
 int n = 0;
+String str = "";
+
 void serverConnection() {
 
   if (!client.connected()) {
@@ -69,14 +71,15 @@ void serverConnection() {
   String str = "ECHO: ";
   bool readMsg = false;
   while (client.available()) {
-    readMsg = true;
     char c = client.read();
     Serial.print("Read: '");
     Serial.print(c);
     Serial.println("'");
     str += c;
-  }
-  if (readMsg) {
-    client.println(str);
+    if( c == '$') {
+      client.print(str);
+      str = "";
+      return;
+    }
   }
 }
