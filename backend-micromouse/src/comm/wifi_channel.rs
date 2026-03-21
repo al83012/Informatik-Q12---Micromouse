@@ -255,7 +255,7 @@ impl WifiChannel {
 
     // Tries to reconnect, if the channel was not allowed to disconnect and did so (even if it was
     // graceful) or if the channel returns a recoverable connection error
-    async unsafe fn send_maybe_disconnect(&mut self, msg: &str) -> Result<(), WifiConnError> {
+    pub async unsafe fn send_maybe_disconnect(&mut self, msg: &str) -> Result<(), WifiConnError> {
         loop {
             let r = self.writer.write_all(msg.as_bytes()).await;
             match r {

@@ -50,7 +50,8 @@ async fn main() {
 
                 info!(target: "comm", "SEND \"{msg}\"");
 
-                if let Err(e) = channel.send(&send_str, DELIM, Duration::from_millis(1000)).await {
+                // if let Err(e) = channel.send(&send_str, DELIM, Duration::from_millis(1000)).await {
+                if let Err(e) = unsafe {channel.send_maybe_disconnect(&send_str).await }{
 
                     warn!("SEND ERR: {e:?}");
                     break;
