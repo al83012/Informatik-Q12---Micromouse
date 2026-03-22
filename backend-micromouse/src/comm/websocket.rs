@@ -4,7 +4,10 @@ use futures_util::{SinkExt, StreamExt};
 use log::{error, info, warn};
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::{Mutex, mpsc::{Receiver, Sender}},
+    sync::{
+        mpsc::{Receiver, Sender},
+        Mutex,
+    },
     time::{self, Instant, Interval},
 };
 use tokio_tungstenite::{accept_async, WebSocketStream};
@@ -59,6 +62,7 @@ pub struct WsChannelConfig {
     conn_config: ChannelConnConfig,
     ping_interval: Duration,
     valid_pong_duration: Duration,
+    nodelay: bool,
 }
 
 impl Default for WsChannelConfig {
@@ -68,6 +72,7 @@ impl Default for WsChannelConfig {
             conn_config: ChannelConnConfig::BindToFirst,
             ping_interval: Duration::from_millis(1000),
             valid_pong_duration: Duration::from_millis(300),
+            nodelay: false,
         }
     }
 }
@@ -102,6 +107,8 @@ impl WsChannelInternal {
 
         info!(target: "comm", "CREATE new TcpStream");
         let (tcp_stream, _socket_addr) = channel_listener.accept().await?;
+
+        tcp_stream.set_nodelay(config.nodelay)?;
 
         info!(target: "comm", "CREATED new TcpStream");
 
@@ -163,9 +170,7 @@ impl WsChannelInternal {
             .ws_stream
             .as_mut()
             .expect("WS Stream should exist outside reconnects")
-            .send(Message::Ping(
-                self.ping_num.to_string().into_bytes().into(),
-            ))
+            .send(Message::Ping(self.ping_num.to_string().into_bytes().into()))
             .await
         {
             if let Err(e) = self.handle_recoverable_ws_error(e).await {
@@ -294,10 +299,9 @@ impl WsChannelInternal {
         }
         info!(target: "comm", "RECONNECT searching...");
         let new_listener = TcpListener::bind(("0.0.0.0", self.port)).await?;
-        let (tcp_stream, new_connection_addr) = new_listener
-            .accept()
-            .await
-            .expect("Could not reconnect");
+        let (tcp_stream, new_connection_addr) =
+            new_listener.accept().await.expect("Could not reconnect");
+        tcp_stream.set_nodelay(self.config.nodelay)?;
 
         match self.config.conn_config {
             ChannelConnConfig::Expect(ip_addr) => {
@@ -377,7 +381,7 @@ impl WsChannel {
             config,
             cancellation_token_recv,
             send_request_recv,
-            port
+            port,
         )
         .await?;
 
@@ -459,7 +463,7 @@ impl WsChannel {
         Ok(ws_external)
     }
 
-    pub async fn read(& self) -> Option<Message> {
+    pub async fn read(&self) -> Option<Message> {
         self.read_recv.lock().await.recv().await
     }
 

@@ -42,6 +42,7 @@ void initWiFi() {
 
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+  WiFi.setSleep(false);
 
   Serial.println("\nConnected!");
   Serial.println(WiFi.localIP());
@@ -74,7 +75,7 @@ void connectWS() {
 void setup() {
   Serial.begin(115200);
   initWiFi();
-  pinMode(RGB_BUILTIN, OUTPUT);
+  
   
 
   client = WebsocketsClient();
@@ -91,7 +92,6 @@ void loop() {
   // Keep websocket alive
   client.poll();
 
-  digitalWrite(RGB_BUILTIN, HIGH);
 
   /*if (millis() - lastPing > 1000 && client.available()) {
     client.ping(String(millis()));
