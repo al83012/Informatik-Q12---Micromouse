@@ -23,6 +23,7 @@ void onEventsCallback(WebsocketsEvent event, String data) {
     Serial.println("Connection Closed");
   } else if (event == WebsocketsEvent::GotPing) {
     Serial.println("Ping " + data);
+    
     //client.pong(data);
   } else if (event == WebsocketsEvent::GotPong) {
     Serial.println("Got a Pong!");
@@ -73,6 +74,8 @@ void connectWS() {
 void setup() {
   Serial.begin(115200);
   initWiFi();
+  pinMode(RGB_BUILTIN, OUTPUT);
+  
 
   client = WebsocketsClient();
 
@@ -87,6 +90,8 @@ static unsigned long lastPing = 0;
 void loop() {
   // Keep websocket alive
   client.poll();
+
+  digitalWrite(RGB_BUILTIN, HIGH);
 
   /*if (millis() - lastPing > 1000 && client.available()) {
     client.ping(String(millis()));

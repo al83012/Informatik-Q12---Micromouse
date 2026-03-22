@@ -4,7 +4,7 @@ use futures_util::{SinkExt, StreamExt};
 use log::{error, info, warn};
 use tokio::{
     net::{TcpListener, TcpStream},
-    sync::mpsc::{Receiver, Sender},
+    sync::{Mutex, mpsc::{Receiver, Sender}},
     time::{self, Instant, Interval},
 };
 use tokio_tungstenite::{accept_async, WebSocketStream};
@@ -18,8 +18,8 @@ use crate::comm::{ChannelConnConfig, ChannelConnError};
 
 pub struct WsChannel {
     // There is no specific read-request, as we are reading continuously
-    read_recv: Receiver<Message>,
-    e_recv: Receiver<WsChannelConnError>,
+    read_recv: Mutex<Receiver<Message>>,
+    e_recv: Mutex<Receiver<WsChannelConnError>>,
     send_request_sender: Sender<Message>,
 
     cancellation_token: CancellationToken,
@@ -382,8 +382,8 @@ impl WsChannel {
         .await?;
 
         let ws_external = Self {
-            read_recv,
-            e_recv,
+            read_recv: Mutex::from(read_recv),
+            e_recv: Mutex::from(e_recv),
             send_request_sender,
             cancellation_token,
         };
@@ -459,15 +459,15 @@ impl WsChannel {
         Ok(ws_external)
     }
 
-    pub async fn read(&mut self) -> Option<Message> {
-        self.read_recv.recv().await
+    pub async fn read(& self) -> Option<Message> {
+        self.read_recv.lock().await.recv().await
     }
 
-    pub async fn next_nonresolved_error(&mut self) -> Option<WsChannelConnError> {
-        self.e_recv.recv().await
+    pub async fn next_nonresolved_error(&self) -> Option<WsChannelConnError> {
+        self.e_recv.lock().await.recv().await
     }
 
-    pub async fn send(&mut self, msg: Message) {
+    pub async fn send(&self, msg: Message) {
         self.send_request_sender
             .send(msg)
             .await
