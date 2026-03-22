@@ -49,3 +49,25 @@ Stabilization works ok, until the connection is reestablished again, at which po
 [2026-03-22T14:07:28Z INFO  comm] PONG TOO LATE: 17.100739s
 [2026-03-22T14:07:28Z INFO  comm] STABILIZING!!!
 [2026-03-22T14:07:28Z INFO  comm] STABILIZING READ
+
+
+
+It seems that our reconnect method is not fully working --> it errors out before it can properly reset --> After "Opening new ws", we should se "Finished Reconnect"
+
+[2026-03-22T14:34:34Z INFO  comm] HANDLE PING
+[2026-03-22T14:34:34Z ERROR comm] PONG TOO LATE: 22.9856607s
+[2026-03-22T14:34:34Z WARN  comm] STABILIZING!!!
+[2026-03-22T14:34:34Z INFO  comm] STABILIZING READ
+[2026-03-22T14:34:34Z INFO  comm] HANDLE READ (Err(Io(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." })))
+[2026-03-22T14:34:34Z INFO  comm] HANDLE RECOVERABLE? ATTEMPT
+[2026-03-22T14:34:34Z WARN  comm] IO ERROR
+[2026-03-22T14:34:34Z INFO  comm] HANDLE ERROR? (An existing connection was forcibly closed by the remote host. (os error 10054))
+[2026-03-22T14:34:34Z INFO  comm] RECOVERABLE --> RECONNECT
+[2026-03-22T14:34:34Z INFO  comm] RECONNECT searching...
+[2026-03-22T14:34:34Z INFO  comm] RECONNECT ACCEPTED (192.168.137.222:64299)
+[2026-03-22T14:34:34Z INFO  comm] CLOSING OLD WS
+[2026-03-22T14:34:34Z INFO  comm] OPENING NEW WS
+[2026-03-22T14:34:35Z ERROR comm] PONG TOO LATE: 23.2056877s
+[2026-03-22T14:34:35Z WARN  comm] STABILIZING!!!
+[2026-03-22T14:34:35Z INFO  comm] STABILIZING READ
+[2026-03-22T14:34:35Z ERROR comm] PONG TOO LATE: 23.4120569s

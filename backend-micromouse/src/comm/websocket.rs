@@ -1,7 +1,7 @@
-use std::{net::SocketAddr, time::Duration};
+use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info};
+use log::{error, info, warn};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc::{Receiver, Sender},
@@ -154,26 +154,22 @@ impl WsChannelInternal {
     // Tries sending ping; if there is a connection error: retries
     pub async fn handle_ping(&mut self) {
         info!(target: "comm", "HANDLE PING");
-        loop {
-            if let Err(e) = self
-                .ws_stream
-                .send(Message::Ping(Bytes::from_iter(
-                    self.ping_num.to_le_bytes().into_iter(),
-                )))
-                .await
-            {
-                if let Err(e) = self.handle_recoverable_ws_error(e).await {
-                    self.e_sender
-                        .send(e)
-                        .await
-                        .expect("Error while writing to mpsc channel");
-                    break;
-                }
-            } else {
-                self.ping_num += 1;
-                self.last_ping = Instant::now();
-                break;
+        if let Err(e) = self
+            .ws_stream
+            .send(Message::Ping(Bytes::from_iter(
+                self.ping_num.to_le_bytes().into_iter(),
+            )))
+            .await
+        {
+            if let Err(e) = self.handle_recoverable_ws_error(e).await {
+                self.e_sender
+                    .send(e)
+                    .await
+                    .expect("Error while writing to mpsc channel");
             }
+        } else {
+            self.ping_num += 1;
+            self.last_ping = Instant::now();
         }
     }
 
@@ -241,10 +237,42 @@ impl WsChannelInternal {
     ) -> Result<(), WsChannelConnError> {
         info!(target: "comm", "HANDLE RECOVERABLE? ATTEMPT");
         match error {
-            Error::ConnectionClosed | Error::AlreadyClosed => self.reconnect().await?,
-            _ => return Err(error.into()),
+            Error::ConnectionClosed | Error::AlreadyClosed => {
+                warn!(target: "comm", "WS CLOSED --> RECONNECT?");
+                self.reconnect().await?
+            }
+            Error::Io(io_err) => {
+                warn!(target: "comm", "IO ERROR");
+                self.handle_recoverable_io_error(io_err).await?;
+            }
+            _ => {
+                error!(target: "comm", "NON RECOVERABLE WS ERROR {error:?}");
+            }
         }
         Ok(())
+    }
+
+    async fn handle_recoverable_io_error(
+        &mut self,
+        error: std::io::Error,
+    ) -> Result<(), WsChannelConnError> {
+        info!(target: "comm", "HANDLE ERROR? ({error})");
+        match error.kind() {
+            ErrorKind::ConnectionReset
+            | ErrorKind::ConnectionAborted
+            | ErrorKind::BrokenPipe
+            | ErrorKind::UnexpectedEof
+            | ErrorKind::TimedOut => {
+                // Try reconnect
+
+                info!(target: "comm", "RECOVERABLE --> RECONNECT");
+                self.reconnect().await
+            }
+            _ => {
+                error!(target: "comm", "NON RECOVERABLE");
+                Err(WsChannelConnError::ChannelConnError(error.into()))
+            }
+        }
     }
 
     pub async fn reconnect(&mut self) -> Result<(), WsChannelConnError> {
@@ -287,6 +315,8 @@ impl WsChannelInternal {
         //         self.handle_recoverable_ws_error(e).await?;
         //     }
         // }
+
+        info!(target: "comm", "CLOSING OLD WS");
         let _ = self
             .ws_stream
             .close(Some(CloseFrame {
@@ -294,7 +324,13 @@ impl WsChannelInternal {
                 reason: "ATTEMPTING RECONNECT".into(),
             }))
             .await;
+
+        info!(target: "comm", "OPENING NEW WS");
+        self.last_ping = Instant::now();
+        self.last_pong = Instant::now();
         self.ws_stream = accept_async(tcp_stream).await?;
+
+        info!(target: "comm", "FINISHED RECONNECT");
 
         Ok(())
     }
@@ -307,7 +343,7 @@ impl WsChannel {
         let listener = TcpListener::bind(("0.0.0.0", port)).await?;
 
         let (read_sender, read_recv) = tokio::sync::mpsc::channel(config.buffer_size);
-        let (send_request_sender,  send_request_recv) =
+        let (send_request_sender, send_request_recv) =
             tokio::sync::mpsc::channel::<Message>(config.buffer_size);
 
         let (e_sender, e_recv) = tokio::sync::mpsc::channel(config.buffer_size);
@@ -339,7 +375,7 @@ impl WsChannel {
                 match ws_internal.mode {
                     // Sending is disabled until the ping indicates, that the connection is stable
                     WsChannelMode::Stabilize => {
-                        info!(target: "comm", "STABILIZING!!!");
+                        warn!(target: "comm", "STABILIZING!!!");
                         tokio::select! {
                             _ = ws_internal.cancellation_token.cancelled() => {
                                 info!(target: "comm", "STABILIZING CANCEL");
@@ -390,7 +426,7 @@ impl WsChannel {
                 if elapsed
                     > ws_internal.config.valid_pong_duration + ws_internal.config.ping_interval
                 {
-                    info!(target: "comm", "PONG TOO LATE: {elapsed:?}");
+                    error!(target: "comm", "PONG TOO LATE: {elapsed:?}");
                     ws_internal.mode = WsChannelMode::Stabilize;
                 } else {
                     ws_internal.mode = WsChannelMode::Stable;
