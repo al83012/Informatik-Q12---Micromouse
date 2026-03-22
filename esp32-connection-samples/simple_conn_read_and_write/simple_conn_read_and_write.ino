@@ -22,7 +22,8 @@ void onEventsCallback(WebsocketsEvent event, String data) {
   } else if (event == WebsocketsEvent::ConnectionClosed) {
     Serial.println("Connection Closed");
   } else if (event == WebsocketsEvent::GotPing) {
-    client.pong(data);
+    Serial.println("Ping " + data);
+    //client.pong(data);
   } else if (event == WebsocketsEvent::GotPong) {
     Serial.println("Got a Pong!");
   }

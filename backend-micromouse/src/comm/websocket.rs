@@ -158,14 +158,14 @@ impl WsChannelInternal {
 
     // Tries sending ping; if there is a connection error: retries
     pub async fn handle_ping(&mut self) {
-        info!(target: "comm", "HANDLE PING");
+        info!(target: "comm", "HANDLE PING ({})", self.ping_num);
         if let Err(e) = self
             .ws_stream
             .as_mut()
             .expect("WS Stream should exist outside reconnects")
-            .send(Message::Ping(Bytes::from_iter(
-                self.ping_num.to_le_bytes().into_iter(),
-            )))
+            .send(Message::Ping(
+                self.ping_num.to_string().into_bytes().into(),
+            ))
             .await
         {
             if let Err(e) = self.handle_recoverable_ws_error(e).await {
@@ -402,7 +402,7 @@ impl WsChannel {
                                 break;
                             }
                             _ = ws_internal.send_interval.tick() => {
-                                info!(target: "comm", "STABILIZING SEND");
+                                info!(target: "comm", "STABILIZING PING");
                                 ws_internal.handle_ping().await;
                             }
                             read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
@@ -412,7 +412,6 @@ impl WsChannel {
                                 }
                             }
                         }
-                        tokio::time::sleep(Duration::from_millis(200)).await;
                     }
 
                     // Normal mode --> Can just do all the things
@@ -420,24 +419,27 @@ impl WsChannel {
                         info!(target: "comm", "STABLE TICK");
                         tokio::select! {
                             _ = ws_internal.cancellation_token.cancelled() => {
+                                info!(target: "comm", "STABLE CANCEL");
                                 ws_internal.handle_close().await;
                                 break;
                             }
                             _ = ws_internal.send_interval.tick() => {
+                                info!(target: "comm", "STABLE PING");
                                 ws_internal.handle_ping().await;
                             }
                             read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
+                                info!(target: "comm", "STABLE READ");
                                 if let Some(read_res) = read_res {
                                     ws_internal.handle_read(read_res).await;
                                 }
                             }
                             send_req = ws_internal.send_request_recv.recv() => {
+                                info!(target: "comm", "STABLE SEND");
                                 if let Some(send_req) = send_req {
                                     ws_internal.handle_send(send_req).await;
                                 }
                             }
                         }
-                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }
 
