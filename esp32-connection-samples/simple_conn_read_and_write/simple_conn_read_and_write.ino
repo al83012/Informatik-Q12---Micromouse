@@ -1,89 +1,105 @@
-/*
-  Example from WiFi > WiFiScan
-  Complete details at https://RandomNerdTutorials.com/esp32-useful-wi-fi-functions-arduino/
-*/
+#include <ArduinoWebsockets.h>
+#include <WiFi.h>
 
-#include "WiFi.h"
+using namespace websockets;
 
-void setup() {
-  Serial.begin(115200);
-
-  delay(3000);
-
-  while (!Serial) {}
-
-  Serial.println("BOOT OK");
-
-
-  // Set WiFi to station mode and disconnect from an AP if it was previously connected
-  WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
-  delay(100);
-
-  Serial.println("Setup done");
-
-  initWiFi();
-}
-
-WiFiClient client;
+String websockets_server = "ws://";
 uint16_t port = 9001;
 
-void loop() {
-  serverConnection();
+WebsocketsClient client;
+
+unsigned long lastReconnectAttempt = 0;
+const unsigned long reconnectInterval = 2000;
+
+void onMessageCallback(WebsocketsMessage message) {
+  Serial.print("Got Message: ");
+  Serial.println(message.data());
+}
+
+void onEventsCallback(WebsocketsEvent event, String data) {
+  if (event == WebsocketsEvent::ConnectionOpened) {
+    Serial.println("Connection Opened");
+  } else if (event == WebsocketsEvent::ConnectionClosed) {
+    Serial.println("Connection Closed");
+  } else if (event == WebsocketsEvent::GotPing) {
+    client.pong(data);
+  } else if (event == WebsocketsEvent::GotPong) {
+    Serial.println("Got a Pong!");
+  }
 }
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin("HOTSPOT-TEST", "12345678");
+
   Serial.print("Connecting to WiFi ..");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print('.');
     delay(1000);
   }
+
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+
+  Serial.println("\nConnected!");
   Serial.println(WiFi.localIP());
-  Serial.println(WiFi.gatewayIP());
 }
 
-int n = 0;
-String str = "";
+String get_ws_url() {
+  return websockets_server + WiFi.gatewayIP().toString() + ":" + port + "/";
+}
 
-void serverConnection() {
+void connectWS() {
+  String ws_ip = get_ws_url();
+  Serial.println("Connecting to... " + ws_ip);
 
-  if (!client.connected()) {
-    Serial.println("Not connected");
-    client.connect(WiFi.gatewayIP(), port);
+  client = WebsocketsClient();
 
-    return;
+  client.onMessage(onMessageCallback);
+  client.onEvent(onEventsCallback);
+
+  bool connected = client.connect(ws_ip);
+
+  if (connected) {
+    Serial.println("Connected!");
+    client.send("Hi Server!");
+    client.ping();
+  } else {
+    Serial.println("Connection failed");
   }
+}
 
-  /*if (n % 1000 == 999) {
-    client.stop();
-    Serial.println("STOPPED");
-    n += 1;
-    return;
+void setup() {
+  Serial.begin(115200);
+  initWiFi();
+
+  client = WebsocketsClient();
+
+  client.onMessage(onMessageCallback);
+  client.onEvent(onEventsCallback);
+
+  connectWS();
+}
+
+static unsigned long lastPing = 0;
+
+void loop() {
+  // Keep websocket alive
+  client.poll();
+
+  /*if (millis() - lastPing > 1000 && client.available()) {
+    client.ping(String(millis()));
+    lastPing = millis();
   }*/
 
-  //Serial.println("CONN");
-  String str = "ECHO: ";
-  bool readMsg = false;
-  while (client.available()) {
-    char c = client.read();
-    Serial.print("Read: '");
-    Serial.print(c);
-    Serial.println("'");
-    str += c;
-    if( c == '$') {
-      if (str.indexOf("ALIVE") > 0) {
-        Serial.println("CONFIRM-ALIVE$");
-        client.print("CONFIRM-ALIVE$");
-      } else {
-        Serial.println(str);
-        client.print(str);
-      }
-      str = "";
-      return;
+  if (!client.available()) {
+    unsigned long now = millis();
+
+    if (now - lastReconnectAttempt > reconnectInterval) {
+      lastReconnectAttempt = now;
+
+      Serial.println("Attempting reconnect...");
+      connectWS();
     }
   }
 }

@@ -6,6 +6,7 @@ use tokio::time;
 
 use crate::comm::{
     heartbeat_channel::{self, HeartbeatWifiChannel, HeartbeatWifiChannelConfig},
+    websocket::{self, WsChannelConfig},
     wifi_channel::WifiChannel,
 };
 
@@ -21,69 +22,10 @@ pub mod tests;
 #[tokio::main]
 async fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("comm=info")).init();
-    info!(target: "prog", "SEARCHING new conn...");
-    let mut channel =
-        WifiChannel::new_on_port(9001, comm::wifi_channel::WifiConnConfig::BindToFirst).await;
-    info!(target: "prog", "FOUND new conn: {}", channel.peer_addr());
 
-    // let mut interval = time::interval(Duration::from_millis(250));
+    let conn = websocket::WsChannel::new(WsChannelConfig::default(), 9001).await.expect("EXITED WITH ERROR");
 
-    // let mut msg = 0;
+    thread::sleep(Duration::from_secs(60));
+    
 
-    // const DELIM: u8 = b'$';
-
-    {
-        let heartbeat_channel =
-            HeartbeatWifiChannel::new(channel, HeartbeatWifiChannelConfig::default());
-        thread::sleep(Duration::from_secs(60));
-    }
-
-    thread::sleep(Duration::from_secs(1));
-
-
-    // loop {
-    //     tokio::select! {
-    //         res = channel.read_until_delim(DELIM) => {
-    //             info!(target: "comm", "READ");
-    //             match res {
-    //                 Ok(msg) => {
-    //                     info!(target: "comm", "READ OK {msg}");
-    //                 }
-    //                 Err(e) => {
-    //                     warn!("READ ERR: {e:?}");
-    //                     break;
-    //                 }
-    //             }
-    //         }
-    //
-    //         _ = interval.tick() => {
-    //
-    //             let send_str = format!("message({msg})$");
-    //
-    //             info!(target: "comm", "SEND \"{msg}\"");
-    //
-    //             if let Err(e) = channel.send(&send_str, DELIM, Duration::from_millis(1000)).await {
-    //             // if let Err(e) = unsafe {channel.send_maybe_disconnect(&send_str).await }{
-    //
-    //                 warn!("SEND ERR: {e:?}");
-    //                 break;
-    //             }
-    //                 msg += 1;
-    //         }
-    //     }
-    // }
-
-    // channels_to("9001").await;
-
-    // let m = Measurement {
-    //     position: Position { x: 0, y: 0 },
-    //     direction: Direction::PosY,
-    //     value: MeasurementValue::Value { cells: 2 },
-    // };
-    //
-    // let mut map = Map::<4>::new();
-    // map.update_discovery(&m).unwrap();
-    //
-
-    // println!("{}", map);
 }

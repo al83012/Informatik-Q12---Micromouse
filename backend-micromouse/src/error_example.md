@@ -23,3 +23,29 @@ Send "9" is successful, but is not being received --> Need to check the connecti
 [2026-03-21T15:24:32Z INFO  comm] READ 12 bytes
 [2026-03-21T15:24:32Z INFO  comm] READ
 [2026-03-21T15:24:32Z INFO  comm] READ OK message(11)
+
+
+Stabilization works ok, until the connection is reestablished again, at which point the reset connection encounters an IO Error, which somehow leads to the select! macro to not wait for a send, probably because the ping and tick somehow loop
+
+[2026-03-22T14:07:26Z INFO  comm] STABILIZING!!!
+[2026-03-22T14:07:26Z INFO  comm] STABILIZING SEND
+[2026-03-22T14:07:26Z INFO  comm] HANDLE PING
+[2026-03-22T14:07:27Z INFO  comm] PONG TOO LATE: 16.0293068s
+[2026-03-22T14:07:27Z INFO  comm] STABILIZING!!!
+[2026-03-22T14:07:27Z INFO  comm] STABILIZING READ
+[2026-03-22T14:07:27Z INFO  comm] HANDLE READ (Err(Io(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." })))
+[2026-03-22T14:07:27Z INFO  comm] HANDLE RECOVERABLE? ATTEMPT
+[2026-03-22T14:07:27Z INFO  comm] PONG TOO LATE: 16.4858273s
+[2026-03-22T14:07:27Z INFO  comm] STABILIZING!!!
+[2026-03-22T14:07:27Z INFO  comm] STABILIZING READ
+[2026-03-22T14:07:27Z INFO  comm] PONG TOO LATE: 16.6894631s
+[2026-03-22T14:07:27Z INFO  comm] STABILIZING!!!
+[2026-03-22T14:07:27Z INFO  comm] STABILIZING READ
+[2026-03-22T14:07:28Z INFO  comm] PONG TOO LATE: 16.8968317s
+[2026-03-22T14:07:28Z INFO  comm] STABILIZING!!!
+[2026-03-22T14:07:28Z INFO  comm] STABILIZING SEND
+[2026-03-22T14:07:28Z INFO  comm] HANDLE PING
+[2026-03-22T14:07:28Z INFO  comm] HANDLE RECOVERABLE? ATTEMPT
+[2026-03-22T14:07:28Z INFO  comm] PONG TOO LATE: 17.100739s
+[2026-03-22T14:07:28Z INFO  comm] STABILIZING!!!
+[2026-03-22T14:07:28Z INFO  comm] STABILIZING READ
