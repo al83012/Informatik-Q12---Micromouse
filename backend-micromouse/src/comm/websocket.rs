@@ -73,9 +73,8 @@ impl Default for WsChannelConfig {
 }
 
 pub struct WsChannelInternal {
-    channel_listener: TcpListener,
     remote_peer_addr: SocketAddr,
-    ws_stream: WebSocketStream<TcpStream>,
+    ws_stream: Option<WebSocketStream<TcpStream>>,
     e_sender: Sender<WsChannelConnError>,
     read_sender: Sender<Message>,
     last_ping: Instant,
@@ -86,6 +85,7 @@ pub struct WsChannelInternal {
     send_request_recv: Receiver<Message>,
     mode: WsChannelMode,
     ping_num: u64,
+    port: u16,
 }
 
 impl WsChannelInternal {
@@ -96,6 +96,7 @@ impl WsChannelInternal {
         config: WsChannelConfig,
         cancellation_token_recv: CancellationToken,
         send_request_recv: Receiver<Message>,
+        port: u16,
     ) -> Result<Self, Error> {
         info!(target: "comm", "CREATE new WsChannelInternal");
 
@@ -107,7 +108,7 @@ impl WsChannelInternal {
         let remote_peer_addr = tcp_stream.peer_addr()?;
 
         info!(target: "comm", "CREATE new WsStream");
-        let ws_stream = accept_async(tcp_stream).await?;
+        let ws_stream = Some(accept_async(tcp_stream).await?);
 
         info!(target: "comm", "CREATED new WsStream");
 
@@ -117,7 +118,6 @@ impl WsChannelInternal {
         let send_interval = time::interval(config.ping_interval);
 
         Ok(WsChannelInternal {
-            channel_listener,
             remote_peer_addr,
             ws_stream,
             e_sender,
@@ -130,14 +130,19 @@ impl WsChannelInternal {
             send_request_recv,
             mode: WsChannelMode::Stable,
             ping_num: 0,
+            port,
         })
     }
 
     // Closes the websocket
-    pub async fn handle_close(mut self) {
+    pub async fn handle_close(self) {
+        let ws_stream = self.ws_stream;
+        if ws_stream.is_none() {
+            return;
+        }
+        let mut ws_stream = ws_stream.unwrap();
         info!(target: "comm", "HANDLE CLOSE");
-        if let Err(e) = self
-            .ws_stream
+        if let Err(e) = ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Away,
                 reason: "Closed as WsChannel was dropped".into(),
@@ -156,6 +161,8 @@ impl WsChannelInternal {
         info!(target: "comm", "HANDLE PING");
         if let Err(e) = self
             .ws_stream
+            .as_mut()
+            .expect("WS Stream should exist outside reconnects")
             .send(Message::Ping(Bytes::from_iter(
                 self.ping_num.to_le_bytes().into_iter(),
             )))
@@ -177,7 +184,12 @@ impl WsChannelInternal {
     pub async fn handle_send(&mut self, msg: Message) {
         info!(target: "comm", "HANDLE SEND {msg:?}");
         loop {
-            let send_res = self.ws_stream.send(msg.clone()).await;
+            let send_res = self
+                .ws_stream
+                .as_mut()
+                .expect("WS Stream should exist outside reconnects")
+                .send(msg.clone())
+                .await;
             if let Err(e) = send_res {
                 if let Err(e) = self.handle_recoverable_ws_error(e).await {
                     self.e_sender
@@ -281,8 +293,8 @@ impl WsChannelInternal {
             return Err(ChannelConnError::ChannelClosed.into());
         }
         info!(target: "comm", "RECONNECT searching...");
-        let (tcp_stream, new_connection_addr) = self
-            .channel_listener
+        let new_listener = TcpListener::bind(("0.0.0.0", self.port)).await?;
+        let (tcp_stream, new_connection_addr) = new_listener
             .accept()
             .await
             .expect("Could not reconnect");
@@ -319,16 +331,22 @@ impl WsChannelInternal {
         info!(target: "comm", "CLOSING OLD WS");
         let _ = self
             .ws_stream
+            .as_mut()
+            .expect("Even in large parts of the reconnect, ws should exist")
             .close(Some(CloseFrame {
                 code: CloseCode::Error,
                 reason: "ATTEMPTING RECONNECT".into(),
             }))
             .await;
 
+        drop(self.ws_stream.take());
+
         info!(target: "comm", "OPENING NEW WS");
         self.last_ping = Instant::now();
         self.last_pong = Instant::now();
-        self.ws_stream = accept_async(tcp_stream).await?;
+        let res = accept_async(tcp_stream).await;
+        info!(target: "comm", "NEW WS = {res:?}");
+        self.ws_stream = Some(res?);
 
         info!(target: "comm", "FINISHED RECONNECT");
 
@@ -359,6 +377,7 @@ impl WsChannel {
             config,
             cancellation_token_recv,
             send_request_recv,
+            port
         )
         .await?;
 
@@ -386,7 +405,7 @@ impl WsChannel {
                                 info!(target: "comm", "STABILIZING SEND");
                                 ws_internal.handle_ping().await;
                             }
-                            read_res = ws_internal.ws_stream.next() => {
+                            read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
                                 info!(target: "comm", "STABILIZING READ");
                                 if let Some(read_res) = read_res {
                                     ws_internal.handle_read(read_res).await;
@@ -407,7 +426,7 @@ impl WsChannel {
                             _ = ws_internal.send_interval.tick() => {
                                 ws_internal.handle_ping().await;
                             }
-                            read_res = ws_internal.ws_stream.next() => {
+                            read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
                                 if let Some(read_res) = read_res {
                                     ws_internal.handle_read(read_res).await;
                                 }
@@ -418,6 +437,7 @@ impl WsChannel {
                                 }
                             }
                         }
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }
 
