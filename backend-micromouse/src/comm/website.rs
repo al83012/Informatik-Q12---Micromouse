@@ -5,6 +5,6 @@ use crate::map::{CellDiscovery, WallDiscovery};
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DiscoveryMessage{
-    cell_discoveries: Vec<CellDiscovery>,
-    wall_discoveries: Vec<WallDiscovery>
+    pub cell_discoveries: Vec<CellDiscovery>,
+    pub wall_discoveries: Vec<WallDiscovery>
 }

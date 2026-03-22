@@ -3,7 +3,10 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    comm::website::DiscoveryMessage, direction::{Direction, DirectionNormalizedVector}, measurement::Measurement, position::Position
+    comm::website::DiscoveryMessage,
+    direction::{Direction, DirectionNormalizedVector},
+    measurement::Measurement,
+    position::Position,
 };
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq)]
@@ -39,10 +42,8 @@ pub struct WallDiscovery {
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CellDiscovery {
     pub new_status: CellDiscoveryStatus,
-    pub at_cell: Position
+    pub at_cell: Position,
 }
-
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MapInconsistencyError {
@@ -171,10 +172,13 @@ impl<const N: usize> Map<N> {
     pub fn update_discovery(
         &mut self,
         measurement: &Measurement,
-    ) ->  Result<DiscoveryMessage, MapInconsistencyError> {
+    ) -> Result<DiscoveryMessage, MapInconsistencyError> {
         let direction = measurement.direction;
         let value = measurement.value;
         let from_pos = measurement.position;
+
+        let mut wall_discoveries: Vec<WallDiscovery> = vec![];
+        let mut cell_discoveries: Vec<CellDiscovery> = vec![];
 
         let cell_status = self
             .cell_mut(&from_pos)
@@ -182,6 +186,13 @@ impl<const N: usize> Map<N> {
                 x: from_pos.x as i64,
                 y: from_pos.y as i64,
             })?;
+
+        if *cell_status != CellDiscoveryStatus::Visited {
+            cell_discoveries.push(CellDiscovery {
+                new_status: CellDiscoveryStatus::Visited,
+                at_cell: from_pos,
+            });
+        }
 
         *cell_status = CellDiscoveryStatus::Visited;
 
@@ -198,12 +209,7 @@ impl<const N: usize> Map<N> {
 
         let mut inconsistencies = vec![];
 
-        let mut wall_discoveries: Vec<WallDiscovery> = vec![];
-        let mut cell_discoveries: Vec<CellDiscovery> = vec![];
-
-        todo!("Update Discoveries");
-
-
+        // todo!("Update Discoveries");
 
         // INFO: going through all the cells (at least none) that were passed over by the vision-ray
 
@@ -231,6 +237,11 @@ impl<const N: usize> Map<N> {
                 })?;
 
             if *cell_status == CellDiscoveryStatus::Undiscovered {
+                // Updated cell status
+                cell_discoveries.push(CellDiscovery {
+                    new_status: CellDiscoveryStatus::Discovered,
+                    at_cell: pos,
+                });
                 // println!("aksdhfö {:#?}",  pos);
                 *cell_status = CellDiscoveryStatus::Discovered;
             }
@@ -244,10 +255,16 @@ impl<const N: usize> Map<N> {
                 // current measurement
                 inconsistencies.push(pos);
             }
+
+            if *wall != WallDiscoveryStatus::Exists(false) {
+                wall_discoveries.push(WallDiscovery {
+                    new_status: WallDiscoveryStatus::Exists(false),
+                    from_cell: pos,
+                    in_direction: direction,
+                });
+            }
             *wall = WallDiscoveryStatus::Exists(false);
         }
-
-
 
         // INFO: Last cell before measurement-end (either reached wall or measurement limit),
         // either way: cell was discovered
@@ -273,6 +290,10 @@ impl<const N: usize> Map<N> {
 
         if *cell_status == CellDiscoveryStatus::Undiscovered {
             // println!("aksdhfö {:#?}",  pos);
+            cell_discoveries.push(CellDiscovery {
+                new_status: CellDiscoveryStatus::Discovered,
+                at_cell: pos,
+            });
             *cell_status = CellDiscoveryStatus::Discovered;
         }
 
@@ -282,8 +303,18 @@ impl<const N: usize> Map<N> {
                 .ok_or(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos })?;
 
             if *wall == WallDiscoveryStatus::Exists(false) {
+                // Wall found which was already assumed to not exists
                 inconsistencies.push(pos);
+            } else if *wall != WallDiscoveryStatus::Exists(true) {
+                // Wall found, where we previously assumed something else, though it does not
+                // conflict
+                wall_discoveries.push(WallDiscovery {
+                    new_status: WallDiscoveryStatus::Exists(true),
+                    from_cell: pos,
+                    in_direction: direction,
+                })
             }
+
             *wall = WallDiscoveryStatus::Exists(true);
         }
 
@@ -294,7 +325,7 @@ impl<const N: usize> Map<N> {
             ));
         }
 
-        todo!("Ok(())")
+        Ok(DiscoveryMessage { cell_discoveries, wall_discoveries })
     }
 }
 

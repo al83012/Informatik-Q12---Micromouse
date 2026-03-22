@@ -63,8 +63,8 @@ impl HeartbeatWifiChannelConfig {
 impl Default for HeartbeatWifiChannelConfig {
     fn default() -> Self {
         Self {
-            send_interval: Duration::from_millis(3000),
-            valid_response_interval: Duration::from_millis(1000),
+            send_interval: Duration::from_millis(1000),
+            valid_response_interval: Duration::from_millis(200),
             msg_to: "ALIVE".to_owned(),
             expected_response: "CONFIRM-ALIVE".to_owned(),
             delim: b'$',
