@@ -138,6 +138,31 @@ export class AnimBorderInner extends Animation {
     }
 }
 
+export class AnimSlideColor extends Animation {
+    constructor(duration, object, color_start, color_end) {
+        super(duration, object);
+        this.color_start = color_start;
+        this.color_end = color_end;
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+
+        let midpoint = ((this.remaining_duration/this.duration)-1)*(-1)*200;
+
+        this.object.style.backgroundImage = `linear-gradient(to right, ${this.color_end} 0% ${midpoint}%, ${this.color_start} ${midpoint}% 500%)`;
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration <= 0) {
+            this.finished = true;
+            this.object.style.backgroundImage = `linear-gradient(to right, ${this.color_end} 0% 500%, ${this.color_start} 500% 500%)`
+        }
+    }
+}
+
 export class AnimBorderColor extends Animation {
     constructor(duration, object, color_start, color_end) {
         super(duration, object);

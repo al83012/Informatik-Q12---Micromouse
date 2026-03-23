@@ -5,8 +5,8 @@ let current_state = ["reset", "finished"];
 let goal = [15, 15]; //the coords for going somewhere (cmd point)
 
 
-import {AnimationHandler, AnimBorderInner, AnimFadeIn, AnimFadeOut} from "./Animation.js"
-import {StyleAdder} from "./style_adder.js";
+import { AnimationHandler, AnimBorderInner, AnimFadeIn, AnimFadeOut, AnimSlideColor } from "./Animation.js"
+import { StyleAdder } from "./style_adder.js";
 
 export class Index {
     static animHandler;
@@ -45,15 +45,13 @@ export class Index {
 
         StyleAdder.disableForClass();
 
-        updateControls();
-
         //creating the AnimationHandler
         Index.animHandler = new AnimationHandler();
         window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
         window.setInterval(() => {
             let request = new XMLHttpRequest();
             request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
-            request.open("GET", "/update", true);
+            request.open("GET", document.location.origin + "/update", true);
             request.send();
         }, 100);
 
@@ -69,6 +67,7 @@ export class Index {
     static handleUpdate(response) {
         response["actions"].forEach(action => {
             let data = action["data"];
+            console.log(action.action);
             switch (action["action"]) {
                 case "update_button":
                     updateControls(data["button_id"], data["state"]);
@@ -150,7 +149,6 @@ function select_square(square) {
     Index.animHandler.addImmediate(borderAnim);
 
     current_state = ["point", "stopped"];
-    updateControls();
 }
 
 function unselect_square(square) {
@@ -160,7 +158,6 @@ function unselect_square(square) {
     Index.animHandler.addImmediate(borderAnim);
 
     current_state = ["reset", "finished"];
-    updateControls();
 }
 
 function update_sensors(sensor, value) {
@@ -189,7 +186,12 @@ function add_message(message) {
 }
 
 function updateControls(button_id, state) {
-    console.log("Update button" + button_id + " " + state);
+    let button = document.getElementById("button_" + button_id);
+    if (state) {
+        Index.animHandler.addImmediate(new AnimSlideColor(50, button, "var(--controll_disabled)", "var(--controll_enabled)"));
+    } else {
+        Index.animHandler.addImmediate(new AnimSlideColor(50, button, "var(--controll_enabled)", "var(--controll_disabled)"));
+    }
 }
 
 function updateControls_disalbed() {

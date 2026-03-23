@@ -6,6 +6,7 @@ t23 {
 
 :root {
     --controll_disabled: #52544D;
+    --controll_enabled: #017fac;
     --win_bg: #0f1119;
     /*--bg: #181F10;*/
     --bg: #0f0f12;
@@ -495,7 +496,8 @@ p-button {
     padding-top: -20px;
     padding-left: 10px;
     padding-right: 10px;
-    background-color: var(--controll_disabled);
+    /*background-color: var(--controll_disabled);*/
+    /*background-image: linear-gradient(to right, var(--controll_enabled), var(--controll_disabled) 500%);*/
 }
 
 .button_pause {
