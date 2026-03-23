@@ -4,13 +4,17 @@ use futures_util::lock::Mutex;
 
 use crate::comm::wifi_channel::WifiChannel;
 
+pub mod websocket;
+pub mod website;
+pub mod micromouse;
+
+
 #[deprecated = "Use the websocket channel, it is more reliable"]
 pub mod wifi_channel;
-pub mod website;
 
 #[deprecated = "Use the websocket channel, it is more reliable and already includes a heartbeat/ping"]
 pub mod heartbeat_channel;
-pub mod websocket;
+
 
 
 

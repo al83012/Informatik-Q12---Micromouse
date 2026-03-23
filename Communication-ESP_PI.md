@@ -26,48 +26,46 @@ Raspberry Pi
 - Separate Komponenten der Befehle sollten für die einfache Erkennbarkeit durch einfache leerzeichen getrennt werden
 #### CMD (vom PI)
 - <CMD_ID> ist ein u32
-- Bewegungsbefehl: `MOVE #<CMD_ID> <N>$` --> N Felder Forwärts; N ist ein u8
+- Bewegungsbefehl: `MOVE #<CMD_ID> <N>` --> N Felder Forwärts; N ist ein u8
 - Bewegungsbefehl mit Messungen:
-  `MOVE #<CMD_ID> <N> MEASURE <Measurement_Tasks>$`
+  `MOVE #<CMD_ID> <N> MEASURE <Measurement_Tasks>`
 - <Measurement_Task>s (Nur als Teil eines Bewegungs-Befehls):
-  `<N>_<L/R/F>_<CONTINUE/STOP-IF-OPEN/STOP-IF-BLOCKED/TURN-IF-OPEN>` --> Beim Nten Teilschritt der Bewegung links, rechts oder forwärts Distanz prüfen und schicken; Falls Continue --> Einfach weiterfahren, sonst entweder stoppen, weil dort direkt eine Wand ist, oder, weil dort keine Wand ist
+  `<N>_<L/R/F>_<CONTINUE/STOP-IF-OPEN/STOP-IF-BLOCKED>` --> Beim Nten Teilschritt der Bewegung links, rechts oder forwärts Distanz prüfen und schicken; Falls Continue --> Einfach weiterfahren, sonst entweder stoppen, weil dort direkt eine Wand ist, oder, weil dort keine Wand ist
 - Statt einer Zahl kann bei dem Teilschritt auch `X` stehen (Also `X_<L/R/F>_<CONTINUE/STOP-IF-OPEN/STOP-IF-BLOCKED/TURN-IF-BLOCKED>`), wodurch das Measurement jeden Schritt durchgeführt wird
-- Drehungsbefehl: `TURN #<CMD_ID> <X>$` --> 0 = Keine Drehung; X = Ganzzahl => Zahl * 90° links (neg. = rechts)
+- Drehungsbefehl: `TURN #<CMD_ID> <X>` --> 0 = Keine Drehung; X = Ganzzahl => Zahl * 90° links (neg. = rechts)
+- `TURN #<CMD_ID> <X> MEASURE <Measurement_Task>s` --> N der Interrupts ist 0 am Anfang und wächst pro 90° um 1
+- Bewegungs-Interrupts des Schrittes "0" sind auszuführen, bevor die Bewegung überhaupt angefangen hat
+- **WICHTIG**: Bei Interrupts kann es gut zu einem Overshoot führen, bei dem die Micromouse erst realisiert, dass sie anhalten muss, wenn sie an dieser Stelle schon vorbei ist; Dafür wäre es bei einem PID Controller wichtig, auch diesen Overshoot auszugleichen
 
 #### DBG (vom ESP32)
-- `DBG <Nachricht>$` --> Wird an Frontend weitergeleitet, darf keine $ enthalten --> würden Nachricht frühzeitig beenden
+- `DBG <Nachricht>` --> Wird an Frontend weitergeleitet, darf keine $ enthalten --> würden Nachricht frühzeitig beenden
 
 #### MEASUREMENT (vom ESP32)
 - Wird immer geschickt, bevor das zu einer Bewegung gehörende Bewegungs-Ack kommt
 - <CMD_ID> ist derselbe u32, der vorher bei der Bewegungs-Anweisung geschickt wurde, die zu der Messung geführt hat
-- `MEASUREMENT #<CMD_ID> <N>_<L/R/F> <DEPTH>$` --> DEPTH ist 0, falls direkt eine Wand ist, je 1 größer, wenn 1 Zelle weiter leer ist
-- `MEASUREMENT #<CMD_ID> <N>_<L/R/F> <DEPTH> SENSORLIMIT$` --> Mindestens die Tiefe wurde erreicht, Sensor kann nicht zuverlässig weiter schauen
+- `MEASUREMENT #<CMD_ID> <N>_<L/R/F> <DEPTH>` --> DEPTH ist 0, falls direkt eine Wand ist, je 1 größer, wenn 1 Zelle weiter leer ist
+- `MEASUREMENT #<CMD_ID> <N>_<L/R/F> <DEPTH> SENSORLIMIT` --> Mindestens die Tiefe wurde erreicht, Sensor kann nicht zuverlässig weiter schauen
 
 #### CMD-FINISHED (vom ESP32)
 - <CMD_ID> wieder derselbe von davor
 - CMD-FINISHED wird immer nach jedem MEASUREMENT geschickt, der von einem CMD verursacht wird
-- `CMD-FINISHED #<CMD_ID>$` --> Befehl vollständig ausgeführt
-- `CMD-FINISHED #<CMD_ID> <N>_<L/R/F>_<STOP-IF-OPEN/STOP-IF-BLOCKED/TURN_IF_OPEN>$` --> Frühzeitig beendeter Befehl + Begründung
+- `CMD-FINISHED #<CMD_ID>` --> Befehl vollständig ausgeführt
+- `CMD-FINISHED #<CMD_ID> <N>_<L/R/F>_<STOP-IF-OPEN/STOP-IF-BLOCKED>` --> Frühzeitig beendeter Befehl + Begründung
 
 #### DESYNC (vom ESP32)
 - Geschickt, falls eine CMD_ID nicht in 1er-Schritten hochzählt --> eine Nachricht wurde nicht empfangen
-- `DESYNC #<CMD_ID> #<CMD_ID> ...$` --> Gibt alle CMD_IDs an, die Übersprungen wurden
+- `DESYNC #<CMD_ID> #<CMD_ID> ...` --> Gibt alle CMD_IDs an, die Übersprungen wurden
 - Falls ein DESYNC passiert, soll der ESP32 den frühzeitig geschickten Befehl nicht ausführen und stattdessen darauf warten, dass die verlorenen Commands geschickt werden (ohne Garantie für Reihenfolge diesmal, soll einfach warten, bis alle von ihnen da sind)
 
-#### ALIVE (vom PI)
-- `ALIVE <Timestamp>$` --> Alle paar Sekunden --> sagt verbundenem ESP32, dass die Verbindung zum PI immer noch aktiv ist --> <Timestamp> ist eine Zeit in Sekunden seit start
-
-#### CONFIRM_ALIVE (vom ESP32)
-- `CONFIRM-ALIVE <Timestamp>$` --> Wie Echo, schickt Timestamp von ALIVE-Nachricht zurück; Soll das so bald wie möglich machen, auch falls z.B. andere Pakete fehlen
-
 #### STOP (vom ESP32)
-- `STOP$` --> Knopf oder ähnliches an ESP32 wurde gedrückt --> Pathfinding beendet, jetzt kann man die micromouse wieder manuell an den Start setzen
+- `STOP` --> Knopf oder ähnliches an ESP32 wurde gedrückt --> Pathfinding beendet, jetzt kann man die micromouse wieder manuell an den Start setzen
+- Wird auch beim Startup vom ESP32 geschickt, um zu signalisieren, dass es keinen internen State mehr gibt (z.B. nach Stromverlust)
 
 #### RESTART (vom ESP32)
-- `RESTART$` --> Knopf oder ähnliches nochmal gedrückt --> Nutzer garantiert, dass sich die micromouse wieder am Start befindet
+- `RESTART` --> Knopf oder ähnliches nochmal gedrückt --> Nutzer garantiert, dass sich die micromouse wieder am Start befindet
 
 #### BATTERY (vom ESP32)
-- `BATTERY <X>$` --> X= pos. Ganzzahl zwischen 0 und 100 --> Batterie in Prozent
+- `BATTERY <X>` --> X= pos. Ganzzahl zwischen 0 und 100 --> Batterie in Prozent
 
 ### Bsp
 
@@ -76,94 +74,77 @@ Raspberry Pi
 #### Simple Bewegungen, nacheinander
 
 ```msgs
-< MOVE #0 2$
-> CMD-FINISHED #0$
-< TURN #1 1$
-> CMD-FINISHED #1$
-< MOVE #2 1$
-> CMD-FINISHED #2$
-< TURN #3 -1$
-> CMD-FINISHED #3$
+< MOVE #0 2
+> CMD-FINISHED #0
+< TURN #1 1
+> CMD-FINISHED #1
+< MOVE #2 1
+> CMD-FINISHED #2
+< TURN #3 -1
+> CMD-FINISHED #3
 ```
 
 #### Simple Bewegungen, batched
 
 ```msgs
-< MOVE #0 2$
-< TURN #1 1$
-< MOVE #2 1$
-< TURN #3 -1$
-> CMD-FINISHED #0$
-> CMD-FINISHED #1$
-> CMD-FINISHED #2$
-> CMD-FINISHED #3$
+< MOVE #0 2
+< TURN #1 1
+< MOVE #2 1
+< TURN #3 -1
+> CMD-FINISHED #0
+> CMD-FINISHED #1
+> CMD-FINISHED #2
+> CMD-FINISHED #3
 ```
 
 #### Simple Bewegungen mit Measurements
 
 ```msgs
-< MOVE #0 4 MEASURE 1_L_CONTINUE 2_R_CONTINUE$
-> MEASUREMENT #0 1_L 2$
-> MEASUREMENT #0 2_R 3 SENSORLIMIT$
-> CMD-FINISHED #0$
+< MOVE #0 4 MEASURE 1_L_CONTINUE 2_R_CONTINUE
+> MEASUREMENT #0 1_L 2
+> MEASUREMENT #0 2_R 3 SENSORLIMIT
+> CMD-FINISHED #0
 ```
 
 #### Simple Bewegungen mit ungenutzten Interrupts
 
 ```msgs
-< MOVE #0 4 MEASURE 1_L_STOP-IF-OPEN 2_R_STOP-IF-OPEN$
-> MEASUREMENT #0 1_L 0$
-> MEASUREMENT #0 2_R 0$
-> CMD-FINISHED #0$
+< MOVE #0 4 MEASURE 1_L_STOP-IF-OPEN 2_R_STOP-IF-OPEN
+> MEASUREMENT #0 1_L 0
+> MEASUREMENT #0 2_R 0
+> CMD-FINISHED #0
 ```
 
 #### Simple Bewegungen mit genutzten Interrupts
 
 ```msgs
-< MOVE #0 4 MEASURE 1_L_STOP-IF-OPEN 2_R_STOP-IF-OPEN$
-> MEASUREMENT #0 1_L 2$
-> CMD-FINISHED #0 1_L_STOP-IF-OPEN$
+< MOVE #0 4 MEASURE 1_L_STOP-IF-OPEN 2_R_STOP-IF-OPEN
+> MEASUREMENT #0 1_L 2
+> CMD-FINISHED #0 1_L_STOP-IF-OPEN
 ```
 
 #### Simple Bewegungen, mit Interrupts und Immer-Measure 
 
 ```msgs
 < MOVE #0 4 MEASURE X_L_STOP-IF-OPEN$
-> MEASUREMENT #0 0_L 0$
-> MEASUREMENT #0 1_L 0$
-> MEASUREMENT #0 2_L 3$
-> CMD-FINISHED #0$
-< TURN #1 1$
-> CMD-FINISHED #1$
+> MEASUREMENT #0 0_L 0
+> MEASUREMENT #0 1_L 0
+> MEASUREMENT #0 2_L 3
+> CMD-FINISHED #0
+< TURN #1 1
+> CMD-FINISHED #1
 ```
 
 #### Simple Bewegungen, mit Interrupts und Immer-Measure + Reingemischte periodische Vorgänge
 
 ```msgs
-< MOVE #0 4 MEASURE X_L_STOP-IF-OPEN$
-> MEASUREMENT #0 0_L 0$
-< ALIVE 3$
-> CONFIRM-ALIVE 3$
-> MEASUREMENT #0 1_L 0$
-> MEASUREMENT #0 2_L 3$
-> BATTERY 76$
-> CMD-FINISHED #0$
-< TURN #1 1$
-< ALIVE 6$
-> CONFIRM-ALIVE 6$
-> CMD-FINISHED #1$
+< MOVE #0 4 MEASURE X_L_STOP-IF-OPEN
+> MEASUREMENT #0 0_L 0
+> MEASUREMENT #0 1_L 0
+> MEASUREMENT #0 2_L 3
+> BATTERY 76
+> CMD-FINISHED #0
+< TURN #1 1
+> CMD-FINISHED #1
 ```
 
-#### Simple Bewegungen, mit Interrupts und Immer-Measure und Batching
-
-```msgs
-< MOVE #0 4 MEASURE X_L_TURN-IF-OPEN$
-> MEASUREMENT #0 0_L 0$
-> MEASUREMENT #0 1_L 0$
-> MEASUREMENT #0 2_L 3$
-> CMD-FINISHED #0 2_L_TURN-IF-OPEN$
-< MOVE #1 1$
-> CMD-FINISHED #1$
-```
-
---> TURN-IF-OPEN gibt extra Zeit, in welcher der Algorithmus die Latenz der Kommunikation überbrücken kann

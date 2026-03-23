@@ -17,6 +17,13 @@ pub struct Map<const N: usize> {
     wall_discovery_status: [[(WallDiscoveryStatus, WallDiscoveryStatus); N]; N],
 }
 
+
+// Wrapping a Map, nothing special, but signifies, that the Map does not represent a full state,
+// but just what is known (--> Every Status is upgradable (e.g. Undiscovered could in truth be
+// Discovered))
+pub struct PartialMap<const N: usize>(pub Map<N>);
+
+
 #[derive(Copy, Clone, PartialEq, Debug, Eq, Default, Serialize, Deserialize, Hash)]
 pub enum CellDiscoveryStatus {
     #[default]

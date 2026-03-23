@@ -16,6 +16,8 @@ pub mod direction;
 pub mod map;
 pub mod measurement;
 pub mod position;
+pub mod strategy;
+pub mod world_data;
 
 #[cfg(test)]
 pub mod tests;
