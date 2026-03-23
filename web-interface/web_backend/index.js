@@ -10,9 +10,14 @@ const back_port = 8090; //which is from arne?
 const host = '127.0.0.1';
 const client = new net.Socket();
 
-client.on('error', (err) => {
+client.on('error', (err) => {console.log("Implement ERROR")})
+
+/*client.on('error', (err) => {
     console.error(err);
-});
+    client.connect({port: back_port, host: host }, function () {
+        console.log('Reconnected successfully');
+    });
+});*/ //for actual production
 
 client.connect( {port: back_port, host: host }, function () {
     console.log('Connected successfully to backend');
@@ -20,7 +25,7 @@ client.connect( {port: back_port, host: host }, function () {
 });
 
 client.on('data', (data) => {
-    manager.b_handleUpdate(client, data);
+    manager.b_handleUpdate(data);
 });
 
 
@@ -34,20 +39,20 @@ let actions = [];
 
 app.use(express.static("./../web_frontend"));
 app.use("/module", express.static("./../web_frontend/module"));
+app.use(express.json());
 
 app.get('/update', (req, res) => {
-    actions.push(Actions.new_path([1,1,2,2,3,3,4,4,5,5,6,6]));
-
-    let result = Actions.toString(actions);
-
-    res.send(result);
-
-    actions = [];
+    manager.f_handleUpdate(res);
 });
 
 app.get('/update_full', (req, res) => {
     res.send(Actions.toString(manager.get_full()));
 })
+
+app.post('/action', (req, res) => {
+    manager.f_handlePost(req.body);
+    res.send("handled");
+});
 
 app.get('/', (req, res) => {
     res.redirect("/home.html");

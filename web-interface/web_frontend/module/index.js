@@ -5,8 +5,8 @@ let current_state = ["reset", "finished"];
 let goal = [15, 15]; //the coords for going somewhere (cmd point)
 
 
-import { Animation, AnimationHandler, AnimFadeIn, AnimFadeOut, AnimBorderOuter, AnimBorderInner, AnimGroup, AnimBorderColor } from "./Animation.js"
-import { StyleAdder } from "./style_adder.js";
+import {AnimationHandler, AnimBorderInner, AnimFadeIn, AnimFadeOut} from "./Animation.js"
+import {StyleAdder} from "./style_adder.js";
 
 export class Index {
     static animHandler;
@@ -50,34 +50,50 @@ export class Index {
         //creating the AnimationHandler
         Index.animHandler = new AnimationHandler();
         window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
+        window.setInterval(() => {
+            let request = new XMLHttpRequest();
+            request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
+            request.open("GET", "/update", true);
+            request.send();
+        }, 100);
 
         //let borderAnim = new AnimBorderColor(100, Index.squares[[5, 5]], "darkblue", "cyan");
         //Index.animHandler.add(borderAnim);
 
         let request = new XMLHttpRequest();
-        request.addEventListener("load", Index.handleUpdate);
+        request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
         request.open("GET", document.location.origin + "/update_full");
         request.send();
     }
 
     static handleUpdate(response) {
-        console.log(response.srcElement.response);
-        let actions = JSON.parse(response.srcElement.response);
-        actions["actions"].forEach(action => {
+        response["actions"].forEach(action => {
             let data = action["data"];
             switch (action["action"]) {
-                case "change_button":
+                case "update_button":
                     updateControls(data["button_id"], data["state"]);
                     break;
                 case "add_message":
                     add_message(data["message"]);
+                    break;
+                case "update_sensor":
+                    update_sensors(data["sensor"], data["values"]);
                     break;
             }
         });
     }
 
     static buttonStartStop() {
-        let pathGroup = new AnimGroup(5);
+        let request = new XMLHttpRequest();
+        request.open("POST", document.location.origin + "/action");
+        request.addEventListener("load", function () {});
+        request.setRequestHeader("Content-Type", "Application/json");
+        request.send(JSON.stringify({
+            action: "button_clicked",
+            button_id: 0,
+        }));
+
+        /*let pathGroup = new AnimGroup(5);
 
         for (let i = 0; i < 255; i++) {
             pathGroup.add(new AnimBorderInner(45, Index.squares[convert_index_to_coords(i)], 2, 2, 1, [1, 30, 30]));
@@ -98,12 +114,13 @@ export class Index {
         pathGroup.add(new AnimBorderInner(15, Index.squares[[7,6]], 2, 2, 1));
         pathGroup.add(new AnimBorderInner(15, Index.squares[[7,7]], 2, 2, 1));
 
-        Index.animHandler.add(pathGroup);
+        Index.animHandler.add(pathGroup);*/
 
+        /*
         let request = new XMLHttpRequest();
         request.addEventListener("load", function () {console.log(this.responseText);});
         request.open("GET", document.location.origin + "/update");
-        request.send();
+        request.send();*/
     }
 
     static openPopAlgo() {
@@ -146,6 +163,12 @@ function unselect_square(square) {
     updateControls();
 }
 
+function update_sensors(sensor, value) {
+    let sensor_ele = document.getElementById(sensor);
+    sensor_ele.innerHTML = (sensor === "left" ? "Links: " : (sensor === "front" ? "Vorne: " : "Rechts: "));
+    sensor_ele.innerHTML = sensor_ele.innerHTML + value[0] + ":" + value[1];
+}
+
 function add_message(message) {
     let console_ele = document.getElementsByClassName("debug_console")[0];
     let message_ele = document.createElement("div");
@@ -165,7 +188,9 @@ function add_message(message) {
     }*/
 }
 
-function updateControls(button_id, state) {}
+function updateControls(button_id, state) {
+    console.log("Update button" + button_id + " " + state);
+}
 
 function updateControls_disalbed() {
     let buttonStart = document.getElementsByClassName("button_start_stop")[0];

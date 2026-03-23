@@ -39,11 +39,15 @@ export class Actions {
         return new Action("new_path", new Map([["coords", coords_string]]));
     }
 
-    static change_button(button_id, state) {
-        return new Action("change_button", new Map([["button_id", button_id], ["state", state]]));
+    static update_button(button_id, state) {
+        return new Action("update_button", new Map([["button_id", button_id], ["state", state]]));
     }
 
     static add_message(message) {
         return new Action("add_message", new Map([["message", '"' + message + '"']]));
+    }
+
+    static update_sensor(sensor, values) {
+        return new Action("update_sensor", new Map([["sensor", '"' + sensor + '"'], ["value", values]]));
     }
 }
