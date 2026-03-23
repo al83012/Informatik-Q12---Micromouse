@@ -53,6 +53,27 @@ export class Index {
 
         //let borderAnim = new AnimBorderColor(100, Index.squares[[5, 5]], "darkblue", "cyan");
         //Index.animHandler.add(borderAnim);
+
+        let request = new XMLHttpRequest();
+        request.addEventListener("load", Index.handleUpdate);
+        request.open("GET", document.location.origin + "/update_full");
+        request.send();
+    }
+
+    static handleUpdate(response) {
+        console.log(response.srcElement.response);
+        let actions = JSON.parse(response.srcElement.response);
+        actions["actions"].forEach(action => {
+            let data = action["data"];
+            switch (action["action"]) {
+                case "change_button":
+                    updateControls(data["button_id"], data["state"]);
+                    break;
+                case "add_message":
+                    add_message(data["message"]);
+                    break;
+            }
+        });
     }
 
     static buttonStartStop() {
@@ -125,7 +146,26 @@ function unselect_square(square) {
     updateControls();
 }
 
-function updateControls() {}
+function add_message(message) {
+    let console_ele = document.getElementsByClassName("debug_console")[0];
+    let message_ele = document.createElement("div");
+    message_ele.className = "debug_console_message unselectable";
+    message_ele.innerHTML = message;
+
+    console_ele.appendChild(message_ele);
+
+    let size = 0;
+    for (let i = 0; i < console_ele.children.length; i++) {
+        size += console_ele.children[i].clientHeight;
+    }
+    console_ele.scrollTop = console_ele.scrollHeight;
+    /*console.log(size);
+    if (size > 250) {
+        console_ele.removeChild(console_ele.children.item(0));
+    }*/
+}
+
+function updateControls(button_id, state) {}
 
 function updateControls_disalbed() {
     let buttonStart = document.getElementsByClassName("button_start_stop")[0];

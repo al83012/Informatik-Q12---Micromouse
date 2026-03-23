@@ -301,8 +301,9 @@ body {
 
 .debug_console {
     display: flex;
-    justify-content: left;
+    /*justify-content: flex-end;*/
     flex-direction: column;
+    align-items: flex-start;
     width: 300px;
     height: 250px;
     background-color: #0a0e1a;
@@ -310,6 +311,34 @@ body {
     border-style: solid;
     border-color: black;
     border-width: 1px;
+
+    overflow-x: hidden;
+    overflow-y: scroll;
+    overflow-block: scroll;
+
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    scroll-behavior: smooth;
+}
+
+.debug_console::-webkit-scrollbar {
+    display: none;
+}
+
+.debug_console_message {
+    display: flex;
+    height: fit-content;
+    width: 94%;
+    flex-direction: row;
+    align-content: flex-start;
+    justify-content: left;
+    padding-left: 8px;
+    padding-right: 10px;
+    padding-top: 1px;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: var(--text-color);
+    border-top: darkgray 1px solid;
 }
 
 .maze_container {
