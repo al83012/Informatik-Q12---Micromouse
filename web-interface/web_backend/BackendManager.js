@@ -24,6 +24,8 @@ export class BackendManager {
         }
     };
     in_console = ["[D] TestDebug", "[D] TestDebug 2", "[D] TestDebug 3", "[D] TestDebug 4", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
+    in_algorithm = "A*";
     backend;
 
     sync = [];
@@ -61,6 +63,11 @@ export class BackendManager {
                     this.sync.push(Actions.update_button(0, true));
                 }
                 break;
+            case "algorithm_selected":
+                //TODO: send the algorithm to the backend
+                this.in_algorithm = data.algorithm;
+                this.sync.push(Actions.update_algorithm(data.algorithm));
+                break;
         }
     }
 
@@ -74,6 +81,10 @@ export class BackendManager {
 
         for (let message of this.in_console) {
             actions.push(Actions.add_message(message));
+        }
+
+        for (let algo of this.algorithms) {
+            actions.push(Actions.add_algorithm(algo));
         }
 
         return actions;

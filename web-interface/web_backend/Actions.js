@@ -50,4 +50,12 @@ export class Actions {
     static update_sensor(sensor, values) {
         return new Action("update_sensor", new Map([["sensor", '"' + sensor + '"'], ["value", values]]));
     }
+
+    static add_algorithm(algorithm) {
+        return new Action("add_algorithm", new Map([["algorithm", '"' + algorithm + '"']]));
+    }
+
+    static update_algorithm(algorithm) {
+        return new Action("update_algorithm", new Map([["algorithm", '"' + algorithm + '"']]));
+    }
 }

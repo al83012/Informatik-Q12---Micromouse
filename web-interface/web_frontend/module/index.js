@@ -12,6 +12,7 @@ export class Index {
     static animHandler;
 
     static squares = {};
+    static algorithms = [];
 
     static eventLoad() {
         let squares = document.getElementsByClassName("maze_tile");
@@ -77,6 +78,13 @@ export class Index {
                     break;
                 case "update_sensor":
                     update_sensors(data["sensor"], data["values"]);
+                    break;
+                case "add_algorithm":
+                    add_algorithm(data["algorithm"]);
+                    document.getElementById("algo_current").innerHTML = data["algorithm"];
+                    break;
+                case "update_algorithm":
+                    document.getElementById("algo_current").innerHTML = data["algorithm"];
                     break;
             }
         });
@@ -216,4 +224,22 @@ function updateControls_disalbed() {
     } else if (current_state[0] === "point") {
         buttonReset.style.backgroundImage = "linear-gradient(to right, cyan, cornflowerblue)";
     }
+}
+
+function add_algorithm(algorithm) {
+    let algorithm_ele = document.createElement("div");
+    algorithm_ele.className = "pop_window_algorithm_choice unselectable";
+    algorithm_ele.innerHTML = algorithm;
+    algorithm_ele.addEventListener("click", function () {
+        let request = new XMLHttpRequest();
+        request.addEventListener("load", function () {console.log(this.responseText);});
+        request.open("POST", document.location.origin + "/action");
+        request.setRequestHeader("Content-Type", "Application/json");
+        request.send(JSON.stringify({
+            action: "algorithm_selected",
+            algorithm: algorithm,
+        }));
+        Index.closePopAlgo();
+    });
+    document.getElementById("algo_content").appendChild(algorithm_ele);
 }
