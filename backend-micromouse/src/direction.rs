@@ -8,15 +8,14 @@ pub enum Direction {
     NegY,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DirectionAngle(pub f32);
 
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DirectionNormalizedVector{pub x: i8,pub y: i8}
-
+pub struct DirectionNormalizedVector {
+    pub x: i8,
+    pub y: i8,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RelativeDirection {
@@ -25,6 +24,19 @@ pub enum RelativeDirection {
     Right,
 }
 
+impl std::fmt::Display for RelativeDirection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                RelativeDirection::Forward => "F",
+                RelativeDirection::Left => "L",
+                RelativeDirection::Right => "R",
+            }
+        )
+    }
+}
 
 impl From<Direction> for DirectionAngle {
     fn from(value: Direction) -> Self {
@@ -42,10 +54,10 @@ impl From<Direction> for DirectionAngle {
 impl From<Direction> for DirectionNormalizedVector {
     fn from(value: Direction) -> Self {
         match value {
-            Direction::PosX => Self{x: 1, y: 0},
-            Direction::PosY => Self{x: 0, y: 1},
-            Direction::NegX => Self{x: -1, y: 0},
-            Direction::NegY => Self{x: 0, y: -1},
+            Direction::PosX => Self { x: 1, y: 0 },
+            Direction::PosY => Self { x: 0, y: 1 },
+            Direction::NegX => Self { x: -1, y: 0 },
+            Direction::NegY => Self { x: 0, y: -1 },
         }
     }
 }
