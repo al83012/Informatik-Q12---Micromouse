@@ -31,3 +31,5 @@
 
 
 
+
+Ich brauche noch ein beispiel von der formatierung + mögliche attribute für "aktion beginnt" und "aktion endet" und ich brauche noch eine formatierung für folgende Aktionen, die ich dir schicke: algorithm_selected + algorithm ; new_goal + goal ; start ; stop ; pause ; continue
