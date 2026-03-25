@@ -4,6 +4,7 @@ use tungstenite::{Message, Utf8Bytes};
 
 use crate::direction::RelativeDirection;
 
+#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CommandId(pub u32);
 // Percentage 0-100
 type Battery = u8;
@@ -53,6 +54,8 @@ impl<T> FormatError<T> {
         from_result.map_err(|e| Self::new(format!("Err caused by {e}")))
     }
 }
+
+
 
 impl<T> std::fmt::Display for FormatError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

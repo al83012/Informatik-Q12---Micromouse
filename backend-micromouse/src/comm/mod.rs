@@ -6,7 +6,8 @@ use crate::comm::wifi_channel::WifiChannel;
 
 pub mod websocket;
 pub mod website;
-pub mod micromouse;
+pub mod micromouse_message;
+pub mod micromouse_manager;
 
 
 #[deprecated = "Use the websocket channel, it is more reliable"]

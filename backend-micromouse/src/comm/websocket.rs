@@ -463,6 +463,7 @@ impl WsChannel {
         Ok(ws_external)
     }
 
+    /// Returns Some(msg) if there is a message and false if the Channel has already been dropped
     pub async fn read(&self) -> Option<Message> {
         self.read_recv.lock().await.recv().await
     }
@@ -477,6 +478,7 @@ impl WsChannel {
             .await
             .expect("Error while writing to mpsc channel");
     }
+
 }
 
 impl Drop for WsChannel {

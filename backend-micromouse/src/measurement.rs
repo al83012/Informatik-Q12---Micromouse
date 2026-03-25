@@ -1,5 +1,5 @@
 use crate::{
-    comm::micromouse::FormatError, direction::{Direction, RelativeDirection}, position::Position
+    comm::micromouse_message::FormatError, direction::{Direction, RelativeDirection}, position::Position
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

@@ -1,4 +1,4 @@
-use crate::{ comm::micromouse::Command, map::PartialMap, position::Position, world_data::WorldData};
+use crate::{ comm::micromouse_message::Command, map::PartialMap, position::Position, world_data::WorldData};
 
 
 pub trait FromConfig {
