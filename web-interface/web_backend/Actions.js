@@ -58,4 +58,8 @@ export class Actions {
     static update_algorithm(algorithm) {
         return new Action("update_algorithm", new Map([["algorithm", '"' + algorithm + '"']]));
     }
+
+    static update_con_status(status) {
+        return new Action("update_con_status", new Map([["status", status]]));
+    }
 }

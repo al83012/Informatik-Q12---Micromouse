@@ -86,6 +86,10 @@ export class Index {
                 case "update_algorithm":
                     document.getElementById("algo_current").innerHTML = data["algorithm"];
                     break;
+                case "update_con_status":
+                    document.getElementById("pill_con_dot").style.borderColor = (data["status"] ? "green" : "red");
+                    document.getElementById("pill_con_text").innerHTML = (data["status"] ? "online" : "offline");
+                    break;
             }
         });
     }

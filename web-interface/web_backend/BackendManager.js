@@ -26,7 +26,7 @@ export class BackendManager {
     in_console = ["[D] TestDebug", "[D] TestDebug 2", "[D] TestDebug 3", "[D] TestDebug 4", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
     algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
     in_algorithm = "A*";
-    backend;
+    backend = null;
 
     sync = [];
 
@@ -78,6 +78,7 @@ export class BackendManager {
         actions.push(Actions.update_button(0, this.in_button_active[0]));
         actions.push(Actions.update_button(1, this.in_button_active[1]));
         actions.push(Actions.update_button(2, this.in_button_active[2]));
+        actions.push(Actions.update_con_status(this.backend !== null));
 
         for (let message of this.in_console) {
             actions.push(Actions.add_message(message));
