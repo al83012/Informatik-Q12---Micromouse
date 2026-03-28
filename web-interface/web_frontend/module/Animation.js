@@ -1,3 +1,21 @@
+function hexToRgb(hex) {
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+function componentToHex(c) {
+    var hex = c.toString(16);
+    return hex.length == 1 ? "0" + hex : hex;
+}
+
+function rgbToHex(r, g, b) {
+    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+}
+
 export class Animation {
     duration;
     finished = false;
@@ -163,6 +181,41 @@ export class AnimSlideColor extends Animation {
     }
 }
 
+export class AnimBackgroundColor extends Animation {
+    constructor(duration, object, color_start, color_end, on_finished = () => {}) {
+        super(duration, object);
+
+        this.color_start = hexToRgb(color_start);
+        this.color_end = hexToRgb(color_end);
+
+        this.dr = this.color_end.r - this.color_start.r;
+        this.dg = this.color_end.g - this.color_start.g;
+        this.db = this.color_end.b - this.color_start.b;
+
+        this.exec = on_finished;
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+
+        this.color_start.r += Math.round(this.dr/this.duration);
+        this.color_start.g += Math.round(this.dg/this.duration);
+        this.color_start.b += Math.round(this.db/this.duration);
+
+        this.object.style.backgroundColor = rgbToHex(this.color_start.r, this.color_start.g, this.color_start.b);
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration <= 0) {
+            this.finished = true;
+            this.exec();
+            this.object.style.backgroundColor = rgbToHex(this.color_end.r, this.color_end.g, this.color_end.b);
+        }
+    }
+}
+
 export class AnimBorderColor extends Animation {
     constructor(duration, object, color_start, color_end) {
         super(duration, object);
@@ -285,7 +338,7 @@ export class AnimGroup extends Animation {
     animations = [];
 
     constructor(delay) {
-        super(-1); //ignore
+        super(-1, null); //ignore
         this.delay = delay;
         this.current_delay = delay;
     }

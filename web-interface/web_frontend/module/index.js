@@ -5,7 +5,15 @@ let current_state = ["reset", "finished"];
 let goal = [15, 15]; //the coords for going somewhere (cmd point)
 
 
-import { AnimationHandler, AnimBorderInner, AnimFadeIn, AnimFadeOut, AnimSlideColor } from "./Animation.js"
+import {
+    AnimationHandler,
+    AnimBorderInner,
+    AnimFadeIn,
+    AnimFadeOut,
+    AnimBackgroundColor,
+    AnimSlideColor,
+    AnimGroup
+} from "./Animation.js"
 import { StyleAdder } from "./style_adder.js";
 
 export class Index {
@@ -95,6 +103,8 @@ export class Index {
     }
 
     static buttonStartStop() {
+        play_reset_animation();
+
         let request = new XMLHttpRequest();
         request.open("POST", document.location.origin + "/action");
         request.addEventListener("load", function () {});
@@ -145,6 +155,22 @@ export class Index {
         let obj = document.getElementsByClassName("pop_window_algorithm_group")[0];
         Index.animHandler.add(new AnimFadeOut(20, obj, (o) => {o.style.display = "none";}));
     }
+}
+
+function play_reset_animation() {
+    let group_main = new AnimGroup(4);
+    for (let i = 0; i<16; i++) {
+        let group_row = new AnimGroup(3);
+        for (let j = 0; j<16; j++) {
+            let group_tile = new AnimGroup(-1);
+            group_tile.add(new AnimBackgroundColor(25, Index.squares[[j, i]], "#0a0e1a", "#FFFFFF"));
+            group_tile.add(new AnimBackgroundColor(25, Index.squares[[j, i]], "#FFFFFF", "#0a0e1a"));
+            group_row.add(group_tile);
+        }
+        group_main.add(group_row);
+    }
+
+    Index.animHandler.add(group_main);
 }
 
 function convert_index_to_coords(i) {
