@@ -18,6 +18,7 @@ pub mod measurement;
 pub mod position;
 pub mod strategy;
 pub mod world_data;
+pub mod nonempty;
 
 #[cfg(test)]
 pub mod tests;
