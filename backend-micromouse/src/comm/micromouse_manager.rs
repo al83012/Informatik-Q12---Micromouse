@@ -8,11 +8,11 @@ use tokio::sync::Mutex;
 use crate::{
     comm::{
         micromouse_message::{
-            Command, CommandFinishedMessage, CommandId, CommandMessage, MicromouseResponse,
-        }, website::DiscoveryMessage, websocket::{WsChannel, WsChannelConfig, WsChannelConnError}
-    },
-    map::Map,
-    position::MouseTransform,
+            Command, CommandFinishedMessage, CommandId, CommandMessage, FormatError, MicromouseResponse
+        },
+        website::DiscoveryMessage,
+        websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
+    }, map::Map, nonempty::NonEmptyVec, position::MouseTransform
 };
 
 pub struct MicromouseManager<const N: usize> {
@@ -36,7 +36,10 @@ impl<const N: usize> MicromouseManager<N> {
         })
     }
 
-    pub async fn send_command(&self, cmd: Command) -> CommandId {
+    pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
+        if self.mode == MicromouseMode::Stopped {
+            return Err(CommandSendError::StoppedExecution);
+        }
         let cmd_id = CommandId(
             self.next_cmd_id
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
@@ -44,7 +47,7 @@ impl<const N: usize> MicromouseManager<N> {
         let msg = CommandMessage { cmd, cmd_id };
         self.channel.send((&msg).into()).await;
         todo!("Add to command queue");
-        cmd_id
+        Ok(cmd_id)
     }
 
     // Returns boolean --> true = was resent, false = already finished, exited queue
@@ -57,10 +60,32 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
-    pub async fn next(&self) -> Vec<MicromouseEvent<N>> {
-        let next_response = &self.channel.read().await;
+    /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
+    /// communication to continue (even though the channel will spin up a separate thread to keep
+    /// the connection alive, it won't handle desyncs and the like)
+    pub async fn next(&self) ->  Result<NonEmptyVec<MicromouseEvent<N>>, MicromouseManagerError> {
 
-        todo!(
+        loop {
+            let next_response = &self.channel.read().await;
+            if next_response.is_none() {
+                return Err(MicromouseManagerError::ConnectionClosedPermanently);
+            }
+            let next_response: MicromouseResponse = next_response.as_ref().unwrap().to_string().try_into()?;
+            match next_response {
+                MicromouseResponse::Debug(_) => todo!(),
+                MicromouseResponse::Measurement(measurement_message) => todo!(),
+                MicromouseResponse::CommandFinished(command_finished_message) => todo!(),
+                MicromouseResponse::Desync(command_ids) => todo!(),
+                MicromouseResponse::Stop => todo!(),
+                MicromouseResponse::Restart => todo!(),
+                MicromouseResponse::Battery(_) => todo!(),
+            }
+            
+
+
+
+
+            todo!(
             "Processing all the events which can be handled internally --> 
 Automatically adjust the position after each substep, so that measurements can be transformed and applied to the map;
 (Only cause event if there is a nonempty discovery message);
@@ -71,10 +96,11 @@ Clear queue etc. on stop;
 On Desync: automatically resend all the commands; keep lock to prevent writing new tasks
 "
         )
+        }
     }
-
 }
 
+#[derive(Debug, PartialEq)]
 pub enum MicromouseMode {
     Stopped,
     Running,
@@ -83,7 +109,31 @@ pub enum MicromouseMode {
 pub enum MicromouseEvent<const N: usize> {
     UpdatePosition,
     UpdatedMap(Map<N>, DiscoveryMessage),
-    FinishedCommand{cmd_id: CommandId, require_new: bool},
+    FinishedCommand {
+        cmd_id: CommandId,
+        require_new: bool,
+    },
     Stop,
     Restart,
+    Error(MicromouseManagerError),
+    DebugMessage(String),
+}
+
+pub enum CommandSendError {
+    /// The strategy was manually stopped, no command should be sent, it will be voided
+    StoppedExecution,
+
+}
+
+pub enum MicromouseManagerError {
+    ConnectionClosedPermanently,
+    UnknownResponse(FormatError<MicromouseResponse>),
+
+}
+
+
+impl From<FormatError<MicromouseResponse>> for MicromouseManagerError {
+    fn from(value: FormatError<MicromouseResponse>) -> Self {
+        Self::UnknownResponse(value)
+    }
 }
