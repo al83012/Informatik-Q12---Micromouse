@@ -1,10 +1,15 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, usize};
 
 use tungstenite::{Message, Utf8Bytes};
 
-use crate::{direction::RelativeDirection, position::MouseTransform};
+use crate::{
+    direction::RelativeDirection,
+    map::{PartialMap, WallDiscoveryStatus},
+    position::MouseTransform,
+    strategy::PartialWorldData,
+};
 
-#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct CommandId(pub u32);
 // Percentage 0-100
 type Battery = u8;
@@ -54,8 +59,6 @@ impl<T> FormatError<T> {
         from_result.map_err(|e| Self::new(format!("Err caused by {e}")))
     }
 }
-
-
 
 impl<T> std::fmt::Display for FormatError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -134,7 +137,7 @@ impl TryFrom<String> for MicromouseResponse {
                             des.push(FormatError::caused_by(CommandId::try_from(d.to_string()))?)
                         }
                         Ok(MicromouseResponse::Desync(des))
-                    },
+                    }
                     _ => Err(FormatError::new(value)),
                 }
             }
@@ -256,17 +259,20 @@ impl TryFrom<String> for CommandId {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Command {
     pub ty: MovementType,
     pub interrupts: Vec<MeasurementInterrupt>,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum MovementType {
     Turn(i8),
     Move(u8),
 }
 
 // Interrupt directive
+#[derive(Clone, Copy, Debug)]
 pub struct MeasurementInterrupt {
     pub direction: RelativeDirection,
     pub at_step: InterruptStep,
@@ -275,21 +281,25 @@ pub struct MeasurementInterrupt {
 
 // Specific time when an interrupt happened
 // Only contains a specific Step number, no action
+#[derive(Clone, Copy, Debug)]
 pub struct MeasurementOccurence {
     pub direction: RelativeDirection,
     pub at_step: StepNum,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct InterruptOccurence {
     pub occurence: MeasurementOccurence,
     pub action: InterruptAction,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct CommandFinishedMessage {
     pub cmd_id: CommandId,
     pub reason: Option<InterruptOccurence>,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum InterruptAction {
     Continue,
     StopIfBlocked,
@@ -309,10 +319,12 @@ impl TryFrom<String> for InterruptAction {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum InterruptStep {
     Each,
     At(StepNum),
 }
+#[derive(Clone, Debug)]
 pub struct CommandMessage {
     pub cmd: Command,
     pub cmd_id: CommandId,
@@ -325,17 +337,130 @@ pub struct MeasurementMessage {
     pub is_sensorlimit: bool,
 }
 
-
 /// Represents a command in the context of its starting conditions: Once the first measurement is
 /// received, we know that a new command was started, then: we need to keep track of how the
 /// command execution is moving the micromouse around
-pub struct TransformedCommand {
+pub struct TransformedMovement {
     start_transform: MouseTransform,
-    command: Command,
+    movement: MovementType,
 }
 
-impl TransformedCommand {
-    pub fn at_step() -> MouseTransform {
-        todo!()
-    }  
+pub struct TransformedCommand<const N: usize> {
+    start_transform: MouseTransform,
+    command: Command,
+    starting_map: PartialMap<N>,
+}
+
+// Stores one of the potential results of a transformed command --> The partial world data shows
+// the transform with which the command finishes as well as the parts of the world which are
+// required for this case to become true
+pub struct TransformedCommandResult<const N: usize>(pub PartialWorldData<N>);
+
+impl TransformedMovement {
+    pub fn at_step(&self, n: usize) -> Option<MouseTransform> {
+        if n > self.max_step_count() {
+            return None;
+        }
+        Some(match self.movement {
+            MovementType::Turn(n) => self.start_transform.rotated(n),
+            MovementType::Move(n) => self.start_transform.moved(n)?,
+        })
+    }
+    pub fn max_step_count(&self) -> usize {
+        match self.movement {
+            MovementType::Turn(n) => n.abs() as usize,
+            MovementType::Move(n) => n as usize,
+        }
+    }
+}
+
+impl InterruptStep {
+    pub fn matches(&self, step_number: usize) -> bool {
+        match self {
+            InterruptStep::Each => true,
+            InterruptStep::At(x) => *x as usize == step_number,
+        }
+    }
+}
+
+impl<const N: usize> TransformedCommand<N> {
+    //TODO: Confirm
+    pub fn possible_results(&self) -> Vec<TransformedCommandResult<N>> {
+        // Transformed Movement = Movement we would get, if no interrupt ever activated
+        let transf_movement = TransformedMovement {
+            start_transform: self.start_transform,
+            movement: self.command.ty,
+        };
+        let max_step = transf_movement.max_step_count();
+        let mut results = vec![];
+
+        let mut step_start = PartialWorldData::new(self.starting_map.clone(), self.start_transform);
+        // let mut step_start_transf = self.start_transform;
+
+        for i in 0..max_step {
+            for interrupt in self.command.interrupts.iter() {
+                if !interrupt.at_step.matches(i) {
+                    continue;
+                }
+                let measurement = step_start.measure(interrupt.direction);
+
+                match (measurement, interrupt.action) {
+                    (_, InterruptAction::Continue) => {
+                        // Does not matter, command execution independent of wall, even if it is
+                        // known
+                        continue;
+                    }
+                    (WallDiscoveryStatus::Exists(true), InterruptAction::StopIfBlocked) => {
+                        // NEEDS TO STOP, no next step
+                        results.push(TransformedCommandResult(step_start));
+                        return results;
+                    }
+                    (WallDiscoveryStatus::Exists(true), InterruptAction::StopIfOpen) => {
+                        //Continues --> Interrupt explicitly not triggered
+                        continue;
+                    }
+                    (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfBlocked) => {
+                        //Continues --> Interrupt explicitly not triggered
+                        continue;
+                    }
+                    (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfOpen) => {
+                        // NEEDS TO STOP, no next step
+                        results.push(TransformedCommandResult(step_start));
+                        return results;
+                    }
+                    (WallDiscoveryStatus::Undiscovered, _action) => {
+                        // let terminating_case = match action {
+                        //     InterruptAction::StopIfOpen => WallDiscoveryStatus::Exists(false),
+                        //     InterruptAction::StopIfBlocked => WallDiscoveryStatus::Exists(true),
+                        //     _ => unreachable!(
+                        //         "Sorted out at the start, Continue-cases are not wanted here"
+                        //     ),
+                        // };
+                        let terminating_world = step_start
+                            .clone()
+                            .with_interrupt_triggered(true, interrupt.direction, interrupt.action)
+                            .expect("Interrupting here should be possible");
+                        //The terminating option is a separate result
+                        results.push(TransformedCommandResult(terminating_world));
+
+                        // If there is another interrupt contradicting the one that was applied
+                        // here --> Will automatically be weeded out in the next iterations of the
+                        // interrupt-loop <-- step_start is already adjusted to consider the only
+                        // way in which this movement can be continued
+                        //
+                        // ALSO: Do not need to add the option "What if a later interrupt stops the
+                        // program and not this one?" --> Interrupts are processed in order
+                        step_start = step_start
+                            .with_interrupt_triggered(false, interrupt.direction, interrupt.action)
+                            .expect("Not interrupting here should be possible");
+                    }
+                }
+            }
+        }
+
+        // Even the "normal" end of the commands has to be considered
+        results.push(TransformedCommandResult(step_start));
+
+        results
+    }
 }
