@@ -176,7 +176,7 @@ impl<const N: usize> Map<N> {
         Some(&mut self.cell_discovery_status[x][y])
     }
 
-    pub fn update_discovery(
+    pub fn apply_measurement(
         &mut self,
         measurement: &Measurement,
     ) -> Result<DiscoveryMessage, MapInconsistencyError> {

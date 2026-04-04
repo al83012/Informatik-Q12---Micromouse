@@ -12,7 +12,7 @@ use crate::{
         },
         website::DiscoveryMessage,
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
-    }, map::Map, nonempty::NonEmptyVec, position::MouseTransform
+    }, map::Map, nonempty::NonEmptyVec, position::MouseTransform, world_data::WorldData
 };
 
 pub struct MicromouseManager<const N: usize> {
@@ -22,18 +22,18 @@ pub struct MicromouseManager<const N: usize> {
     mode: MicromouseMode,
     /// 0.0 to 1.0
     battery: f32,
-    micromouse_position: MouseTransform,
+    world_data: WorldData<N>,
     map: Map<N>,
 }
 
 impl<const N: usize> MicromouseManager<N> {
     pub async fn new() -> Result<Self, WsChannelConnError> {
         todo!();
-        Ok(Self {
-            channel: WsChannel::new(WsChannelConfig::default(), 9001).await?,
-            next_cmd_id: AtomicU32::new(0),
-            unfinished_messages: Mutex::new(HashMap::new()),
-        })
+        // Ok(Self {
+        //     channel: WsChannel::new(WsChannelConfig::default(), 9001).await?,
+        //     next_cmd_id: AtomicU32::new(0),
+        //     unfinished_messages: Mutex::new(HashMap::new()),
+        // })
     }
 
     pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
@@ -72,7 +72,7 @@ impl<const N: usize> MicromouseManager<N> {
             }
             let next_response: MicromouseResponse = next_response.as_ref().unwrap().to_string().try_into()?;
             match next_response {
-                MicromouseResponse::Debug(_) => todo!(),
+                MicromouseResponse::Debug(msg) =>return Ok(NonEmptyVec::one(MicromouseEvent::DebugMessage(msg))),
                 MicromouseResponse::Measurement(measurement_message) => todo!(),
                 MicromouseResponse::CommandFinished(command_finished_message) => todo!(),
                 MicromouseResponse::Desync(command_ids) => todo!(),
@@ -98,6 +98,7 @@ On Desync: automatically resend all the commands; keep lock to prevent writing n
         )
         }
     }
+
 }
 
 #[derive(Debug, PartialEq)]

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use tungstenite::{Message, Utf8Bytes};
 
-use crate::direction::RelativeDirection;
+use crate::{direction::RelativeDirection, position::MouseTransform};
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CommandId(pub u32);
@@ -323,4 +323,19 @@ pub struct MeasurementMessage {
     pub interrupt: MeasurementOccurence,
     pub depth: Depth,
     pub is_sensorlimit: bool,
+}
+
+
+/// Represents a command in the context of its starting conditions: Once the first measurement is
+/// received, we know that a new command was started, then: we need to keep track of how the
+/// command execution is moving the micromouse around
+pub struct TransformedCommand {
+    start_transform: MouseTransform,
+    command: Command,
+}
+
+impl TransformedCommand {
+    pub fn at_step() -> MouseTransform {
+        todo!()
+    }  
 }

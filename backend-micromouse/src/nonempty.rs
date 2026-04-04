@@ -29,3 +29,10 @@ impl<'a, T: Sized> Into<&'a Vec<T>> for &'a NonEmptyVec<T> {
         &self.0
     }
 }
+
+
+impl<T: Sized> NonEmptyVec<T> {
+    pub fn one(element: T) -> Self {
+        Self(vec![element])
+    }
+}

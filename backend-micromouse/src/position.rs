@@ -12,3 +12,12 @@ pub struct MouseTransform {
     pub pos: Position,
     pub dir: Direction
 }
+
+impl Default for MouseTransform {
+    fn default() -> Self {
+        Self {
+            pos: Position { x: 0, y: 0 },
+            dir: Direction::PosX
+        }
+    }
+}

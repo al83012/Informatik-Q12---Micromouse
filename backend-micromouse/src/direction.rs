@@ -81,3 +81,36 @@ impl RelativeDirection {
         }
     }
 }
+
+impl Direction {
+    pub const COUNTER_CLOCKWISE_ROTATIONS: [Self; 4] = [
+        Direction::PosX,
+        Direction::PosY,
+        Direction::NegX,
+        Direction::NegY,
+    ];
+
+    fn rotation_index(&self) -> usize {
+        for i in 0..4 {
+            if &Self::COUNTER_CLOCKWISE_ROTATIONS[i] == self {
+                return i;
+            }
+        }
+        panic!("Direction has to be in list");
+    }
+
+    //TODO: unittests
+    pub fn rotated(&self, interval_counter_clockwise: i8) -> Self {
+        let rot_idx = self.rotation_index();
+        let transformed_rot_idx = rot_idx as i8 + interval_counter_clockwise;
+        let idx = if transformed_rot_idx > 0 {
+            transformed_rot_idx as usize % 4
+        } else {
+            let from_last = transformed_rot_idx.abs() as usize % 4;
+            3 - from_last
+        };
+
+        Self::COUNTER_CLOCKWISE_ROTATIONS[idx]
+    }
+
+}
