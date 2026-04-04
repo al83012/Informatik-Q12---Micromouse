@@ -23,6 +23,9 @@ using namespace websockets;
 
 
 
+
+String wifi_name = "micromouse_pi_hotspot";
+String wifi_password = "012345678";
 String websockets_server = "ws://";
 uint16_t port = 9001;
 
@@ -67,7 +70,7 @@ void onEventsCallback(WebsocketsEvent event, String data) {
 
 void initWiFi() {
   WiFi.mode(WIFI_STA);
-  WiFi.begin("HOTSPOT-TEST", "12345678");
+  WiFi.begin(wifi_name, wifi_password);
 
   Serial.print("Connecting to WiFi ..");
   while (WiFi.status() != WL_CONNECTED) {
