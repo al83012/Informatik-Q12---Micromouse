@@ -21,6 +21,7 @@ pub struct Map<const N: usize> {
 // Wrapping a Map, nothing special, but signifies, that the Map does not represent a full state,
 // but just what is known (--> Every Status is upgradable (e.g. Undiscovered could in truth be
 // Discovered))
+#[derive(Copy, Clone, PartialEq, Debug, Eq)]
 pub struct PartialMap<const N: usize>(pub Map<N>);
 
 

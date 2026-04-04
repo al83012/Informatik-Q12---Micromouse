@@ -21,7 +21,7 @@ pub struct MicromouseManager<const N: usize> {
     unfinished_messages: Mutex<HashMap<CommandId, CommandMessage>>,
     mode: MicromouseMode,
     /// 0.0 to 1.0
-    battery: f32,
+    // battery: f32,
     world_data: WorldData<N>,
     map: Map<N>,
 }
@@ -85,17 +85,17 @@ impl<const N: usize> MicromouseManager<N> {
 
 
 
-            todo!(
-            "Processing all the events which can be handled internally --> 
-Automatically adjust the position after each substep, so that measurements can be transformed and applied to the map;
-(Only cause event if there is a nonempty discovery message);
-Update the map (like clearing it), also with Stop and Restart;
-Clear commands that are sent while the micromouse is stopped / error on send-attempt;
-Clear queue etc. on stop;
-
-On Desync: automatically resend all the commands; keep lock to prevent writing new tasks
-"
-        )
+//             todo!(
+//             "Processing all the events which can be handled internally --> 
+// Automatically adjust the position after each substep, so that measurements can be transformed and applied to the map;
+// (Only cause event if there is a nonempty discovery message);
+// Update the map (like clearing it), also with Stop and Restart;
+// Clear commands that are sent while the micromouse is stopped / error on send-attempt;
+// Clear queue etc. on stop;
+//
+// On Desync: automatically resend all the commands; keep lock to prevent writing new tasks
+// "
+//         )
         }
     }
 

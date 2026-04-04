@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::position::{Position, PositionOffset};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Direction {
     PosX,
@@ -112,5 +114,13 @@ impl Direction {
 
         Self::COUNTER_CLOCKWISE_ROTATIONS[idx]
     }
-
+    pub fn steps_in_dir(self, steps: u8) -> PositionOffset {
+        let dir_vec: DirectionNormalizedVector = self.into();
+        let d_x = dir_vec.x;
+        let d_y = dir_vec.y;
+        PositionOffset {
+            d_x: d_x as i32 * steps as i32,
+            d_y: d_y as i32 * steps as i32,
+        }
+    }
 }
