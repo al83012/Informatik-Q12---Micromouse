@@ -17,6 +17,9 @@ use tungstenite::{
     Bytes, Error, Message, Utf8Bytes,
 };
 
+#[cfg(feature = "comm_stats")]
+use incr_stats;
+
 use crate::comm::{ChannelConnConfig, ChannelConnError};
 
 pub struct WsChannel {
@@ -91,6 +94,10 @@ pub struct WsChannelInternal {
     mode: WsChannelMode,
     ping_num: u64,
     port: u16,
+    #[cfg(feature = "comm_stats")]
+    latency_stats: incr_stats::incr::Stats,
+    #[cfg(feature = "comm_stats")]
+    period_stats: incr_stats::incr::Stats,
 }
 
 impl WsChannelInternal {
@@ -138,6 +145,10 @@ impl WsChannelInternal {
             mode: WsChannelMode::Stable,
             ping_num: 0,
             port,
+            #[cfg(feature = "comm_stats")]
+            latency_stats: incr_stats::incr::Stats::new(),
+            #[cfg(feature = "comm_stats")]
+            period_stats: incr_stats::incr::Stats::new(),
         })
     }
 
@@ -223,8 +234,19 @@ impl WsChannelInternal {
                     let time_since_last_pong = self.last_pong.elapsed();
                     let time_since_last_ping = self.last_ping.elapsed();
 
-                    self.last_pong = Instant::now();
                     info!(target: "comm", "RECV PONG (latency = {time_since_last_ping:?}, period = {time_since_last_pong:?})");
+                    #[cfg(feature = "comm_stats")]
+                    {
+                        let _ = self.latency_stats.array_update(&[time_since_last_ping.as_millis() as f64]);
+                        let _ = self.period_stats.array_update(&[time_since_last_pong.as_millis() as f64]);
+                        let avg_latency = self.latency_stats.sum().unwrap() as u32 / self.latency_stats.count();
+                        let avg_period = self.period_stats.sum().unwrap() as u32 / self.latency_stats.count();
+                        let sd_latency = self.latency_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
+                        let sd_period = self.period_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
+                        info!(target: "comm", "LATENCY: ⌀ = {avg_latency}, σ = {sd_latency}");
+                        info!(target: "comm", "PERIOD : ⌀ = {avg_period}, σ = {sd_period}");
+                    }
+                    self.last_pong = Instant::now();
                 }
                 Message::Ping(_bytes) => self.handle_ping().await,
                 Message::Close(c) => {
@@ -364,6 +386,8 @@ impl WsChannel {
 
         let listener = TcpListener::bind(("0.0.0.0", port)).await?;
 
+        info!(target: "comm", "CREATED new TcpListener");
+
         let (read_sender, read_recv) = tokio::sync::mpsc::channel(config.buffer_size);
         let (send_request_sender, send_request_recv) =
             tokio::sync::mpsc::channel::<Message>(config.buffer_size);
@@ -478,7 +502,6 @@ impl WsChannel {
             .await
             .expect("Error while writing to mpsc channel");
     }
-
 }
 
 impl Drop for WsChannel {

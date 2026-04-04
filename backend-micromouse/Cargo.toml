@@ -12,3 +12,8 @@ futures-util = "0.3"
 log = "*"
 env_logger = "*"
 tokio-util = "*"
+incr_stats = "*"
+
+[features]
+comm_stats = []
+default = ["comm_stats"]
