@@ -26,7 +26,7 @@ impl<const N: usize> WorldData<N> {
         &mut self,
         measurement: &Measurement,
     ) -> Result<crate::comm::website::DiscoveryMessage, map::MapInconsistencyError> {
-        self.map.apply_measurement(&measurement)
+        self.map.apply_measurement(measurement)
     }
     pub fn measure(&self, relative_direction: RelativeDirection) -> &WallDiscoveryStatus {
         self.map

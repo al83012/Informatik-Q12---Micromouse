@@ -4,9 +4,9 @@ use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     direction::RelativeDirection,
-    map::{PartialMap, WallDiscoveryStatus},
+    map::{Map, PartialMap, WallDiscoveryStatus},
     position::MouseTransform,
-    strategy::PartialWorldData,
+    strategy::PartialWorldData, world_data::WorldData,
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -16,7 +16,7 @@ type Battery = u8;
 
 type Depth = u32;
 
-type StepNum = u32;
+pub type StepNum = u32;
 
 pub enum MicromouseMessage {
     MicromouseCommand(CommandMessage),
@@ -357,6 +357,9 @@ pub struct TransformedCommand<const N: usize> {
 pub struct TransformedCommandResult<const N: usize>(pub PartialWorldData<N>);
 
 impl TransformedMovement {
+    pub fn new(movement: MovementType, current_transform: MouseTransform) -> Self {
+        Self { start_transform: current_transform, movement }
+    }
     pub fn at_step(&self, n: usize) -> Option<MouseTransform> {
         if n > self.max_step_count() {
             return None;
@@ -384,6 +387,16 @@ impl InterruptStep {
 }
 
 impl<const N: usize> TransformedCommand<N> {
+    pub fn new(cmd: Command, current_world: impl Into<WorldData<N>>) -> Self {
+        let world: WorldData<N> = current_world.into();
+        
+        TransformedCommand {
+            start_transform: world.mouse,
+            command: cmd,
+            starting_map: PartialMap(world.map),
+        }
+
+    }
     //TODO: Confirm
     pub fn possible_results(&self) -> Vec<TransformedCommandResult<N>> {
         // Transformed Movement = Movement we would get, if no interrupt ever activated
