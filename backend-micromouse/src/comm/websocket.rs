@@ -243,8 +243,8 @@ impl WsChannelInternal {
                         let avg_period = self.period_stats.sum().unwrap() as u32 / self.latency_stats.count();
                         let sd_latency = self.latency_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
                         let sd_period = self.period_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
-                        info!(target: "comm", "LATENCY: ⌀ = {avg_latency}, σ = {sd_latency}");
-                        info!(target: "comm", "PERIOD : ⌀ = {avg_period}, σ = {sd_period}");
+                        info!(target: "comm", "LATENCY: Ø = {avg_latency}, σ = {sd_latency}");
+                        info!(target: "comm", "PERIOD : Ø = {avg_period}, σ = {sd_period}");
                     }
                     self.last_pong = Instant::now();
                 }

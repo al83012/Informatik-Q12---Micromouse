@@ -22,8 +22,14 @@ Write-Host "New connection"
 Start-Sleep -Seconds 5
 
 # Deploy + run
+
+# Stopping restart and then killing previous processes
+Write-Host "Stopping previous"
+ssh arne_lender@micromouse-pi "touch /home/arne_lender/stop_micromouse && pkill -f 'backend-micromouse'"
+Write-Host "Copying File"
 scp "C://Users/arnel/Desktop/Other/Schule/Informatik - 12/Projekt - Q12_2/Informatik-Q12---Micromouse/backend-micromouse/target/aarch64-unknown-linux-musl/release/backend-micromouse" arne_lender@micromouse-pi:/home/arne_lender/
-ssh arne_lender@micromouse-pi "chmod +x ./backend-micromouse && ./backend-micromouse"
+Write-Host "Restart"
+ssh arne_lender@micromouse-pi "chmod +x ./backend-micromouse && rm /home/arne_lender/stop_micromouse && sudo reboot"
 
 
 netsh wlan disconnect
