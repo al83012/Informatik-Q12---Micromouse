@@ -11,6 +11,8 @@ t23 {
     /*--bg: #181F10;*/
     --bg: #0f0f12;
     --bg_old: #0a0c12;
+    --bg_path: #0765A0;
+    --shadow_path: #4994C3;
     --text-color: #7F3D41/*#6B2737;*/;
     --button-text-color: #D9C5B2;
     --square_size: 30px;
@@ -450,6 +452,66 @@ body {
     border-width: 1px;
     border-style: dashed;
     border-color: black;
+}
+
+.path_container {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    z-index: 18; /*height of all path_containers*/
+}
+
+.path_row_tb {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 25% !important;
+    flex-direction: row;
+    justify-content: center;
+}
+
+.path_row_middle {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    height: 50% !important;
+    flex-direction: row;
+    justify-content: center;
+    z-index: 19; /*to be on top of every box shadow*/
+}
+
+.path_tile_tb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 50% !important;
+    background: var(--bg_path);
+    /*box-shadow: darkgray 0 0 2px 2px;
+    border-left-width: 1px;
+    border-left-style: solid;
+    border-left-color: var(--shadow_path);*/
+}
+
+.path_tile_lr {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 25% !important;
+    background: var(--bg_path);
+    /*box-shadow: var(--bg_path) 0 0 2px 2px;*/
+}
+
+.path_tile_middle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    width: 50% !important;
+    background: var(--bg_path);
 }
 
 .unselectable {

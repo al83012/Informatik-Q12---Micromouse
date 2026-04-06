@@ -52,6 +52,8 @@ export class Index {
                 });
         }
 
+        init_maze();
+
         StyleAdder.disableForClass();
 
         //creating the AnimationHandler
@@ -157,6 +159,59 @@ export class Index {
     }
 }
 
+function init_maze() {
+    for (let i = 0; i < 16*16; i++) {
+        let tile = Index.squares[convert_index_to_coords(i)];
+        let container = document.createElement("div");
+        container.className = "path_container";
+        container.id = "path_container_" + i;
+
+        let row_up = document.createElement("div");
+        row_up.className = "path_row_tb"
+        row_up.id = "path_row_up_" + i;
+
+        let row_middle = document.createElement("div");
+        row_middle.className = "path_row_middle";
+        row_middle.id = "path_row_middle_" + i;
+
+        let row_down = document.createElement("div");
+        row_down.className = "path_row_tb";
+        row_down.id = "path_row_down_" + i;
+
+        let up = document.createElement("div");
+        up.className = "path_tile_tb";
+        up.id = "path_tile_up_" + i;
+
+        let down = document.createElement("div");
+        down.className = "path_tile_tb";
+        down.id = "path_tile_down_" + i;
+
+        let right = document.createElement("div");
+        right.className = "path_tile_lr";
+        right.id = "path_tile_right_" + i;
+
+        let left = document.createElement("div");
+        left.className = "path_tile_lr";
+        left.id = "path_tile_left_" + i;
+
+        let middle = document.createElement("div");
+        middle.className = "path_tile_middle";
+        middle.id = "path_tile_middle_" + i;
+
+        row_up.appendChild(up);
+        row_middle.appendChild(left);
+        row_middle.appendChild(middle);
+        row_middle.appendChild(right);
+        row_down.appendChild(down);
+
+        container.appendChild(row_up);
+        container.appendChild(row_middle);
+        container.appendChild(row_down);
+
+        tile.appendChild(container);
+    }
+}
+
 function play_reset_animation() {
     let group_main = new AnimGroup(4);
     for (let i = 0; i<16; i++) {
@@ -178,6 +233,10 @@ function convert_index_to_coords(i) {
     x = (i)%16;
     y = (i-x)/16;
     return [x,y];
+}
+
+function convert_coords_to_index(i) {
+    return i[1]*16+i[0];
 }
 
 function select_square(square) {
