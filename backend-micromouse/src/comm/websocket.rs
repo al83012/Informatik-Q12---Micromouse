@@ -21,6 +21,8 @@ use tungstenite::{
 use incr_stats;
 
 use crate::comm::{ChannelConnConfig, ChannelConnError};
+#[cfg(feature = "comm_stats")]
+use crate::stats::StatAccumulator;
 
 pub struct WsChannel {
     // There is no specific read-request, as we are reading continuously
@@ -95,9 +97,11 @@ pub struct WsChannelInternal {
     ping_num: u64,
     port: u16,
     #[cfg(feature = "comm_stats")]
-    latency_stats: incr_stats::incr::Stats,
+    latency_stats: StatAccumulator,
+    // latency_stats: incr_stats::incr::Stats,
     #[cfg(feature = "comm_stats")]
-    period_stats: incr_stats::incr::Stats,
+    period_stats: StatAccumulator,
+    // period_stats: incr_stats::incr::Stats,
 }
 
 impl WsChannelInternal {
@@ -146,9 +150,11 @@ impl WsChannelInternal {
             ping_num: 0,
             port,
             #[cfg(feature = "comm_stats")]
-            latency_stats: incr_stats::incr::Stats::new(),
+            latency_stats: StatAccumulator::new(1000),
+            // latency_stats: incr_stats::incr::Stats::new(),
             #[cfg(feature = "comm_stats")]
-            period_stats: incr_stats::incr::Stats::new(),
+            period_stats: StatAccumulator::new(1000),
+            // period_stats: incr_stats::incr::Stats::new(),
         })
     }
 
@@ -237,14 +243,48 @@ impl WsChannelInternal {
                     info!(target: "comm", "RECV PONG (latency = {time_since_last_ping:?}, period = {time_since_last_pong:?})");
                     #[cfg(feature = "comm_stats")]
                     {
-                        let _ = self.latency_stats.array_update(&[time_since_last_ping.as_millis() as f64]);
-                        let _ = self.period_stats.array_update(&[time_since_last_pong.as_millis() as f64]);
-                        let avg_latency = self.latency_stats.sum().unwrap() as u32 / self.latency_stats.count();
-                        let avg_period = self.period_stats.sum().unwrap() as u32 / self.latency_stats.count();
-                        let sd_latency = self.latency_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
-                        let sd_period = self.period_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
-                        info!(target: "comm", "LATENCY: Ø = {avg_latency}, σ = {sd_latency}");
-                        info!(target: "comm", "PERIOD : Ø = {avg_period}, σ = {sd_period}");
+                        self.latency_stats
+                            .add(time_since_last_ping.as_millis() as f64);
+                        self.period_stats
+                            .add(time_since_last_pong.as_millis() as f64);
+
+                        let stat_count = self.latency_stats.count();
+
+                        let avg_latency = self.latency_stats.avg().unwrap_or(0.0);
+                        let avg_period = self.period_stats.avg().unwrap_or(0.0);
+
+                        info!(target: "comm/stats", "AVG LATENCY: Ø = {avg_latency:.0}");
+                        info!(target: "comm/stats", "AVG PERIOD : Ø = {avg_period:.0}");
+
+                        if stat_count.is_multiple_of(50) && stat_count >= 50 {
+                            let sd_latency = self.latency_stats.standard_deviation().unwrap_or(0.0);
+                            let sd_period = self.period_stats.standard_deviation().unwrap_or(0.0);
+
+                            info!(target: "comm/stats", "SD LATENCY: σ = {sd_latency:.0}");
+                            info!(target: "comm/stats", "SD PERIOD : σ = {sd_period:.0}");
+
+                            const NUM_OF_CHUNKS: usize = 10;
+
+                            let percentiles_latency =
+                                self.latency_stats.percentile_chunks(NUM_OF_CHUNKS);
+                            let percentiles_period =
+                                self.period_stats.percentile_chunks(NUM_OF_CHUNKS);
+
+                            if let Some(percentiles_latency) = percentiles_latency {
+                                info!(target: "comm/stats", "{}", percentiles_latency);
+                            }
+                            if let Some(percentiles_period) = percentiles_period {
+                                info!(target: "comm/stats", "{}", percentiles_period);
+                            }
+                        }
+                        // let _ = self.latency_stats.array_update(&[time_since_last_ping.as_millis() as f64]);
+                        // let _ = self.period_stats.array_update(&[time_since_last_pong.as_millis() as f64]);
+                        // let avg_latency = self.latency_stats.sum().unwrap() as u32 / self.latency_stats.count();
+                        // let avg_period = self.period_stats.sum().unwrap() as u32 / self.latency_stats.count();
+                        // let sd_latency = self.latency_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
+                        // let sd_period = self.period_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
+                        // info!(target: "comm", "LATENCY: Ø = {avg_latency}, σ = {sd_latency}");
+                        // info!(target: "comm", "PERIOD : Ø = {avg_period}, σ = {sd_period}");
                     }
                     self.last_pong = Instant::now();
                 }
