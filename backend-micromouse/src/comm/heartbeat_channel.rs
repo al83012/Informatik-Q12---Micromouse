@@ -7,7 +7,7 @@ use std::{
 };
 
 use futures_util::lock::Mutex;
-use log::{error, info};
+use tracing::{error, info};
 use tokio::{
     select,
     sync::mpsc::{Receiver, Sender},

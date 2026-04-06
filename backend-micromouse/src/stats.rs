@@ -107,8 +107,9 @@ impl StatAccumulator {
         let mut chunks = Vec::with_capacity(number_of_chunks);
         for chunk in 0..number_of_chunks {
             let mut new_chunk = Vec::with_capacity(chunk_size);
-            for i in (chunk * count / number_of_chunks)..((chunk + 1) * count / number_of_chunks) {
-                new_chunk.push(values[i]);
+            for v in &values[(chunk * count / number_of_chunks)..((chunk + 1) * count / number_of_chunks)] {
+                
+                new_chunk.push(*v);
             }
             chunks.push(new_chunk);
         }

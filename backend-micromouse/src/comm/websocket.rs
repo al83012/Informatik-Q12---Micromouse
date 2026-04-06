@@ -1,7 +1,6 @@
 use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
-use log::{error, info, warn};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::{
@@ -12,6 +11,8 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, WebSocketStream};
 use tokio_util::{bytes::Buf, sync::CancellationToken};
+use tracing::{debug, error, info, warn};
+use tracing_log::log::Level;
 use tungstenite::{
     protocol::{frame::coding::CloseCode, CloseFrame},
     Bytes, Error, Message, Utf8Bytes,
@@ -182,7 +183,7 @@ impl WsChannelInternal {
 
     // Tries sending ping; if there is a connection error: retries
     pub async fn handle_ping(&mut self) {
-        info!(target: "comm", "HANDLE PING ({})", self.ping_num);
+        debug!(target: "comm", "HANDLE PING ({})", self.ping_num);
         if let Err(e) = self
             .ws_stream
             .as_mut()
@@ -204,7 +205,7 @@ impl WsChannelInternal {
 
     // Retries sending the msg, doing reconnect attempts in-between
     pub async fn handle_send(&mut self, msg: Message) {
-        info!(target: "comm", "HANDLE SEND {msg:?}");
+        debug!(target: "comm", "HANDLE SEND {msg:?}");
         loop {
             let send_res = self
                 .ws_stream
@@ -228,7 +229,7 @@ impl WsChannelInternal {
 
     // Tries reconnecting if a recoverable error was read, otherwise processes the message
     pub async fn handle_read(&mut self, read_res: Result<Message, Error>) {
-        info!(target: "comm", "HANDLE READ ({read_res:?})");
+        debug!(target: "comm", "HANDLE READ ({read_res:?})");
         match read_res {
             Ok(msg) => match msg {
                 Message::Text(_) | Message::Binary(_) => self
@@ -240,7 +241,11 @@ impl WsChannelInternal {
                     let time_since_last_pong = self.last_pong.elapsed();
                     let time_since_last_ping = self.last_ping.elapsed();
 
-                    info!(target: "comm", "RECV PONG (latency = {time_since_last_ping:?}, period = {time_since_last_pong:?})");
+                    if time_since_last_ping.as_millis() < 50 {
+                        debug!(target: "comm", "RECV PONG (latency = {time_since_last_ping:?}, period = {time_since_last_pong:?})");
+                    } else {
+                        warn!(target: "comm", "RECV PONG (latency = {time_since_last_ping:?}, period = {time_since_last_pong:?})");
+                    }
                     #[cfg(feature = "comm_stats")]
                     {
                         self.latency_stats
@@ -248,20 +253,19 @@ impl WsChannelInternal {
                         self.period_stats
                             .add(time_since_last_pong.as_millis() as f64);
 
-                        let stat_count = self.latency_stats.count();
-
+                        let stat_count = self.ping_num;
                         let avg_latency = self.latency_stats.avg().unwrap_or(0.0);
                         let avg_period = self.period_stats.avg().unwrap_or(0.0);
 
-                        info!(target: "comm/stats", "AVG LATENCY: Ø = {avg_latency:.0}");
-                        info!(target: "comm/stats", "AVG PERIOD : Ø = {avg_period:.0}");
+                        debug!(target: "comm/stats", "AVG LATENCY: Ø = {avg_latency:.0}");
+                        debug!(target: "comm/stats", "AVG PERIOD : Ø = {avg_period:.0}");
 
                         if stat_count.is_multiple_of(50) && stat_count >= 50 {
                             let sd_latency = self.latency_stats.standard_deviation().unwrap_or(0.0);
                             let sd_period = self.period_stats.standard_deviation().unwrap_or(0.0);
 
-                            info!(target: "comm/stats", "SD LATENCY: σ = {sd_latency:.0}");
-                            info!(target: "comm/stats", "SD PERIOD : σ = {sd_period:.0}");
+                            debug!(target: "comm/stats", "SD LATENCY: σ = {sd_latency:.0}");
+                            debug!(target: "comm/stats", "SD PERIOD : σ = {sd_period:.0}");
 
                             const NUM_OF_CHUNKS: usize = 10;
 
@@ -271,10 +275,10 @@ impl WsChannelInternal {
                                 self.period_stats.percentile_chunks(NUM_OF_CHUNKS);
 
                             if let Some(percentiles_latency) = percentiles_latency {
-                                info!(target: "comm/stats", "{}", percentiles_latency);
+                                debug!(target: "comm/stats", "{}", percentiles_latency);
                             }
                             if let Some(percentiles_period) = percentiles_period {
-                                info!(target: "comm/stats", "{}", percentiles_period);
+                                debug!(target: "comm/stats", "{}", percentiles_period);
                             }
                         }
                         // let _ = self.latency_stats.array_update(&[time_since_last_ping.as_millis() as f64]);
@@ -335,7 +339,7 @@ impl WsChannelInternal {
         &mut self,
         error: std::io::Error,
     ) -> Result<(), WsChannelConnError> {
-        info!(target: "comm", "HANDLE ERROR? ({error})");
+        debug!(target: "comm", "HANDLE ERROR? ({error})");
         match error.kind() {
             ErrorKind::ConnectionReset
             | ErrorKind::ConnectionAborted
@@ -344,7 +348,7 @@ impl WsChannelInternal {
             | ErrorKind::TimedOut => {
                 // Try reconnect
 
-                info!(target: "comm", "RECOVERABLE --> RECONNECT");
+                debug!(target: "comm", "RECOVERABLE --> RECONNECT");
                 self.reconnect().await
             }
             _ => {
@@ -465,16 +469,16 @@ impl WsChannel {
                         warn!(target: "comm", "STABILIZING!!!");
                         tokio::select! {
                             _ = ws_internal.cancellation_token.cancelled() => {
-                                info!(target: "comm", "STABILIZING CANCEL");
+                                debug!(target: "comm", "STABILIZING CANCEL");
                                 ws_internal.handle_close().await;
                                 break;
                             }
                             _ = ws_internal.send_interval.tick() => {
-                                info!(target: "comm", "STABILIZING PING");
+                                debug!(target: "comm", "STABILIZING PING");
                                 ws_internal.handle_ping().await;
                             }
                             read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
-                                info!(target: "comm", "STABILIZING READ");
+                                debug!(target: "comm", "STABILIZING READ");
                                 if let Some(read_res) = read_res {
                                     ws_internal.handle_read(read_res).await;
                                 }
@@ -487,22 +491,22 @@ impl WsChannel {
                         info!(target: "comm", "STABLE TICK");
                         tokio::select! {
                             _ = ws_internal.cancellation_token.cancelled() => {
-                                info!(target: "comm", "STABLE CANCEL");
+                                debug!(target: "comm", "STABLE CANCEL");
                                 ws_internal.handle_close().await;
                                 break;
                             }
                             _ = ws_internal.send_interval.tick() => {
-                                info!(target: "comm", "STABLE PING");
+                                debug!(target: "comm", "STABLE PING");
                                 ws_internal.handle_ping().await;
                             }
                             read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
-                                info!(target: "comm", "STABLE READ");
+                                debug!(target: "comm", "STABLE READ");
                                 if let Some(read_res) = read_res {
                                     ws_internal.handle_read(read_res).await;
                                 }
                             }
                             send_req = ws_internal.send_request_recv.recv() => {
-                                info!(target: "comm", "STABLE SEND");
+                                debug!(target: "comm", "STABLE SEND");
                                 if let Some(send_req) = send_req {
                                     ws_internal.handle_send(send_req).await;
                                 }

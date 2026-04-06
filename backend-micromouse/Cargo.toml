@@ -9,10 +9,15 @@ tungstenite = "0.28.0"
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = "0.28.0"
 futures-util = "0.3"
-log = "*"
-env_logger = "*"
+# log = "*"
+# env_logger = "*"
 tokio-util = "*"
 incr_stats = "*"
+# log4rs 
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+tracing-log = "0.2" # optional= "*"
+console = "0"
 
 [features]
 comm_stats = []

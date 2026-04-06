@@ -25,6 +25,7 @@ using namespace websockets;
 
 
 String wifi_name = "micromouse_pi_hotspot";
+//String wifi_name = "HOTSPOT-TEST";
 String wifi_password = "012345678";
 String websockets_server = "ws://";
 uint16_t port = 9001;

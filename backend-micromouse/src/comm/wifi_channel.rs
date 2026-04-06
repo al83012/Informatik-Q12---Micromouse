@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures_util::FutureExt;
-use log::{error, info, warn};
+use tracing::{error, info, warn};
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, Lines},
     net::{
