@@ -182,7 +182,7 @@ export class AnimSlideColor extends Animation {
 }
 
 export class AnimBackgroundColor extends Animation {
-    constructor(duration, object, color_start, color_end, on_finished = () => {}) {
+    constructor(duration, object, color_start, color_end, on_finished = (obj) => {}, on_start = (obj) => {}) {
         super(duration, object);
 
         this.color_start = hexToRgb(color_start);
@@ -193,11 +193,15 @@ export class AnimBackgroundColor extends Animation {
         this.db = this.color_end.b - this.color_start.b;
 
         this.exec = on_finished;
+        this.on_start = on_start;
     }
 
     execute() {
         if (this.finished) {
             return;
+        }
+        if (this.remaining_duration === this.duration) {
+            this.on_start(this.object);
         }
 
         this.color_start.r += Math.round(this.dr/this.duration);
@@ -210,7 +214,7 @@ export class AnimBackgroundColor extends Animation {
 
         if (this.remaining_duration <= 0) {
             this.finished = true;
-            this.exec();
+            this.exec(this.object);
             this.object.style.backgroundColor = rgbToHex(this.color_end.r, this.color_end.g, this.color_end.b);
         }
     }

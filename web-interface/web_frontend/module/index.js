@@ -52,8 +52,6 @@ export class Index {
                 });
         }
 
-        init_maze();
-
         StyleAdder.disableForClass();
 
         //creating the AnimationHandler
@@ -65,6 +63,10 @@ export class Index {
             request.open("GET", document.location.origin + "/update", true);
             request.send();
         }, 100);
+
+
+        init_maze();
+
 
         //let borderAnim = new AnimBorderColor(100, Index.squares[[5, 5]], "darkblue", "cyan");
         //Index.animHandler.add(borderAnim);
@@ -210,15 +212,41 @@ function init_maze() {
 
         tile.appendChild(container);
     }
+
+    reset_maze(false);
 }
 
-function play_reset_animation() {
+function reset_maze(play_anim) {
+    if (play_anim) {
+        play_reset_animation((object) => {
+            let children = object.children[0].children;
+            for (let i = 0; i < children.length; i++) {
+                for (let j = 0; j < children[i].children.length; j++) {
+                    children[i].children[j].style.background = "var(--maze_bg)";
+                }
+            }
+        });
+    } else {
+        //TODO: reset without anim
+        for (let i = 0; i < 16*16; i++) {
+            let tile = Index.squares[convert_index_to_coords(i)];
+            let children = tile.children[0].children;
+            for (let i = 0; i < children.length; i++) {
+                for (let j = 0; j < children[i].children.length; j++) {
+                    children[i].children[j].style.background = "var(--maze_bg)";
+                }
+            }
+        }
+    }
+}
+
+function play_reset_animation(on_finished = (obj) => {}) {
     let group_main = new AnimGroup(4);
-    for (let i = 0; i<16; i++) {
+    for (let i = 0; i < 16; i++) {
         let group_row = new AnimGroup(3);
-        for (let j = 0; j<16; j++) {
+        for (let j = 0; j < 16; j++) {
             let group_tile = new AnimGroup(-1);
-            group_tile.add(new AnimBackgroundColor(25, Index.squares[[j, i]], "#0a0e1a", "#FFFFFF"));
+            group_tile.add(new AnimBackgroundColor(25, Index.squares[[j, i]], "#0a0e1a", "#FFFFFF", on_finished));
             group_tile.add(new AnimBackgroundColor(25, Index.squares[[j, i]], "#FFFFFF", "#0a0e1a"));
             group_row.add(group_tile);
         }
