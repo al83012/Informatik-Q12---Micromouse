@@ -17,7 +17,8 @@ incr_stats = "*"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tracing-log = "0.2" # optional= "*"
-console = "0"
+console = "*"
+rand = "*"
 
 [features]
 comm_stats = []

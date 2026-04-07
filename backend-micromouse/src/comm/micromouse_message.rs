@@ -5,7 +5,8 @@ use tungstenite::{Message, Utf8Bytes};
 use crate::{
     direction::RelativeDirection,
     map::{Map, PartialMap, WallDiscoveryStatus},
-    position::MouseTransform, world_data::{PartialWorldData, WorldData},
+    position::MouseTransform,
+    world_data::{PartialWorldData, WorldData},
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -336,14 +337,16 @@ pub struct MeasurementMessage {
     pub is_sensorlimit: bool,
 }
 
-/// Represents a command in the context of its starting conditions: Once the first measurement is
-/// received, we know that a new command was started, then: we need to keep track of how the
-/// command execution is moving the micromouse around
+/// Represents a movement in the context of its starting conditions: Does not do any work to figure
+/// out interrupts; believes the movement will succeed
 pub struct TransformedMovement {
     start_transform: MouseTransform,
     movement: MovementType,
 }
 
+/// Represents a command in the context of its starting conditions: Once the first measurement is
+/// received, we know that a new command was started, then: we need to keep track of how the
+/// command execution is moving the micromouse around
 pub struct TransformedCommand<const N: usize> {
     start_transform: MouseTransform,
     command: Command,
@@ -353,11 +356,23 @@ pub struct TransformedCommand<const N: usize> {
 // Stores one of the potential results of a transformed command --> The partial world data shows
 // the transform with which the command finishes as well as the parts of the world which are
 // required for this case to become true
-pub struct TransformedCommandResult<const N: usize>(pub PartialWorldData<N>);
+pub struct TransformedCommandResult<const N: usize>(pub PartialWorldData<N>, pub StepNum);
+
+impl MovementType {
+    pub fn max_step_count(&self) -> usize {
+        match self {
+            Self::Turn(x) => x.unsigned_abs() as usize,
+            Self::Move(x) => *x as usize,
+        }
+    }
+}
 
 impl TransformedMovement {
     pub fn new(movement: MovementType, current_transform: MouseTransform) -> Self {
-        Self { start_transform: current_transform, movement }
+        Self {
+            start_transform: current_transform,
+            movement,
+        }
     }
     pub fn at_step(&self, n: usize) -> Option<MouseTransform> {
         if n > self.max_step_count() {
@@ -369,10 +384,7 @@ impl TransformedMovement {
         })
     }
     pub fn max_step_count(&self) -> usize {
-        match self.movement {
-            MovementType::Turn(n) => n.unsigned_abs() as usize,
-            MovementType::Move(n) => n as usize,
-        }
+        self.movement.max_step_count()
     }
 }
 
@@ -388,13 +400,12 @@ impl InterruptStep {
 impl<const N: usize> TransformedCommand<N> {
     pub fn new(cmd: Command, current_world: impl Into<WorldData<N>>) -> Self {
         let world: WorldData<N> = current_world.into();
-        
+
         TransformedCommand {
             start_transform: world.mouse,
             command: cmd,
             starting_map: PartialMap(world.map),
         }
-
     }
     //TODO: Confirm
     pub fn possible_results(&self) -> Vec<TransformedCommandResult<N>> {
@@ -424,7 +435,7 @@ impl<const N: usize> TransformedCommand<N> {
                     }
                     (WallDiscoveryStatus::Exists(true), InterruptAction::StopIfBlocked) => {
                         // NEEDS TO STOP, no next step
-                        results.push(TransformedCommandResult(step_start));
+                        results.push(TransformedCommandResult(step_start, i as u32));
                         return results;
                     }
                     (WallDiscoveryStatus::Exists(true), InterruptAction::StopIfOpen) => {
@@ -437,7 +448,7 @@ impl<const N: usize> TransformedCommand<N> {
                     }
                     (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfOpen) => {
                         // NEEDS TO STOP, no next step
-                        results.push(TransformedCommandResult(step_start));
+                        results.push(TransformedCommandResult(step_start, i as u32));
                         return results;
                     }
                     (WallDiscoveryStatus::Undiscovered, _action) => {
@@ -453,7 +464,7 @@ impl<const N: usize> TransformedCommand<N> {
                             .with_interrupt_triggered(true, interrupt.direction, interrupt.action)
                             .expect("Interrupting here should be possible");
                         //The terminating option is a separate result
-                        results.push(TransformedCommandResult(terminating_world));
+                        results.push(TransformedCommandResult(terminating_world, i as u32));
 
                         // If there is another interrupt contradicting the one that was applied
                         // here --> Will automatically be weeded out in the next iterations of the
@@ -471,7 +482,7 @@ impl<const N: usize> TransformedCommand<N> {
         }
 
         // Even the "normal" end of the commands has to be considered
-        results.push(TransformedCommandResult(step_start));
+        results.push(TransformedCommandResult(step_start, max_step as u32));
 
         results
     }

@@ -18,6 +18,7 @@ dependencies = [
  "console",
  "futures-util",
  "incr_stats",
+ "rand 0.8.5",
  "serde",
  "tokio",
  "tokio-tungstenite",

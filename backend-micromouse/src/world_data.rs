@@ -1,8 +1,10 @@
 use std::{fmt::Display, ops::Deref};
 
 use crate::{
-    comm::micromouse_message::InterruptAction,
-    direction::RelativeDirection,
+    comm::micromouse_message::{
+        Command, InterruptAction, MeasurementInterrupt, StepNum, TransformedCommand,
+    },
+    direction::{Direction, RelativeDirection},
     map::{self, Map, PartialMap, WallDiscoveryStatus},
     measurement::{self, Measurement},
     position::MouseTransform,
@@ -31,6 +33,12 @@ impl<const N: usize> WorldData<N> {
         self.map.apply_measurement(measurement)
     }
     pub fn measure_one(&self, relative_direction: RelativeDirection) -> &WallDiscoveryStatus {
+        let measure_dir = relative_direction.transform_by(&self.mouse.dir);
+        if (self.mouse.pos.x == 0 && measure_dir == Direction::NegX)
+            || (self.mouse.pos.y == 0 && measure_dir == Direction::NegY)
+        {
+            return &WallDiscoveryStatus::Exists(true);
+        }
         self.map
             .wall(
                 &self.mouse.pos,
@@ -38,16 +46,107 @@ impl<const N: usize> WorldData<N> {
             )
             .expect("")
     }
+    pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
+        let start_pos = self.mouse;
+        for i in 0..=max_depth {
+            let current_pos = start_pos.moved(i);
+            if current_pos.is_none() {
+                return Measurement {
+                    value: measurement::MeasurementValue::Value { cells: i as u32 },
+                    direction: relative_direction.transform_by(&start_pos.dir),
+                    position: start_pos.pos,
+                };
+            }
+            let current_pos = current_pos.unwrap();
+            let next_wall = self
+                .map
+                .wall(&current_pos.pos, &start_pos.dir)
+                .expect("Already checked");
+            if i != max_depth {
+                // Not yet the end --> could continue
+                match next_wall {
+                    //INFO: The ray only doesn't hit a wall if it is explicitly not there
+                    //Does not work, if it is the max-depth: int that case HAS to create a measurement
+                    WallDiscoveryStatus::Exists(false) => continue,
+                    WallDiscoveryStatus::Exists(true) => {
+                        return Measurement {
+                            value: measurement::MeasurementValue::Value { cells: i as u32 },
+                            direction: start_pos.dir,
+                            position: start_pos.pos,
+                        };
+                    }
+                    WallDiscoveryStatus::Undiscovered => {
+                        return Measurement {
+                            value: measurement::MeasurementValue::OutsideRange {
+                                at_least_cells: i as u32,
+                            },
+                            direction: relative_direction.transform_by(&start_pos.dir),
+                            position: start_pos.pos,
+                        };
+                    }
+                }
+            } else {
+                match next_wall {
+                    //
+                    WallDiscoveryStatus::Exists(false) => {
+                        return Measurement {
+                            value: measurement::MeasurementValue::OutsideRange {
+                                at_least_cells: i as u32,
+                            },
+                            direction: relative_direction.transform_by(&start_pos.dir),
+                            position: start_pos.pos,
+                        };
+                    }
+                    WallDiscoveryStatus::Exists(true) => {
+                        return Measurement {
+                            value: measurement::MeasurementValue::Value { cells: i as u32 },
+                            direction: start_pos.dir,
+                            position: start_pos.pos,
+                        };
+                    }
+                    WallDiscoveryStatus::Undiscovered => {
+                        return Measurement {
+                            value: measurement::MeasurementValue::OutsideRange {
+                                at_least_cells: i as u32,
+                            },
+                            direction: relative_direction.transform_by(&start_pos.dir),
+                            position: start_pos.pos,
+                        };
+                    }
+                }
+            }
+        }
+        Measurement {
+            value: measurement::MeasurementValue::OutsideRange {
+                at_least_cells: max_depth as u32,
+            },
+            direction: start_pos.dir,
+            position: start_pos.pos,
+        }
+    }
 
+    pub fn is_interrupt_triggered(
+        &self,
+        interrupt: MeasurementInterrupt,
+        at_step: StepNum,
+    ) -> bool {
+        if !interrupt.at_step.matches(at_step as usize) {
+            return false;
+        }
+        let wall = self.measure_one(interrupt.direction);
+
+        matches!(
+            (wall, interrupt.action),
+            (
+                WallDiscoveryStatus::Exists(true),
+                InterruptAction::StopIfBlocked
+            ) | (
+                WallDiscoveryStatus::Exists(false),
+                InterruptAction::StopIfOpen
+            )
+        )
+    }
 }
-
-
-
-pub struct TransformingWorldData<const N: usize> {
-    // world_data: 
-}
-
-
 
 /// Same as WorldData, but signifies, that it is not the problem state at the end of a step, but
 /// an incomplete look into the future (The contained map does not include all the information that
@@ -58,7 +157,11 @@ pub struct PartialWorldData<const N: usize>(WorldData<N>);
 
 impl<const N: usize> Display for PartialWorldData<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "PARTIAL(pos = {:?}, dir = {:?})\n{}", self.0.mouse.pos, self.0.mouse.dir, self.0.map)
+        write!(
+            f,
+            "PARTIAL(pos = {:?}, dir = {:?})\n{}",
+            self.0.mouse.pos, self.0.mouse.dir, self.0.map
+        )
     }
 }
 
@@ -142,10 +245,69 @@ impl<const N: usize> PartialWorldData<N> {
     }
 
     pub fn new(partial_map: PartialMap<N>, mouse_transform: MouseTransform) -> Self {
-        Self(WorldData { map: partial_map.0, mouse: mouse_transform })
+        Self(WorldData {
+            map: partial_map.0,
+            mouse: mouse_transform,
+        })
     }
 
     pub fn map(&self) -> PartialMap<N> {
         PartialMap(self.map)
     }
 }
+
+pub struct CommandExecution<const N: usize> {
+    pub world: WorldData<N>,
+    pub command: Command,
+    pub next_step: usize,
+}
+
+pub enum CommandStepResult<const N: usize> {
+    Ongoing(CommandExecution<N>),
+    Finished(WorldData<N>),
+}
+
+pub const SIM_MAX_DEPTH: u8 = 4;
+
+impl<const N: usize> CommandExecution<N> {
+    pub fn new(world: WorldData<N>, command: Command) -> Self {
+        Self {
+            world: WorldData::default(),
+            command,
+            next_step: 0,
+        }
+    }
+    pub fn next(mut self) -> (Vec<Measurement>, CommandStepResult<N>) {
+        let mut measurements = vec![];
+
+        for interrupt in self.command.interrupts.iter() {
+            if interrupt.at_step.matches(self.next_step) {
+                let measurement = self.world.measure(interrupt.direction, SIM_MAX_DEPTH);
+                measurements.push(measurement);
+                if self
+                    .world
+                    .is_interrupt_triggered(*interrupt, self.next_step as u32)
+                {
+                    return (measurements, CommandStepResult::Finished(self.world));
+                }
+            }
+        }
+
+        self.world.mouse = self
+            .world
+            .mouse
+            .step_once(self.command.ty)
+            .expect("Command Execution outside bounds");
+
+        self.next_step += 1;
+
+        if self.next_step > self.command.ty.max_step_count() {
+            (measurements, CommandStepResult::Finished(self.world))
+        } else {
+            (measurements, CommandStepResult::Ongoing(self))
+        }
+    }
+}
+
+
+

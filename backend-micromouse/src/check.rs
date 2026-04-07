@@ -1,5 +1,8 @@
 use crate::{
-    map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus}, position::Position, world_data::PartialWorldData, world_data::WorldData
+    comm::micromouse_message::TransformedCommandResult,
+    map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus},
+    position::Position,
+    world_data::{PartialWorldData, WorldData},
 };
 
 pub trait PotentiallyEq {
@@ -61,7 +64,6 @@ impl<const N: usize> PotentiallyEq for Map<N> {
     }
 }
 
-
 impl<const N: usize> PotentiallyEq for WorldData<N> {
     type Other = PartialWorldData<N>;
 
@@ -76,3 +78,6 @@ impl<const N: usize> PotentiallyEq for WorldData<N> {
         true
     }
 }
+
+
+
