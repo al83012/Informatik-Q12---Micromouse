@@ -370,6 +370,10 @@ body {
     border-top: darkgray 1px solid;
 }
 
+/*
+ *  Entire maze square including the sensor info in the maze header
+ */
+
 .maze_container {
     display: flex;
     width: fit-content;/*calc(var(--square_size_full)*16);*/
@@ -435,7 +439,7 @@ body {
     align-items: center;
     justify-content: center;
     background-color: red;
-    margin: 35px;
+    margin: 27px;
     box-shadow: darkslategray 0 0 5px 5px;
 }
 
@@ -447,13 +451,18 @@ body {
 }
 
 .maze_tile {
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     background-color: #0a0e1a;
     border-width: 1px;
     border-style: dashed;
     border-color: black;
 }
+
+/*
+ *  Old path system which got replaced by the new Arm system.
+ *  Still here as an emergency fallback system
+ */
 
 .path_container {
     display: flex;
@@ -514,6 +523,34 @@ body {
     width: 50% !important;
     background: var(--bg_path);
 }
+
+/*
+ *  Using new Arm system for displaying paths instead of path system
+ *  Arm system includes a middle point and for "arms" which are smaller
+ *  but more noticeable
+ */
+
+.sys-arm_container {
+    width: 100%;
+    height: 100%;
+    background: #fa0;
+    z-index: 18; /*the arm system operates on z-index 18 and above*/
+}
+
+.sys-arm_arm {
+    position: relative;
+    background: #1a1e2e;
+    border-radius: 3px;
+    z-index: 19;
+}
+
+.sys-arm_arm-n, .sys-arm_arm-s {
+    width: 5px;
+    height: calc(50% - 6px);
+    left: 50%;
+}
+
+
 
 .unselectable {
     cursor: default;

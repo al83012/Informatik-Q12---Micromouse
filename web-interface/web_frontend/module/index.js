@@ -161,7 +161,13 @@ export class Index {
     }
 }
 
-function init_maze() {
+
+//new function for initializing using the arm system
+function init_maze() {}
+
+//deprecated function using the path system
+//now replaced by the arm system
+function dep_init_maze() {
     for (let i = 0; i < 16*16; i++) {
         let tile = Index.squares[convert_index_to_coords(i)];
         let container = document.createElement("div");
@@ -213,7 +219,7 @@ function init_maze() {
         tile.appendChild(container);
     }
 
-    reset_maze(false);
+    //reset_maze(false);
 }
 
 function reset_maze(play_anim) {
@@ -270,7 +276,7 @@ function convert_coords_to_index(i) {
 function select_square(square) {
     square.style.borderColor = "orange";
 
-    let borderAnim = new AnimBorderInner(20, square, 3, 2, 2, [1, 30, 30]);
+    let borderAnim = new AnimBorderInner(20, square, 3, 2, 2, [1, 32, 32]);
     Index.animHandler.addImmediate(borderAnim);
 
     current_state = ["point", "stopped"];
@@ -279,7 +285,7 @@ function select_square(square) {
 function unselect_square(square) {
     square.style.borderColor = "black";
 
-    let borderAnim = new AnimBorderInner(20, square, 2, 3, 1, [2, 28, 28]);
+    let borderAnim = new AnimBorderInner(20, square, 2, 3, 1, [2, 30, 30]);
     Index.animHandler.addImmediate(borderAnim);
 
     current_state = ["reset", "finished"];
