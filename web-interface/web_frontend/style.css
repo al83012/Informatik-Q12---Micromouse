@@ -451,10 +451,10 @@ body {
 }
 
 .maze_tile {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     background-color: #0a0e1a;
-    border-width: 1px;
+    border-width: 0px;
     border-style: dashed;
     border-color: black;
 }
@@ -531,16 +531,17 @@ body {
  */
 
 .sys-arm_container {
+    position: relative;
     width: 100%;
     height: 100%;
-    background: #fa0;
+    /*background: #fa0;*/
     z-index: 18; /*the arm system operates on z-index 18 and above*/
 }
 
 .sys-arm_arm {
-    position: relative;
+    position: absolute;
     background: #1a1e2e;
-    border-radius: 3px;
+    border-radius: 2px;
     z-index: 19;
 }
 
@@ -548,8 +549,19 @@ body {
     width: 5px;
     height: calc(50% - 6px);
     left: 50%;
+    transform: translateX(-50%);
 }
+.sys-arm_arm-n { top: 0; border-radius: 2px 2px 0 0; }
+.sys-arm_arm-s { bottom: 0; border-radius: 0 0 2px 2px;}
 
+.sys-arm_arm-e, .sys-arm_arm-w {
+    height: 5px;
+    width: calc(50% - 6px);
+    top: 50%;
+    transform: translateY(-50%);
+}
+.sys-arm_arm-e { right: 0; border-radius: 0 2px 2px 0; }
+.sys-arm_arm-w { left: 0; border-radius: 2px 0 0 2px; }
 
 
 .unselectable {

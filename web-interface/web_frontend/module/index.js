@@ -276,7 +276,7 @@ function convert_coords_to_index(i) {
 function select_square(square) {
     square.style.borderColor = "orange";
 
-    let borderAnim = new AnimBorderInner(20, square, 3, 2, 2, [1, 32, 32]);
+    let borderAnim = new AnimBorderInner(20, square, 3, 1, 2, [0, 34, 34]);
     Index.animHandler.addImmediate(borderAnim);
 
     current_state = ["point", "stopped"];
@@ -285,7 +285,7 @@ function select_square(square) {
 function unselect_square(square) {
     square.style.borderColor = "black";
 
-    let borderAnim = new AnimBorderInner(20, square, 2, 3, 1, [2, 30, 30]);
+    let borderAnim = new AnimBorderInner(20, square, 1, 3, 0, [2, 30, 30]);
     Index.animHandler.addImmediate(borderAnim);
 
     current_state = ["reset", "finished"];
