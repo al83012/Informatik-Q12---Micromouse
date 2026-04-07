@@ -15,3 +15,4 @@ backend-micromouse/target
 
 # node.js modules folder
 /web-interface/web_backend/node_modules/
+/web-interface/micromouse_design_demo.html
