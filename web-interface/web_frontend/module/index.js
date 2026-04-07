@@ -269,6 +269,26 @@ function reset_maze(play_anim) {
         play_reset_animation((object) => {
             let children = object.children[0].children;
             for (let i = 0; i < children.length; i++) {
+                children[i].className = children[i].className.replaceAll(" on", "");
+            }
+        });
+    } else {
+        for (let i = 0; i < 16*16; i++) {
+            let tile = Index.squares[convert_index_to_coords(i)];
+            for (let j = 0; j < tile.children[0].children.length; j++) {
+                tile.children[0].children[i].className = tile.children[0].children[j].className.replaceAll(" on", "");
+            }
+        }
+    }
+}
+
+//deprecated
+//old function that used the path system
+function dep_reset_maze(play_anim) {
+    if (play_anim) {
+        play_reset_animation((object) => {
+            let children = object.children[0].children;
+            for (let i = 0; i < children.length; i++) {
                 for (let j = 0; j < children[i].children.length; j++) {
                     children[i].children[j].style.background = "var(--maze_bg)";
                 }
