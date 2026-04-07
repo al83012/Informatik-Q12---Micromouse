@@ -102,6 +102,9 @@ export class Index {
                     document.getElementById("pill_con_dot").style.borderColor = (data["status"] ? "green" : "red");
                     document.getElementById("pill_con_text").innerHTML = (data["status"] ? "online" : "offline");
                     break;
+                case "reset_maze":
+                    reset_maze(data["animation"] === "true");
+                    break;
             }
         });
     }

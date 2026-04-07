@@ -62,4 +62,8 @@ export class Actions {
     static update_con_status(status) {
         return new Action("update_con_status", new Map([["status", status]]));
     }
+
+    static reset_maze(play_anim) {
+        return new Action("reset_maze", new Map([["animation", play_anim]]));
+    }
 }
