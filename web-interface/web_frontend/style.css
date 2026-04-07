@@ -19,6 +19,9 @@ t23 {
     --square_size: 30px;
     --square_size_full: calc(var(--square_size) + var(--square_border_size)*2);
     --square_border_size: 1px;
+    --arm: #00cfff;
+    --arm-glow: rgba(0,207,255,0.6);
+    --node: #00cfff;
 }
 
 body {
@@ -532,6 +535,8 @@ body {
 
 .sys-arm_container {
     position: relative;
+    align-content: center;
+    justify-items: center;
     width: 100%;
     height: 100%;
     /*background: #fa0;*/
@@ -562,6 +567,31 @@ body {
 }
 .sys-arm_arm-e { right: 0; border-radius: 0 2px 2px 0; }
 .sys-arm_arm-w { left: 0; border-radius: 2px 0 0 2px; }
+
+.sys-arm_arm.on {
+    background: var(--arm);
+    box-shadow: 0 0 8px var(--arm-glow), 0 0 2px var(--arm);
+}
+
+.sys-arm_node {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: #1e2438;
+    border: 1.5px solid #2a3050;
+    position: relative;
+    /*transform: translate(104%, 104%);*/
+    transform: translate(-4%, 4%);
+    z-index: 19;
+    flex-shrink: 0;
+}
+
+.sys-arm_node.on {
+    background: var(--node);
+    border-color: var(--node);
+    box-shadow: 0 0 10px var(--arm-glow), 0 0 20px rgba(0,207,255,0.25);
+}
+
+
 
 
 .unselectable {

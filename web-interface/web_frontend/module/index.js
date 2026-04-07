@@ -163,7 +163,49 @@ export class Index {
 
 
 //new function for initializing using the arm system
-function init_maze() {}
+function init_maze() {
+    for (let i = 0; i < 16*16; i++) {
+        let coords = convert_index_to_coords(i);
+        let tile = Index.squares[coords];
+
+        let arm_container = document.createElement("div");
+        arm_container.className = "sys-arm_container";
+        tile.appendChild(arm_container);
+
+        let node = document.createElement("div");
+        node.className = "sys-arm_node";
+        node.id = "sys-arm_node_" + i;
+        arm_container.appendChild(node);
+
+        if (!(coords[1] === 0)) {
+            let arm_up = document.createElement("div");
+            arm_up.className = "sys-arm_arm sys-arm_arm-n";
+            arm_up.id = "sys-arm_arm-n_" + i;
+            arm_container.appendChild(arm_up);
+        }
+
+        if (!(coords[1] === 15)) {
+            let arm_down = document.createElement("div");
+            arm_down.className = "sys-arm_arm sys-arm_arm-s";
+            arm_down.id = "sys-arm_arm-s_" + i;
+            arm_container.appendChild(arm_down);
+        }
+
+        if (!(coords[0] === 0)) {
+            let arm_left = document.createElement("div");
+            arm_left.className = "sys-arm_arm sys-arm_arm-w";
+            arm_left.id = "sys-arm_arm-w_" + i;
+            arm_container.appendChild(arm_left);
+        }
+
+        if (!(coords[0] === 15)) {
+            let arm_right = document.createElement("div");
+            arm_right.className = "sys-arm_arm sys-arm_arm-e";
+            arm_right.id = "sys-arm_arm-e_" + i;
+            arm_container.appendChild(arm_right);
+        }
+    }
+}
 
 //deprecated function using the path system
 //now replaced by the arm system
