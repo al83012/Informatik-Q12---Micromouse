@@ -24,6 +24,7 @@ pub mod world_data;
 pub mod logging;
 pub mod map_display;
 pub mod check;
+pub mod command_world_state;
 
 #[cfg(test)]
 pub mod tests;
