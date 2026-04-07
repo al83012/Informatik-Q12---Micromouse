@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use rand::Rng;
 use tracing::{debug, info};
 
@@ -15,7 +17,7 @@ use crate::{
 
 #[test]
 pub fn do_random_moves() {
-    let mut rng = rand::thread_rng();
+    // let mut rng = rand::thread_rng();
     let mut world = test_world(0.6);
     let mut partial_world = PartialWorldData::<TEST_MAP_SIZE>::default();
     run_test("info", || {
@@ -98,7 +100,7 @@ pub fn do_random_moves() {
 
         let mut cmd_iter = commands.into_iter().cycle();
         let mut transf_move;
-        for i in 0..100 {
+        for i in 0..500 {
             // let ty = if rng.gen_range(0.0..1.0) > 0.2
             //     && *world.measure_one(crate::direction::RelativeDirection::Forward)
             //         == WallDiscoveryStatus::Exists(false)
@@ -142,11 +144,13 @@ pub fn do_random_moves() {
             let next_cmd = cmd_iter.next().clone().expect("Iterator is cycling");
 
             debug!(target: "tests/map", "NEW TRANSF MOVE");
-            transf_move = TransformedMovement::new(next_cmd.ty, partial_world.mouse);
+            let cmd_ty = next_cmd.ty;
+            transf_move = TransformedMovement::new(cmd_ty, partial_world.mouse);
 
             debug!(target: "tests/map", "NEXT CMD: {next_cmd:?}");
 
             let mut command_executor = CommandExecution::new(world, next_cmd);
+            let mut last_step = 0;
 
             loop {
                 let res = command_executor.next();
@@ -157,6 +161,20 @@ pub fn do_random_moves() {
                 match is_continuing {
                     EndState::Ongoing(e) => {
                         debug!(target: "tests/map", "ONGOING --> apply move {:?}", partial_world.mouse);
+                        if last_step + 1 == steps_done {
+                            // crossed boundary?
+                            
+                            if let MovementType::Move(_) = cmd_ty {
+                                let direction = partial_world.mouse.dir;
+                                let from_cell = partial_world.mouse.pos;
+                                if let Some(boundary) = partial_world.map.wall_mut(&from_cell, &direction) {
+                                    *boundary = WallDiscoveryStatus::Visited;
+                                }
+                            }
+                        }
+                        last_step = steps_done;
+
+                        //TODO: Auslagern
                         partial_world.mouse = transf_move
                             .at_step(steps_done)
                             .expect("Overexceeded move steps");

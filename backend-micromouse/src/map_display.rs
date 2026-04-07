@@ -396,6 +396,10 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
                 let right_wall = value.wall(&pos, &dir_right).expect("Wall should exist");
                 match right_wall {
                     WallDiscoveryStatus::Undiscovered => {}
+                    WallDiscoveryStatus::Visited => {
+                        let mut wall = display.wall_mut(pos, dir_right).expect("Wall should exist");
+                        wall.inner().apply_style(visited_style.clone());
+                    }
                     WallDiscoveryStatus::Exists(exists) => {
                         let mut wall = display.wall_mut(pos, dir_right).expect("Wall should exist");
                         if *exists {
@@ -412,6 +416,10 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
                 let lower_wall = value.wall(&pos, &dir_down).expect("Wall should exist");
                 match lower_wall {
                     WallDiscoveryStatus::Undiscovered => {}
+                    WallDiscoveryStatus::Visited => {
+                        let mut wall = display.wall_mut(pos, dir_down).expect("Wall should exist");
+                        wall.inner().apply_style(visited_style.clone());
+                    }
                     WallDiscoveryStatus::Exists(exists) => {
                         let mut wall = display.wall_mut(pos, dir_down).expect("Wall should exist");
                         if *exists {
@@ -444,3 +452,5 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
         display
     }
 }
+
+

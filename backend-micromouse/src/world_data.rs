@@ -8,7 +8,8 @@ use tracing::{debug, info};
 
 use crate::{
     comm::micromouse_message::{
-        Command, InterruptAction, MeasurementInterrupt, StepNum, TransformedCommand,
+        Command, InterruptAction, MeasurementInterrupt, MovementType, StepNum, TransformedCommand,
+        TransformedMovement,
     },
     direction::{Direction, RelativeDirection},
     map::{self, Map, PartialMap, WallDiscoveryStatus},
@@ -56,7 +57,10 @@ impl<const N: usize> WorldData<N> {
     pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
         let start_transform = self.mouse;
         let measure_dir = relative_direction.transform_by(&start_transform.dir);
-        let ray_transform = MouseTransform{pos: start_transform.pos, dir: measure_dir};
+        let ray_transform = MouseTransform {
+            pos: start_transform.pos,
+            dir: measure_dir,
+        };
         debug!(target: "map/measure", "Starting measure {start_transform:?} -> {relative_direction}");
         for i in 0..=max_depth {
             let current_pos = ray_transform.moved(i);
@@ -86,7 +90,7 @@ impl<const N: usize> WorldData<N> {
                 match next_wall {
                     //INFO: The ray only doesn't hit a wall if it is explicitly not there
                     //Does not work, if it is the max-depth: int that case HAS to create a measurement
-                    WallDiscoveryStatus::Exists(false) => continue,
+                    WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => continue,
                     WallDiscoveryStatus::Exists(true) => {
                         return Measurement {
                             value: measurement::MeasurementValue::Value { cells: i as u32 },
@@ -107,7 +111,7 @@ impl<const N: usize> WorldData<N> {
             } else {
                 match next_wall {
                     //
-                    WallDiscoveryStatus::Exists(false) => {
+                    WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => {
                         return Measurement {
                             value: measurement::MeasurementValue::OutsideRange {
                                 at_least_cells: i as u32,
@@ -160,7 +164,7 @@ impl<const N: usize> WorldData<N> {
                 WallDiscoveryStatus::Exists(true),
                 InterruptAction::StopIfBlocked
             ) | (
-                WallDiscoveryStatus::Exists(false),
+                WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
                 InterruptAction::StopIfOpen
             )
         )
@@ -240,7 +244,10 @@ impl<const N: usize> PartialWorldData<N> {
                     return None;
                 }
             }
-            (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfOpen) => {
+            (
+                WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
+                InterruptAction::StopIfOpen,
+            ) => {
                 if should_trigger {
                     *deciding_wall
                 } else {
@@ -249,7 +256,10 @@ impl<const N: usize> PartialWorldData<N> {
             }
 
             // Interrupt will never be triggered
-            (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfBlocked) => {
+            (
+                WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
+                InterruptAction::StopIfBlocked,
+            ) => {
                 if !should_trigger {
                     *deciding_wall
                 } else {
@@ -286,6 +296,10 @@ impl<const N: usize> Default for PartialWorldData<N> {
         Self(WorldData::default())
     }
 }
+
+
+
+
 
 pub struct CommandExecution<const N: usize> {
     pub world: WorldData<N>,

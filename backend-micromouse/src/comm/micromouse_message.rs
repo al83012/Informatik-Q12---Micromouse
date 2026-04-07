@@ -444,11 +444,11 @@ impl<const N: usize> TransformedCommand<N> {
                         //Continues --> Interrupt explicitly not triggered
                         continue;
                     }
-                    (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfBlocked) => {
+                    (WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited, InterruptAction::StopIfBlocked) => {
                         //Continues --> Interrupt explicitly not triggered
                         continue;
                     }
-                    (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfOpen) => {
+                    (WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited, InterruptAction::StopIfOpen) => {
                         // NEEDS TO STOP, no next step
                         results.push(TransformedCommandResult(step_start, i as u32));
                         return results;
