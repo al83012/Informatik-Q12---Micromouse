@@ -41,14 +41,14 @@ pub enum WallDiscoveryStatus {
     Exists(bool),
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct WallDiscovery {
     pub new_status: WallDiscoveryStatus,
     pub from_cell: Position,
     pub in_direction: Direction,
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
 pub struct CellDiscovery {
     pub new_status: CellDiscoveryStatus,
     pub at_cell: Position,
@@ -359,114 +359,12 @@ impl<const N: usize> Default for Map<N> {
     }
 }
 
+
 impl<const N: usize> Display for Map<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         debug!(target: "tests/map/display", "Starting format");
 
-        let dim = self.cell_discovery_status.len();
-        let mut display = MapDisplay::new(dim, 9, 5);
-
-        let discovered_style = Style::new().on_black().on_bright().white();
-        let visited_style = Style::new().on_white().black();
-
-        for x in 0..dim {
-            let pos = Position { x: x as u32, y: 0 };
-            let dir = Direction::NegY;
-            // let upper_wall = self.wall(&pos, &dir).expect("Wall should exist");
-            // match upper_wall {
-            // WallDiscoveryStatus::Undiscovered => {
-            //     continue;
-            // }
-            // WallDiscoveryStatus::Exists(exists) => {
-            let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
-            //     if *exists {
-            wall.full().set_char('+');
-            wall.inner().set_char('-');
-            wall.full().apply_style(discovered_style.clone().red());
-            //             } else {
-            //                 wall.inner().apply_style(discovered_style.clone());
-            //             }
-            //         }
-            //     }
-        }
-        for y in 0..dim {
-            let pos = Position { x: 0, y: y as u32 };
-            let dir = Direction::NegX;
-            // let upper_wall = self.wall(&pos, &dir).expect("Wall should exist");
-            // match upper_wall {
-            //     WallDiscoveryStatus::Undiscovered => {
-            //         continue;
-            //     }
-            //     WallDiscoveryStatus::Exists(exists) => {
-            let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
-            // if *exists {
-            wall.full().set_char('+');
-            wall.inner().set_char('|');
-            wall.full().apply_style(discovered_style.clone().red());
-            //         } else {
-            //             wall.inner().apply_style(discovered_style.clone());
-            //         }
-            //     }
-            // }
-        }
-
-        for x in 0..dim {
-            for y in 0..dim {
-                let pos = Position {
-                    x: x as u32,
-                    y: y as u32,
-                };
-                let dir_right = Direction::PosX;
-                let dir_down = Direction::PosY;
-
-                let right_wall = self.wall(&pos, &dir_right).expect("Wall should exist");
-                match right_wall {
-                    WallDiscoveryStatus::Undiscovered => {}
-                    WallDiscoveryStatus::Exists(exists) => {
-                        let mut wall = display.wall_mut(pos, dir_right).expect("Wall should exist");
-                        if *exists {
-                            wall.full().set_char('+');
-                            wall.inner().set_char('|');
-                            // wall.full().apply_style(Style::new().on_red());
-                            wall.full().apply_style(discovered_style.clone().red());
-                        } else {
-                            // wall.inner().apply_style(Style::new().on_red());
-                            wall.inner().apply_style(discovered_style.clone());
-                        }
-                    }
-                }
-                let lower_wall = self.wall(&pos, &dir_down).expect("Wall should exist");
-                match lower_wall {
-                    WallDiscoveryStatus::Undiscovered => {}
-                    WallDiscoveryStatus::Exists(exists) => {
-                        let mut wall = display.wall_mut(pos, dir_down).expect("Wall should exist");
-                        if *exists {
-                            wall.full().set_char('+');
-                            wall.inner().set_char('-');
-                            // wall.full().apply_style(Style::new().on_blue());
-                            wall.full().apply_style(discovered_style.clone().red());
-                        } else {
-                            // wall.inner().apply_style(Style::new().on_blue());
-                            wall.inner().apply_style(discovered_style.clone());
-                        }
-                    }
-                }
-                let cell = self.cell(&pos).expect("Cell should exist");
-                let mut cell_vis = display.cell_mut(pos).expect("Cell should exist");
-
-                match cell {
-                    CellDiscoveryStatus::Undiscovered => {
-                        // cell_vis.apply_style(Style::new().on_yellow());
-                    }
-                    CellDiscoveryStatus::Discovered => {
-                        cell_vis.apply_style(discovered_style.clone());
-                    }
-                    CellDiscoveryStatus::Visited => {
-                        cell_vis.apply_style(visited_style.clone());
-                    }
-                }
-            }
-        }
+        let display = MapDisplay::from(self);
 
         writeln!(f, "{}", display)?;
 

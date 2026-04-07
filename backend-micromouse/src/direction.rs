@@ -87,9 +87,9 @@ impl RelativeDirection {
 impl Direction {
     pub const COUNTER_CLOCKWISE_ROTATIONS: [Self; 4] = [
         Direction::PosX,
-        Direction::PosY,
-        Direction::NegX,
         Direction::NegY,
+        Direction::NegX,
+        Direction::PosY,
     ];
 
     fn rotation_index(&self) -> usize {
@@ -105,12 +105,18 @@ impl Direction {
     pub fn rotated(&self, interval_counter_clockwise: i8) -> Self {
         let rot_idx = self.rotation_index();
         let transformed_rot_idx = rot_idx as i8 + interval_counter_clockwise;
-        let idx = if transformed_rot_idx > 0 {
+        let idx = if transformed_rot_idx >= 0 {
             transformed_rot_idx as usize % 4
         } else {
-            let from_last = transformed_rot_idx.abs() as usize % 4;
-            3 - from_last
+            let from_last =  (transformed_rot_idx.abs() - 1) % 4;
+            3 - from_last as usize 
         };
+        // let idx = if transformed_rot_idx > 0 {
+        //     transformed_rot_idx as usize % 4
+        // } else {
+        //     let from_last = transformed_rot_idx.abs() as usize % 4;
+        //     3 - from_last
+        // };
 
         Self::COUNTER_CLOCKWISE_ROTATIONS[idx]
     }

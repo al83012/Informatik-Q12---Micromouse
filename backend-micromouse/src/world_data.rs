@@ -1,4 +1,10 @@
-use std::{fmt::Display, ops::Deref};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
+
+use console::Style;
+use tracing::{debug, info};
 
 use crate::{
     comm::micromouse_message::{
@@ -6,6 +12,7 @@ use crate::{
     },
     direction::{Direction, RelativeDirection},
     map::{self, Map, PartialMap, WallDiscoveryStatus},
+    map_display::{MapDisplay, MapDisplayWrite},
     measurement::{self, Measurement},
     position::MouseTransform,
 };
@@ -47,21 +54,33 @@ impl<const N: usize> WorldData<N> {
             .expect("")
     }
     pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
-        let start_pos = self.mouse;
+        let start_transform = self.mouse;
+        let measure_dir = relative_direction.transform_by(&start_transform.dir);
+        let ray_transform = MouseTransform{pos: start_transform.pos, dir: measure_dir};
+        debug!(target: "map/measure", "Starting measure {start_transform:?} -> {relative_direction}");
         for i in 0..=max_depth {
-            let current_pos = start_pos.moved(i);
+            let current_pos = ray_transform.moved(i);
+            debug!(target: "map/measure", "Checking pos = {current_pos:?}");
             if current_pos.is_none() {
+                debug!(target: "map/measure", "CHECK out of bounds --> Mark as collision");
                 return Measurement {
                     value: measurement::MeasurementValue::Value { cells: i as u32 },
-                    direction: relative_direction.transform_by(&start_pos.dir),
-                    position: start_pos.pos,
+                    direction: measure_dir,
+                    position: ray_transform.pos,
                 };
             }
             let current_pos = current_pos.unwrap();
-            let next_wall = self
-                .map
-                .wall(&current_pos.pos, &start_pos.dir)
-                .expect("Already checked");
+            let next_wall = self.map.wall(&current_pos.pos, &measure_dir);
+            // .expect("Already checked");
+            if next_wall.is_none() {
+                debug!(target: "map/measure", "HIT map wall");
+                return Measurement {
+                    value: measurement::MeasurementValue::Value { cells: i as u32 },
+                    direction: measure_dir,
+                    position: ray_transform.pos,
+                };
+            }
+            let next_wall = next_wall.unwrap();
             if i != max_depth {
                 // Not yet the end --> could continue
                 match next_wall {
@@ -71,8 +90,8 @@ impl<const N: usize> WorldData<N> {
                     WallDiscoveryStatus::Exists(true) => {
                         return Measurement {
                             value: measurement::MeasurementValue::Value { cells: i as u32 },
-                            direction: start_pos.dir,
-                            position: start_pos.pos,
+                            direction: measure_dir,
+                            position: ray_transform.pos,
                         };
                     }
                     WallDiscoveryStatus::Undiscovered => {
@@ -80,8 +99,8 @@ impl<const N: usize> WorldData<N> {
                             value: measurement::MeasurementValue::OutsideRange {
                                 at_least_cells: i as u32,
                             },
-                            direction: relative_direction.transform_by(&start_pos.dir),
-                            position: start_pos.pos,
+                            direction: measure_dir,
+                            position: ray_transform.pos,
                         };
                     }
                 }
@@ -93,15 +112,15 @@ impl<const N: usize> WorldData<N> {
                             value: measurement::MeasurementValue::OutsideRange {
                                 at_least_cells: i as u32,
                             },
-                            direction: relative_direction.transform_by(&start_pos.dir),
-                            position: start_pos.pos,
+                            direction: measure_dir,
+                            position: ray_transform.pos,
                         };
                     }
                     WallDiscoveryStatus::Exists(true) => {
                         return Measurement {
                             value: measurement::MeasurementValue::Value { cells: i as u32 },
-                            direction: start_pos.dir,
-                            position: start_pos.pos,
+                            direction: measure_dir,
+                            position: ray_transform.pos,
                         };
                     }
                     WallDiscoveryStatus::Undiscovered => {
@@ -109,8 +128,8 @@ impl<const N: usize> WorldData<N> {
                             value: measurement::MeasurementValue::OutsideRange {
                                 at_least_cells: i as u32,
                             },
-                            direction: relative_direction.transform_by(&start_pos.dir),
-                            position: start_pos.pos,
+                            direction: measure_dir,
+                            position: ray_transform.pos,
                         };
                     }
                 }
@@ -120,8 +139,8 @@ impl<const N: usize> WorldData<N> {
             value: measurement::MeasurementValue::OutsideRange {
                 at_least_cells: max_depth as u32,
             },
-            direction: start_pos.dir,
-            position: start_pos.pos,
+            direction: measure_dir,
+            position: ray_transform.pos,
         }
     }
 
@@ -159,8 +178,9 @@ impl<const N: usize> Display for PartialWorldData<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "PARTIAL(pos = {:?}, dir = {:?})\n{}",
-            self.0.mouse.pos, self.0.mouse.dir, self.0.map
+            "{}",
+            self.0 // "PARTIAL(pos = {:?}, dir = {:?})\n{}",
+                   // self.0.mouse.pos, self.0.mouse.dir, self.0.map
         )
     }
 }
@@ -169,6 +189,11 @@ impl<const N: usize> Deref for PartialWorldData<N> {
     type Target = WorldData<N>;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+impl<const N: usize> DerefMut for PartialWorldData<N> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -256,15 +281,33 @@ impl<const N: usize> PartialWorldData<N> {
     }
 }
 
+impl<const N: usize> Default for PartialWorldData<N> {
+    fn default() -> Self {
+        Self(WorldData::default())
+    }
+}
+
 pub struct CommandExecution<const N: usize> {
     pub world: WorldData<N>,
     pub command: Command,
     pub next_step: usize,
 }
 
-pub enum CommandStepResult<const N: usize> {
+// pub enum CommandStepResult<const N: usize> {
+//     Ongoing(CommandExecution<N>),
+//     Finished(WorldData<N>),
+// }
+
+pub enum EndState<const N: usize> {
     Ongoing(CommandExecution<N>),
     Finished(WorldData<N>),
+}
+
+pub struct CommandStepResult<const N: usize> {
+    /// if nothing was done, = 0;
+    pub num_of_finished_steps: usize,
+    pub is_continuing: EndState<N>,
+    pub measurements: Vec<Measurement>,
 }
 
 pub const SIM_MAX_DEPTH: u8 = 4;
@@ -272,42 +315,80 @@ pub const SIM_MAX_DEPTH: u8 = 4;
 impl<const N: usize> CommandExecution<N> {
     pub fn new(world: WorldData<N>, command: Command) -> Self {
         Self {
-            world: WorldData::default(),
+            world,
             command,
             next_step: 0,
         }
     }
-    pub fn next(mut self) -> (Vec<Measurement>, CommandStepResult<N>) {
+
+    pub fn next(mut self) -> CommandStepResult<N> {
+        let max_steps = self.command.ty.max_step_count();
+        info!(target: "map", "CURRENT EXECUTION STEP {} / {}", self.next_step + 1, max_steps);
+
         let mut measurements = vec![];
 
         for interrupt in self.command.interrupts.iter() {
             if interrupt.at_step.matches(self.next_step) {
+                debug!(target: "map/measure", "PROCESS INTERRUPT {interrupt}");
                 let measurement = self.world.measure(interrupt.direction, SIM_MAX_DEPTH);
                 measurements.push(measurement);
                 if self
                     .world
                     .is_interrupt_triggered(*interrupt, self.next_step as u32)
                 {
-                    return (measurements, CommandStepResult::Finished(self.world));
+                    info!(target: "map/measure", "--> TRIGGERED");
+                    return CommandStepResult {
+                        num_of_finished_steps: self.next_step,
+                        is_continuing: EndState::Finished(self.world),
+                        measurements,
+                    };
                 }
             }
         }
 
+        if self.next_step >= max_steps {
+            // If max steps is 0, it should finish before even doing transforms
+            info!(target: "map", "Max step reached ({})", max_steps);
+            return CommandStepResult {
+                num_of_finished_steps: self.next_step,
+                is_continuing: EndState::Finished(self.world),
+                measurements,
+            };
+        }
+
+        debug!(target: "map", "Before step: {:?}", self.world.mouse);
         self.world.mouse = self
             .world
             .mouse
             .step_once(self.command.ty)
-            .expect("Command Execution outside bounds");
+            .expect("Command execution outside bounds");
+        debug!(target: "map", "After step: {:?}", self.world.mouse);
 
         self.next_step += 1;
+        //Now: next_step is the number of steps completed
 
-        if self.next_step > self.command.ty.max_step_count() {
-            (measurements, CommandStepResult::Finished(self.world))
-        } else {
-            (measurements, CommandStepResult::Ongoing(self))
+        CommandStepResult {
+            num_of_finished_steps: self.next_step,
+            is_continuing: EndState::Ongoing(self),
+            measurements,
         }
     }
 }
 
-
-
+impl<const N: usize> Display for WorldData<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut map_display = MapDisplay::from(&self.map);
+        let mut cell = map_display
+            .cell_mut(self.mouse.pos)
+            .expect("Should exist in valid world");
+        let mut center = cell.center();
+        center.set_char(match self.mouse.dir {
+            Direction::PosX => '>',
+            Direction::PosY => 'v',
+            Direction::NegX => '<',
+            Direction::NegY => 'A',
+        });
+        center.apply_style(Style::new().on_red().on_bright().black());
+        write!(f, "{}", map_display)
+    }
+}
