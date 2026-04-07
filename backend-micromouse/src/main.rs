@@ -22,6 +22,8 @@ pub mod stats;
 pub mod strategy;
 pub mod world_data;
 pub mod logging;
+pub mod map_display;
+pub mod check;
 
 #[cfg(test)]
 pub mod tests;

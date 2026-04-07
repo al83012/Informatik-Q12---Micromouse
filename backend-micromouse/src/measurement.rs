@@ -1,5 +1,9 @@
+use std::fmt::Display;
+
 use crate::{
-    comm::micromouse_message::FormatError, direction::{Direction, RelativeDirection}, position::Position
+    comm::micromouse_message::FormatError,
+    direction::{Direction, RelativeDirection},
+    position::Position,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -27,7 +31,25 @@ impl TryFrom<String> for RelativeDirection {
             "L" => Ok(Self::Left),
             "R" => Ok(Self::Right),
             "F" => Ok(Self::Forward),
-            _ => Err(FormatError::new(value))
+            _ => Err(FormatError::new(value)),
         }
+    }
+}
+
+impl Display for MeasurementValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}{}",
+            match self {
+                MeasurementValue::OutsideRange { at_least_cells } => at_least_cells,
+                MeasurementValue::Value { cells } => cells,
+            },
+            if let MeasurementValue::Value { cells } = self {
+                "|"
+            } else {
+                "+"
+            }
+        )
     }
 }

@@ -1,10 +1,13 @@
 use std::fmt::Display;
 
+use console::Style;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error};
 
 use crate::{
     comm::website::DiscoveryMessage,
     direction::{Direction, DirectionNormalizedVector},
+    map_display::{MapDisplay, MapDisplayWrite},
     measurement::Measurement,
     position::Position,
 };
@@ -17,13 +20,11 @@ pub struct Map<const N: usize> {
     wall_discovery_status: [[(WallDiscoveryStatus, WallDiscoveryStatus); N]; N],
 }
 
-
 // Wrapping a Map, nothing special, but signifies, that the Map does not represent a full state,
 // but just what is known (--> Every Status is upgradable (e.g. Undiscovered could in truth be
 // Discovered))
 #[derive(Copy, Clone, PartialEq, Debug, Eq)]
 pub struct PartialMap<const N: usize>(pub Map<N>);
-
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq, Default, Serialize, Deserialize, Hash)]
 pub enum CellDiscoveryStatus {
@@ -185,6 +186,8 @@ impl<const N: usize> Map<N> {
         let value = measurement.value;
         let from_pos = measurement.position;
 
+        debug!(target: "map", "MEASUREMENT {from_pos} -> {direction} | {value}");
+
         let mut wall_discoveries: Vec<WallDiscovery> = vec![];
         let mut cell_discoveries: Vec<CellDiscovery> = vec![];
 
@@ -196,6 +199,7 @@ impl<const N: usize> Map<N> {
             })?;
 
         if *cell_status != CellDiscoveryStatus::Visited {
+            debug!(target: "map/discovery", "VISITED {from_pos:?}");
             cell_discoveries.push(CellDiscovery {
                 new_status: CellDiscoveryStatus::Visited,
                 at_cell: from_pos,
@@ -210,6 +214,7 @@ impl<const N: usize> Map<N> {
             }
             crate::measurement::MeasurementValue::Value { cells } => (cells, true),
         };
+        debug!(target: "map", "MEASUREMENT depth={no_walls_up_to_depth}, hits_wall={hit_wall_at_end}");
 
         let dir_norm_vec: DirectionNormalizedVector = direction.into();
         let dx = dir_norm_vec.x as i64;
@@ -222,6 +227,7 @@ impl<const N: usize> Map<N> {
         // INFO: going through all the cells (at least none) that were passed over by the vision-ray
 
         for i in 0..no_walls_up_to_depth as i64 {
+            debug!(target: "map", "MEASUREMENT Exploring depth = {i}");
             let x_offset = dx * i;
             let y_offset = dy * i;
 
@@ -229,6 +235,7 @@ impl<const N: usize> Map<N> {
             let y_pos = from_pos.y as i64 + y_offset;
 
             if x_pos < 0 || y_pos < 0 {
+                error!(target: "map", "MEASUREMENT OUTSIDE BOUNDS (at_step={i}, pos=({x_pos}, {y_pos}))");
                 return Err(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos });
             }
 
@@ -246,6 +253,7 @@ impl<const N: usize> Map<N> {
 
             if *cell_status == CellDiscoveryStatus::Undiscovered {
                 // Updated cell status
+                debug!(target: "map/discovery", "DISCOVERED {pos:?}");
                 cell_discoveries.push(CellDiscovery {
                     new_status: CellDiscoveryStatus::Discovered,
                     at_cell: pos,
@@ -259,12 +267,14 @@ impl<const N: usize> Map<N> {
                 .ok_or(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos })?;
 
             if *wall == WallDiscoveryStatus::Exists(true) {
+                error!(target: "map/discovery", "DISCOVERED INCONSISTENCY {pos:?} {direction:?}");
                 // SHOULDN'T be true --> conflicts with
                 // current measurement
                 inconsistencies.push(pos);
             }
 
             if *wall != WallDiscoveryStatus::Exists(false) {
+                debug!(target: "map/discovery", "DISCOVERED {pos:?}{direction:?}");
                 wall_discoveries.push(WallDiscovery {
                     new_status: WallDiscoveryStatus::Exists(false),
                     from_cell: pos,
@@ -277,10 +287,12 @@ impl<const N: usize> Map<N> {
         // INFO: Last cell before measurement-end (either reached wall or measurement limit),
         // either way: cell was discovered
 
+        debug!(target: "map", "Handle last cell");
         let x_pos = from_pos.x as i64 + dx * no_walls_up_to_depth as i64;
         let y_pos = from_pos.y as i64 + dy * no_walls_up_to_depth as i64;
 
         if x_pos < 0 || y_pos < 0 {
+            error!(target: "map", "MEASUREMENT OUTSIDE BOUNDS (at_step=END, pos=({x_pos}, {y_pos}))");
             return Err(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos });
         }
 
@@ -298,6 +310,7 @@ impl<const N: usize> Map<N> {
 
         if *cell_status == CellDiscoveryStatus::Undiscovered {
             // println!("aksdhfö {:#?}",  pos);
+            debug!(target: "map/discovery", "DISCOVERED {pos:?}");
             cell_discoveries.push(CellDiscovery {
                 new_status: CellDiscoveryStatus::Discovered,
                 at_cell: pos,
@@ -306,24 +319,24 @@ impl<const N: usize> Map<N> {
         }
 
         if hit_wall_at_end {
-            let wall = self
-                .wall_mut(&pos, &direction)
-                .ok_or(MapInconsistencyError::OutsideBounds { x: x_pos, y: y_pos })?;
+            // If it is none, that is ok (the left and top edge return none)
+            if let Some(wall) = self.wall_mut(&pos, &direction) {
+                if *wall == WallDiscoveryStatus::Exists(false) {
+                    // Wall found which was already assumed to not exists
+                    inconsistencies.push(pos);
+                } else if *wall != WallDiscoveryStatus::Exists(true) {
+                    // Wall found, where we previously assumed something else, though it does not
+                    // conflict
+                    debug!(target: "map/discovery", "DISCOVERED {pos:?}{direction:?}");
+                    wall_discoveries.push(WallDiscovery {
+                        new_status: WallDiscoveryStatus::Exists(true),
+                        from_cell: pos,
+                        in_direction: direction,
+                    })
+                }
 
-            if *wall == WallDiscoveryStatus::Exists(false) {
-                // Wall found which was already assumed to not exists
-                inconsistencies.push(pos);
-            } else if *wall != WallDiscoveryStatus::Exists(true) {
-                // Wall found, where we previously assumed something else, though it does not
-                // conflict
-                wall_discoveries.push(WallDiscovery {
-                    new_status: WallDiscoveryStatus::Exists(true),
-                    from_cell: pos,
-                    in_direction: direction,
-                })
+                *wall = WallDiscoveryStatus::Exists(true);
             }
-
-            *wall = WallDiscoveryStatus::Exists(true);
         }
 
         if !inconsistencies.is_empty() {
@@ -333,7 +346,10 @@ impl<const N: usize> Map<N> {
             ));
         }
 
-        Ok(DiscoveryMessage { cell_discoveries, wall_discoveries })
+        Ok(DiscoveryMessage {
+            cell_discoveries,
+            wall_discoveries,
+        })
     }
 }
 
@@ -345,65 +361,114 @@ impl<const N: usize> Default for Map<N> {
 
 impl<const N: usize> Display for Map<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let dim = self.cell_discovery_status.len();
-        let mut visuals = vec![vec![' '; (dim * 4) + 1]; (dim * 2) + 1];
+        debug!(target: "tests/map/display", "Starting format");
 
-        for x in 0..dim + 1 {
-            for y in 0..dim + 1 {
-                visuals[y * 2][x * 4] = '+';
-            }
+        let dim = self.cell_discovery_status.len();
+        let mut display = MapDisplay::new(dim, 9, 5);
+
+        let discovered_style = Style::new().on_black().on_bright().white();
+        let visited_style = Style::new().on_white().black();
+
+        for x in 0..dim {
+            let pos = Position { x: x as u32, y: 0 };
+            let dir = Direction::NegY;
+            // let upper_wall = self.wall(&pos, &dir).expect("Wall should exist");
+            // match upper_wall {
+            // WallDiscoveryStatus::Undiscovered => {
+            //     continue;
+            // }
+            // WallDiscoveryStatus::Exists(exists) => {
+            let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
+            //     if *exists {
+            wall.full().set_char('+');
+            wall.inner().set_char('-');
+            wall.full().apply_style(discovered_style.clone().red());
+            //             } else {
+            //                 wall.inner().apply_style(discovered_style.clone());
+            //             }
+            //         }
+            //     }
+        }
+        for y in 0..dim {
+            let pos = Position { x: 0, y: y as u32 };
+            let dir = Direction::NegX;
+            // let upper_wall = self.wall(&pos, &dir).expect("Wall should exist");
+            // match upper_wall {
+            //     WallDiscoveryStatus::Undiscovered => {
+            //         continue;
+            //     }
+            //     WallDiscoveryStatus::Exists(exists) => {
+            let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
+            // if *exists {
+            wall.full().set_char('+');
+            wall.inner().set_char('|');
+            wall.full().apply_style(discovered_style.clone().red());
+            //         } else {
+            //             wall.inner().apply_style(discovered_style.clone());
+            //         }
+            //     }
+            // }
         }
 
         for x in 0..dim {
-            let start = x * 4 + 1;
-            for x_i in 0..3 {
-                visuals[0][x_i + start] = '-';
-            }
-        }
-        for y in 0..dim {
-            visuals[y * 2 + 1][0] = '|';
-        }
-
-        for x in 0..dim as u32 {
-            for y in 0..dim as u32 {
-                let pos = Position { x, y };
-                let wall_right = self.wall(&pos, &Direction::PosX).unwrap();
-                let wall_down = self.wall(&pos, &Direction::PosY).unwrap();
-
-                visuals[y as usize * 2 + 1][(x as usize + 1) * 4] = match wall_right {
-                    WallDiscoveryStatus::Undiscovered => '?',
-                    WallDiscoveryStatus::Exists(true) => '|',
-                    _ => ' ',
+            for y in 0..dim {
+                let pos = Position {
+                    x: x as u32,
+                    y: y as u32,
                 };
+                let dir_right = Direction::PosX;
+                let dir_down = Direction::PosY;
 
-                match wall_down {
-                    WallDiscoveryStatus::Undiscovered => {
-                        visuals[(y as usize + 1) * 2][x as usize * 4 + 2] = '?';
-                    }
-                    WallDiscoveryStatus::Exists(true) => {
-                        let start = x as usize * 4 + 1;
-                        for x_i in 0..3 {
-                            visuals[(y as usize + 1) * 2][x_i + start] = '-';
+                let right_wall = self.wall(&pos, &dir_right).expect("Wall should exist");
+                match right_wall {
+                    WallDiscoveryStatus::Undiscovered => {}
+                    WallDiscoveryStatus::Exists(exists) => {
+                        let mut wall = display.wall_mut(pos, dir_right).expect("Wall should exist");
+                        if *exists {
+                            wall.full().set_char('+');
+                            wall.inner().set_char('|');
+                            // wall.full().apply_style(Style::new().on_red());
+                            wall.full().apply_style(discovered_style.clone().red());
+                        } else {
+                            // wall.inner().apply_style(Style::new().on_red());
+                            wall.inner().apply_style(discovered_style.clone());
                         }
                     }
-                    _ => {}
                 }
+                let lower_wall = self.wall(&pos, &dir_down).expect("Wall should exist");
+                match lower_wall {
+                    WallDiscoveryStatus::Undiscovered => {}
+                    WallDiscoveryStatus::Exists(exists) => {
+                        let mut wall = display.wall_mut(pos, dir_down).expect("Wall should exist");
+                        if *exists {
+                            wall.full().set_char('+');
+                            wall.inner().set_char('-');
+                            // wall.full().apply_style(Style::new().on_blue());
+                            wall.full().apply_style(discovered_style.clone().red());
+                        } else {
+                            // wall.inner().apply_style(Style::new().on_blue());
+                            wall.inner().apply_style(discovered_style.clone());
+                        }
+                    }
+                }
+                let cell = self.cell(&pos).expect("Cell should exist");
+                let mut cell_vis = display.cell_mut(pos).expect("Cell should exist");
 
-                let cell_discovery_status = self.cell(&pos).unwrap();
-                visuals[(y as usize) * 2 + 1][(x as usize) * 4 + 2] = match cell_discovery_status {
-                    CellDiscoveryStatus::Undiscovered => ' ',
-                    CellDiscoveryStatus::Discovered => '·',
-                    CellDiscoveryStatus::Visited => '□',
-                };
+                match cell {
+                    CellDiscoveryStatus::Undiscovered => {
+                        // cell_vis.apply_style(Style::new().on_yellow());
+                    }
+                    CellDiscoveryStatus::Discovered => {
+                        cell_vis.apply_style(discovered_style.clone());
+                    }
+                    CellDiscoveryStatus::Visited => {
+                        cell_vis.apply_style(visited_style.clone());
+                    }
+                }
             }
         }
 
-        for line in visuals {
-            for c in line {
-                write!(f, "{}", c)?;
-            }
-            writeln!(f)?;
-        }
+        writeln!(f, "{}", display)?;
 
         Ok(())
     }

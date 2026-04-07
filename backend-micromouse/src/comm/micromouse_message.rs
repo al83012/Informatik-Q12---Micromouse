@@ -5,8 +5,7 @@ use tungstenite::{Message, Utf8Bytes};
 use crate::{
     direction::RelativeDirection,
     map::{Map, PartialMap, WallDiscoveryStatus},
-    position::MouseTransform,
-    strategy::PartialWorldData, world_data::WorldData,
+    position::MouseTransform, world_data::{PartialWorldData, WorldData},
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -371,7 +370,7 @@ impl TransformedMovement {
     }
     pub fn max_step_count(&self) -> usize {
         match self.movement {
-            MovementType::Turn(n) => n.abs() as usize,
+            MovementType::Turn(n) => n.unsigned_abs() as usize,
             MovementType::Move(n) => n as usize,
         }
     }
@@ -415,7 +414,7 @@ impl<const N: usize> TransformedCommand<N> {
                 if !interrupt.at_step.matches(i) {
                     continue;
                 }
-                let measurement = step_start.measure(interrupt.direction);
+                let measurement = step_start.measure_one(interrupt.direction);
 
                 match (measurement, interrupt.action) {
                     (_, InterruptAction::Continue) => {
