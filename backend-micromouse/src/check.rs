@@ -16,6 +16,11 @@ impl PotentiallyEq for WallDiscoveryStatus {
         match (self, other) {
             (WallDiscoveryStatus::Undiscovered, _) | (_, WallDiscoveryStatus::Undiscovered) => true,
             (WallDiscoveryStatus::Exists(a), WallDiscoveryStatus::Exists(b)) => a == b,
+            (WallDiscoveryStatus::Visited, WallDiscoveryStatus::Exists(false)) => true,
+            (WallDiscoveryStatus::Exists(false), WallDiscoveryStatus::Visited) => true,
+            (WallDiscoveryStatus::Visited, WallDiscoveryStatus::Visited) => true,
+            (WallDiscoveryStatus::Visited, WallDiscoveryStatus::Exists(true)) => false,
+            (WallDiscoveryStatus::Exists(true), WallDiscoveryStatus::Visited) => false,
         }
     }
 }
@@ -78,6 +83,3 @@ impl<const N: usize> PotentiallyEq for WorldData<N> {
         true
     }
 }
-
-
-

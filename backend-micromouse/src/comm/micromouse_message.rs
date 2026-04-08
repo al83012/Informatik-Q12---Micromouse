@@ -1,5 +1,6 @@
 use std::{marker::PhantomData, usize};
 
+use tracing::debug;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -378,9 +379,10 @@ impl TransformedMovement {
         if n > self.max_step_count() {
             return None;
         }
+        debug!(target: "tests/map", "Movement at step {n} ({:?} & {:?}) ", self.start_transform, self.movement);
         Some(match self.movement {
-            MovementType::Turn(n) => self.start_transform.rotated(n),
-            MovementType::Move(n) => self.start_transform.moved(n)?,
+            MovementType::Turn(i) => self.start_transform.rotated( i.signum() * n as i8),
+            MovementType::Move(_) => self.start_transform.moved(n as u8)?,
         })
     }
     pub fn max_step_count(&self) -> usize {
@@ -442,11 +444,11 @@ impl<const N: usize> TransformedCommand<N> {
                         //Continues --> Interrupt explicitly not triggered
                         continue;
                     }
-                    (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfBlocked) => {
+                    (WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited, InterruptAction::StopIfBlocked) => {
                         //Continues --> Interrupt explicitly not triggered
                         continue;
                     }
-                    (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfOpen) => {
+                    (WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited, InterruptAction::StopIfOpen) => {
                         // NEEDS TO STOP, no next step
                         results.push(TransformedCommandResult(step_start, i as u32));
                         return results;

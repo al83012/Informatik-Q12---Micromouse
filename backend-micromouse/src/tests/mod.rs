@@ -6,8 +6,8 @@ use tracing::debug;
 use crate::{
     direction::{Direction, DirectionNormalizedVector},
     map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
-    position::{Position, PositionOffset},
-    world_data::{WorldData, SIM_MAX_DEPTH},
+    position::{MouseTransform, Position, PositionOffset},
+    world_data::{SIM_MAX_DEPTH, WorldData},
 };
 
 mod random_move;
@@ -16,8 +16,10 @@ mod visual_tests;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
-pub fn test_world() -> WorldData<TEST_MAP_SIZE> {
-    todo!()
+pub fn test_world(loopiness: f32) -> WorldData<TEST_MAP_SIZE> {
+    let map = test_map(loopiness);
+    let mouse = MouseTransform::default();
+    WorldData { map, mouse }
 }
 
 pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
@@ -29,7 +31,6 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
     let mut groups = Vec::<Vec<usize>>::new();
     let mut possible_connections = HashMap::<Position, HashSet<Direction>>::new();
 
-    let mut num_of_groups = TEST_MAP_SIZE * TEST_MAP_SIZE;
     debug!(target: "tests/map/gen", "Initializing...");
 
     for y in 0..TEST_MAP_SIZE {
@@ -62,7 +63,7 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
     debug!(target: "tests/map/gen", "Initialized: All blocked...\n{map}");
 
     let mut rand = rand::thread_rng();
-    while num_of_groups > 1 {
+    while !possible_connections.is_empty() {
         let num_of_conn_sources = possible_connections.len();
         debug!(target: "tests/map/gen", "Sources left = {num_of_conn_sources}");
         let rand_key = {
@@ -160,8 +161,7 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
             }
         }
 
-        num_of_groups -= 1;
-        debug!(target: "tests/map/gen","Num of groups= {num_of_groups}\n{}", map);
+        debug!(target: "tests/map/gen","\n{}", map);
     }
 
     map
