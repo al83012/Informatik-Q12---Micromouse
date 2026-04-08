@@ -19,10 +19,13 @@ use crate::{
     comm::micromouse_message::{
         Command, InterruptOccurence, InterruptType, MeasurementInterrupt, MeasurementOccurence,
         StepNum, TransformedMovement,
-    }, map::{Map, PartialMap}, measurement::Measurement, world_data::{PartialWorldData, WorldData}
+    },
+    map::{Map, PartialMap},
+    measurement::Measurement,
+    world_data::{PartialWorldData, WorldData},
 };
 
-pub struct CommandApplication<const N: usize> {
+pub struct FilteredCommandApplication<const N: usize> {
     // containing steps 0..<n
     // Not always at that length though
     // --> One ExecutionSubStep per
@@ -60,11 +63,71 @@ pub enum CommandTerminationReason {
     MaxStep(usize),
 }
 
-impl<const N: usize> CommandApplication<N> {
-    pub fn new(world_at_start: WorldData<N>, command: Command) -> Self {
-        let filter = world_at_start.map;
+/**
+CommandApplication represents the execution of a command within a given filter.
 
-        let start_transform = world_at_start.mouse;
+The given command will precompute all the possible steps and outcomes.
+
+Most methods will take the internal filter into account, like the `at_step_filtered` method,
+which will just return `Unreachable` if the step cannot be reached with a given filter, `End`,
+if it has to be the last step (given the filter), `Continue` if this is not the last step and
+`PotentialEnd{end, continue}`, if there could be another step (as the filter is not disclosing
+enough information)
+
+The general workflow with this type:
+- Taking in the currently known map as a filter, apply command
+- Whenever there is new feedback / whenever a measurement comes in: Apply it to the filter
+  --> Receive all the information about which interrupts / paths were pruned
+
+And with that:
+- For use in a strategy tree (where we do not really care about all the individual steps, but
+  just the results of the commands): call `.potential_outcomes_given_filter` to get all the
+  possible outcomes whenever the filter changes
+  --> This will allow us to also update all the children-nodes in the strategy-tree (Also
+  allowing us to use the `WorldData.intersect` function to
+  combine all the nodes:
+
+  (/potential outcomes of a command based on the potential outcomes of
+  previous commands) within a level of the tree (As long as the intersects cannot agree on
+  where the mouse is for instance: cannot build intersect, Maps are fundamentally different,
+  but otherwise: can combine maps as long as they are potentially_eq (in which case they
+  downgrade to the lowest common denominator)
+
+  By combining all those nodes, as soon as a consensus is reached, the strategy can call `try_next_move()`
+  on this combined map (which it is allowed to fail (as long as the only command left is
+  not yet finished (as that would mean, that there will not be any additional information with which
+  to work (until the next command is sent))))
+- For use in simulation-environments:
+  One generally has:
+  - A map, which will contain the internally known full data
+  - A partial world, the simulation-space
+
+  With that, you can use the `FilteredCommandApplication`'s `measurements_at_step`-method to find out
+  which measurements would be performed at a certain step,
+
+  Then, these measurement-tasks (/directions) can be taken to actually perform the measurements using the
+  map, which then get fed back into the FilteredCommandApplication.
+
+  After this, we can actually call `at_step` to determine, whether the given measurements triggered an interrupt
+
+*/
+impl<const N: usize> FilteredCommandApplication<N> {
+    /// Creates a new CommandApplication, which precomputes the steps a command takes to reach its
+    /// execution end.
+    ///
+    /// `with_filter` is the world in which this execution will take place; It limits, which
+    /// command-steps will be computed, as it will stop execution, if it violates the filter
+    ///
+    /// To get a "full" evaluation, set `with_filter` to `None` to use the Default (or empty /
+    /// Undiscovered) World. This means, that any step with an interrupt, which could stop
+    /// execution will find a way to change the filter so that it could stop at this point or not
+    /// (The only exception to this is the case, in which interrupts are contradictory (like
+    /// opposing `0_L_STOP-IF-BLOCKED` and `0_l_STOP-IF-OPEN`))
+    pub fn new(with_filter: Option<WorldData<N>>, command: Command) -> Self {
+        let with_filter = with_filter.unwrap_or_default();
+        let filter = with_filter.map;
+
+        let start_transform = with_filter.mouse;
         let transformed_move = TransformedMovement::new(command.ty, start_transform);
 
         let max_step_count = transformed_move.max_step_count();
@@ -74,7 +137,7 @@ impl<const N: usize> CommandApplication<N> {
         // The condition for the next step to happen is that **NO** interrupt was triggered before
         // that point --> next_step_start_requirements is the running toll of how the map would
         // have to look like to make it past a certain point
-        let mut next_step_start_requirements = PartialWorldData::from(world_at_start);
+        let mut next_step_start_requirements = PartialWorldData::from(with_filter);
 
         for i in 0..=max_step_count {
             let transform_at_step = transformed_move.at_step(i).expect("step in range");
@@ -147,9 +210,19 @@ impl<const N: usize> CommandApplication<N> {
         self.execution_steps.len()
     }
 
-    pub fn update_filter(measurement: Measurement) /* -> Result */ {
-
+    pub fn update_filter(measurement: Measurement)
+    /* -> Result --> can upgrade current filter to this? + Return all the newly discarded stops  */
+    {
     }
 
+    /// Returns all the different outcomes that the execution of this command in the context of its
+    /// current filter --> Can be used to construct a StrategyTree
+    pub fn potential_outcomes_given_filter(&self) /* --> _ */ {}
+
     // pub fn at_step(&self, )
+}
+
+pub struct CommandApplicationIterator<const N: usize> {
+    next_step: usize,
+    application: FilteredCommandApplication<N>,
 }
