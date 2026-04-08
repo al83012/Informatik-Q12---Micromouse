@@ -272,7 +272,7 @@ pub enum MovementType {
     Move(u8),
 }
 
-// Interrupt directive
+/// The task for an interrupt (be it terminating or continuing) --> Sent to micromouse
 #[derive(Clone, Copy, Debug)]
 pub struct MeasurementInterrupt {
     pub direction: RelativeDirection,
@@ -280,14 +280,43 @@ pub struct MeasurementInterrupt {
     pub action: InterruptAction,
 }
 
+/// Description of what and how to perform the measurement, without the information when
+#[derive(Clone, Copy, Debug)]
+pub struct InterruptType {
+    pub direction: RelativeDirection,
+    pub action: InterruptAction,
+}
+
+impl From<MeasurementInterrupt> for InterruptType {
+    fn from(value: MeasurementInterrupt) -> Self {
+        Self {
+            direction: value.direction,
+            action: value.action,
+        }
+    }
+}
+
+impl From<&MeasurementInterrupt> for InterruptType {
+    fn from(value: &MeasurementInterrupt) -> InterruptType {
+        InterruptType {
+            direction: value.direction,
+            action: value.action,
+        }
+    }
+}
+
 // Specific time when an interrupt happened
 // Only contains a specific Step number, no action
+/// Direction and Step number at which a measurement took place (not what to do with it, no
+/// "Each"-option)
 #[derive(Clone, Copy, Debug)]
 pub struct MeasurementOccurence {
     pub direction: RelativeDirection,
     pub at_step: StepNum,
 }
 
+/// MeasurementOccurence, but with the action which will be performed as a result of the interrupt
+/// --> Like MeasurementInterrupt, but like the other "Occurence"-type: cannot use step-num "Each"
 #[derive(Clone, Copy, Debug)]
 pub struct InterruptOccurence {
     pub occurence: MeasurementOccurence,
@@ -300,7 +329,7 @@ pub struct CommandFinishedMessage {
     pub reason: Option<InterruptOccurence>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InterruptAction {
     Continue,
     StopIfBlocked,
@@ -381,7 +410,7 @@ impl TransformedMovement {
         }
         debug!(target: "tests/map", "Movement at step {n} ({:?} & {:?}) ", self.start_transform, self.movement);
         Some(match self.movement {
-            MovementType::Turn(i) => self.start_transform.rotated( i.signum() * n as i8),
+            MovementType::Turn(i) => self.start_transform.rotated(i.signum() * n as i8),
             MovementType::Move(_) => self.start_transform.moved(n as u8)?,
         })
     }
@@ -444,11 +473,17 @@ impl<const N: usize> TransformedCommand<N> {
                         //Continues --> Interrupt explicitly not triggered
                         continue;
                     }
-                    (WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited, InterruptAction::StopIfBlocked) => {
+                    (
+                        WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
+                        InterruptAction::StopIfBlocked,
+                    ) => {
                         //Continues --> Interrupt explicitly not triggered
                         continue;
                     }
-                    (WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited, InterruptAction::StopIfOpen) => {
+                    (
+                        WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
+                        InterruptAction::StopIfOpen,
+                    ) => {
                         // NEEDS TO STOP, no next step
                         results.push(TransformedCommandResult(step_start, i as u32));
                         return results;
@@ -463,7 +498,11 @@ impl<const N: usize> TransformedCommand<N> {
                         // };
                         let terminating_world = step_start
                             .clone()
-                            .with_interrupt_triggered(true, interrupt.direction, interrupt.action)
+                            .with_interrupt_stop_triggered(
+                                true,
+                                interrupt.direction,
+                                interrupt.action,
+                            )
                             .expect("Interrupting here should be possible");
                         //The terminating option is a separate result
                         results.push(TransformedCommandResult(terminating_world, i as u32));
@@ -476,7 +515,11 @@ impl<const N: usize> TransformedCommand<N> {
                         // ALSO: Do not need to add the option "What if a later interrupt stops the
                         // program and not this one?" --> Interrupts are processed in order
                         step_start = step_start
-                            .with_interrupt_triggered(false, interrupt.direction, interrupt.action)
+                            .with_interrupt_stop_triggered(
+                                false,
+                                interrupt.direction,
+                                interrupt.action,
+                            )
                             .expect("Not interrupting here should be possible");
                     }
                 }
@@ -487,5 +530,24 @@ impl<const N: usize> TransformedCommand<N> {
         results.push(TransformedCommandResult(step_start, max_step as u32));
 
         results
+    }
+}
+
+impl Command {
+    pub fn max_step_count(&self) -> usize {
+        self.ty.max_step_count()
+    }
+}
+
+impl MeasurementInterrupt {
+    // continue-interrupts cannot interrupt; keeping it open / readable for future understanding
+    pub fn could_interrupt(&self) -> bool {
+        self.action.could_interrupt()
+    }
+}
+
+impl InterruptAction {
+    pub fn could_interrupt(&self) -> bool {
+        *self != Self::Continue
     }
 }

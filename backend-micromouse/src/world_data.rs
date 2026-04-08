@@ -212,7 +212,7 @@ impl<const N: usize> PartialWorldData<N> {
     // interrupt will trigger or not (depending on `should_trigger`) at the current transform
     // Returns None if the wall can never be set to a state which would trigger the interrupt
     // TODO: confirm
-    pub fn with_interrupt_triggered(
+    pub fn with_interrupt_stop_triggered(
         mut self,
         should_trigger: bool,
         interrupt_dir: RelativeDirection,
