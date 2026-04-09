@@ -376,21 +376,3 @@ impl<const N: usize> Display for Map<N> {
     }
 }
 
-pub struct WorldCombinationError;
-
-
-impl<const N: usize> PartialWorldData<N> {
-
-    // Every element x of the resulting map will be such, that it is both an upgrade from its
-    // equivalient in self and other
-    //
-    // --> (Exists(true) & Undiscovered) -> Exists(true)
-    // --> (Discovered & Visited) -> Visited
-    pub fn union(other: Self) -> Result<Self, WorldCombinationError> {
-        todo!()
-    }
-
-    pub fn intersect(other: Self) -> WorldCombinationError {
-        todo!()
-    }
-}
