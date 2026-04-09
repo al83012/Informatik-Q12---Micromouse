@@ -498,7 +498,7 @@ impl<const N: usize> TransformedCommand<N> {
                         // };
                         let terminating_world = step_start
                             .clone()
-                            .with_interrupt_stop_triggered(
+                            .with_interrupt_termination_triggered(
                                 true,
                                 interrupt.direction,
                                 interrupt.action,
@@ -515,7 +515,7 @@ impl<const N: usize> TransformedCommand<N> {
                         // ALSO: Do not need to add the option "What if a later interrupt stops the
                         // program and not this one?" --> Interrupts are processed in order
                         step_start = step_start
-                            .with_interrupt_stop_triggered(
+                            .with_interrupt_termination_triggered(
                                 false,
                                 interrupt.direction,
                                 interrupt.action,

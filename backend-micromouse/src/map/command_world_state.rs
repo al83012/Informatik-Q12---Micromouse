@@ -15,16 +15,21 @@
 // WARN:
 // See notes on ipad
 
-use std::collections::{hash_map, HashMap};
+use std::collections::{hash_map, HashMap, HashSet};
+
+use tungstenite::http::header::MaxSizeReached;
 
 use crate::{
     comm::micromouse_message::{
         Command, InterruptOccurence, InterruptType, MeasurementInterrupt, MeasurementOccurence,
         StepNum, TransformedMovement,
     },
-    map::map::{Map, PartialMap},
-    map::measurement::Measurement,
-    map::world_data::{PartialWorldData, WorldData},
+    map::{
+        map::{Map, PartialMap},
+        measurement::Measurement,
+        upgrade::IsUpgradeable,
+        world_data::{PartialWorldData, WorldData},
+    },
 };
 
 pub struct FilteredCommandApplication<const N: usize> {
@@ -34,14 +39,17 @@ pub struct FilteredCommandApplication<const N: usize> {
     // Still at least one per step (as every step, even without interrupt is recorded (to be able
     // to call .at_step without having to interpolate))
     execution_steps: Vec<ExecutionStep<N>>,
-    // step n
-    // condition = same as the the execution_steps[n-1] condition
-    execution_end: CommandTerminationReason,
+
+    // Either the last interrupt which is executed as it **HAS** to be triggered (based on filter)
+    execution_termination: CommandTerminationReason<N>,
+    last_possible_state: PartialWorldData<N>,
     // filter/what is currently actually known about the map --> doesn't modify the execution
     // steps, but can be used to filter the given paths
     // Does NOT include MouseTransform, as it is representative of all different steps during
     // command execution
     filter: Map<N>,
+
+    transformed_move: TransformedMovement,
 
     command: Command,
 }
@@ -49,23 +57,36 @@ pub struct FilteredCommandApplication<const N: usize> {
 /// Every step has an ExecutionStep, if there is no way that a step can fail, the
 /// potential_interrupts are simply empty
 pub struct ExecutionStep<const N: usize> {
-    potential_ends: Vec<PotentialExecutionEnd<N>>,
+    interrupts: Vec<PotentialCommandInterruptTermination<N>>,
 }
 
-pub struct PotentialExecutionEnd<const N: usize> {
+// For a step: Could continue, but could also stop due to the interrupt
+// --> Represents an interrupt that may trigger
+pub struct PotentialCommandInterruptTermination<const N: usize> {
     // Could also still be a "continue" interrupt
-    potential_end_reason: InterruptType,
+    potentially_terminating_interrupt: InterruptType,
     interrupt_index: usize,
     // What the world would have to (at least) look like in order for the interrupt to not stop
     // execution
     // This includes the mouse transform as it is representative of a specific step (and thus
     // position) of execution
-    world_if_stop_not_triggered: PartialWorldData<N>,
-    world_if_stop_triggered: Option<PartialWorldData<N>>,
+    continuing_world: PartialWorldData<N>,
+    terminating_world: Option<PartialWorldData<N>>,
 }
 
-pub enum CommandTerminationReason {
-    Interrupted(InterruptOccurence),
+// For the very end of a command
+// --> Represents an interrupt that will trigger
+pub struct CommandInterruptEnd<const N: usize> {
+    terminating_interrupt: InterruptType,
+    interrupt_index: usize,
+    terminating_world: PartialWorldData<N>,
+}
+
+// End of command
+// --> Represents, whether the command ends due to reaching the end of its associated
+// move-directive or if it is forced to terminate prematurely due to an interrupt
+pub enum CommandTerminationReason<const N: usize> {
+    Interrupted(CommandInterruptEnd<N>),
     MaxStep(usize),
 }
 
@@ -162,56 +183,68 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
                 // Create a world-filter, which ensures, that the interrupt, which would trigger
                 // the command to finish is off
-                let world_if_not_triggered = next_step_start_requirements.clone()
-                    .with_interrupt_stop_triggered(
+                let continuing_world = next_step_start_requirements
+                    .clone()
+                    .with_interrupt_termination_triggered(
                         false,
                         potential_end_reason.direction,
                         potential_end_reason.action,
                     );
 
-                let world_if_stop_triggered = next_step_start_requirements
-                    .with_interrupt_stop_triggered(
-                        false,
+                let terminating_world = next_step_start_requirements.clone()
+                    .with_interrupt_termination_triggered(
+                        true,
                         potential_end_reason.direction,
                         potential_end_reason.action,
                     );
 
-                if world_if_not_triggered.is_none() {
+                // INFO: Adding the current interrupt as the end of this command execution --> HAS
+                // to interrupt
+                if continuing_world.is_none() {
                     // There is no way of passing this step without triggering an interrupt which
                     // will stop
                     // INFO: WILL HAVE TO STOP
 
                     let end_of_command =
-                        CommandTerminationReason::Interrupted(InterruptOccurence {
-                            occurence: MeasurementOccurence {
-                                direction: interrupt.direction,
-                                at_step: i as StepNum,
-                            },
-                            action: interrupt.action,
+                        CommandTerminationReason::Interrupted(CommandInterruptEnd {
+                            terminating_interrupt: potential_end_reason,
+                            interrupt_index,
+                            terminating_world: terminating_world.expect("By definition, if `world_if_stop_NOT_triggered` does not exist, `world_if_stop_triggered` has to exist (As it is also the termination, it would be nice if it existed)"),
                         });
 
+                    // Still need to add the current step to the list (but without the final
+                    // interrupt)
+                    execution_steps.push(ExecutionStep {
+                        interrupts: step_potential_ends,
+                    });
                     return Self {
                         execution_steps,
-                        execution_end: end_of_command,
+                        execution_termination: end_of_command,
                         filter,
-                        command
+                        command,
+                        transformed_move,
+                        last_possible_state: next_step_start_requirements
                     };
                 }
-                let world_if_stop_not_triggered =
-                    world_if_not_triggered.expect("Already handled forced end");
-                next_step_start_requirements = world_if_stop_not_triggered.clone();
 
-                // Even registers `Continue`-Interrupts
+
+                // INFO: Adding the current interrupt as a normal interrupt, which could activate
+                // or not
+                let continuing_world =
+                    continuing_world.expect("Already handled forced end; This path **has** to continue");
+                next_step_start_requirements = continuing_world.clone();
+
+                // Even registers `Continue`-Interrupts (Which is why terminating world is optional)
                 //
-                step_potential_ends.push(PotentialExecutionEnd {
-                    potential_end_reason,
-                    world_if_stop_not_triggered,
+                step_potential_ends.push(PotentialCommandInterruptTermination {
+                    potentially_terminating_interrupt: potential_end_reason,
+                    continuing_world,
                     interrupt_index,
-                    world_if_stop_triggered
+                    terminating_world,
                 });
             }
             execution_steps.push(ExecutionStep {
-                potential_ends: step_potential_ends,
+                interrupts: step_potential_ends,
             });
         }
 
@@ -219,9 +252,11 @@ impl<const N: usize> FilteredCommandApplication<N> {
             execution_steps,
             // The MaxStep-Execution end is only reached, if no interrupt is forced to trigger
             // before that (even if that interrupt is in the last step)
-            execution_end: CommandTerminationReason::MaxStep(max_step_count),
+            execution_termination: CommandTerminationReason::MaxStep(max_step_count),
             filter,
-            command
+            command,
+            transformed_move,
+            last_possible_state: next_step_start_requirements
         }
     }
 
@@ -237,41 +272,104 @@ impl<const N: usize> FilteredCommandApplication<N> {
         //TODO: *self = Self::new(new_filter, self.command);
     }
 
-    pub fn upgrade_filter(&mut self, upgraded_filter: PartialMap<N>) /* Result */
-    {
+    pub fn upgrade_filter(
+        &mut self,
+        upgraded_filter: Map<N>,
+    ) -> Result<RejectedOutcomes, FilterUpgradeError> {
+        let is_upgrade_valid = upgraded_filter.could_be_upgrade_of(&self.filter);
+
+        if !is_upgrade_valid {
+            return Err(FilterUpgradeError);
+        }
+
+        // for
 
         todo!()
 
-
-       //TODO: *self = Self::new(new_filter, self.command); 
+        //TODO: *self = Self::new(new_filter, self.command);
     }
 
-    /// Returns all the different outcomes that the execution of this command in the context of its
-    /// current filter --> Can be used to construct a StrategyTree
-    pub fn potential_outcomes_given_filter(&self) -> CommandOutcomes<N> {
-        let mut potential_outcomes = HashMap::new();
-
-        // steps 0..<n
+    fn potential_outcome_ids(&self) -> HashSet<PathLocalOutcomeId> {
+        let mut current_potential_outcome_ids = HashSet::new();
         for (step_num, step) in self.execution_steps.iter().enumerate() {
-            for end in step.potential_ends.iter() {
-                let InterruptType { direction, action } = end.potential_end_reason;
+            for pot_outcome in step.interrupts.iter() {
+                let InterruptType { direction, action } =
+                    pot_outcome.potentially_terminating_interrupt;
                 if !action.could_interrupt() {
                     // Continue-Action; Not a potential Command-Outcome: Command cannot stop here
                     continue;
                 }
 
-                let world_if_stop_triggered = end.world_if_stop_triggered.as_ref();
+                if pot_outcome.terminating_world.is_none() {
+                    // Though an interrupt does exist and that interrupt generally could stop
+                    // execution (it is not of type continue/was caught before), With the currently
+                    // applied filter, it is no longer possible to interrupt at this point
+                    continue;
+                }
+
+                current_potential_outcome_ids.insert(PathLocalOutcomeId {
+                    at_step: step_num,
+                    from_interrupt: PathLocalInterruptId::InterruptAtIndex(
+                        pot_outcome.interrupt_index,
+                    ),
+                });
+            }
+        }
+
+        // The guaranteed termination of the command, no interrupt before that may be forced
+        match &self.execution_termination {
+            CommandTerminationReason::Interrupted(i) => {
+                let interrupt_idx = i.interrupt_index;
+                current_potential_outcome_ids.insert(PathLocalOutcomeId {
+                    at_step: self.step_with_termination(),
+                    from_interrupt: PathLocalInterruptId::InterruptAtIndex(interrupt_idx),
+                });
+            }
+            CommandTerminationReason::MaxStep(max_step) => {
+                current_potential_outcome_ids.insert(PathLocalOutcomeId {
+                    at_step: *max_step,
+                    from_interrupt: PathLocalInterruptId::MaxStep,
+                });
+            }
+        };
+
+        current_potential_outcome_ids
+    }
+
+    // The max-step / last step which will (at least partially) be executed
+    // The step at which the command either reaches the max_step_count of the move or is forced to
+    // terminate by the filter
+    pub fn step_with_termination(&self) -> usize {
+        // The execution_steps go from 0..=step_with_termination
+        self.execution_steps.len() - 1
+    }
+
+    /// Returns all the different outcomes that the execution of this command in the context of its
+    /// current filter --> Can be used to construct a StrategyTree
+    pub fn potential_outcomes_given_filter<'a>(&'a self) -> CommandOutcomes<'a, N> {
+        let mut potential_outcomes = HashMap::new();
+
+        // steps 0..<n
+        for (step_num, step) in self.execution_steps.iter().enumerate() {
+            for end in step.interrupts.iter() {
+                let InterruptType { direction, action } = end.potentially_terminating_interrupt;
+                if !action.could_interrupt() {
+                    // Continue-Action; Not a potential Command-Outcome: Command cannot stop here
+                    continue;
+                }
+
+                let world_if_stop_triggered = end.terminating_world.as_ref();
 
                 if world_if_stop_triggered.is_none() {
                     // Though an interrupt does exist and that interrupt generally could stop
                     // execution (it is not of type continue/was caught before), With the currently
                     // applied filter, it is no longer possible to interrupt at this point
-                    
+
                     continue;
                 }
 
-                let termination_outcome = world_if_stop_triggered.expect("Nonexistence of Outcome already handled");
-
+                let termination_outcome =
+                    world_if_stop_triggered.expect("Nonexistence of Outcome already handled");
 
                 let index_of_interrupt = end.interrupt_index;
 
@@ -280,26 +378,42 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     from_interrupt: PathLocalInterruptId::InterruptAtIndex(index_of_interrupt),
                 };
 
-
                 potential_outcomes.insert(outcome_id, termination_outcome);
-
-
-
-
-
-
-                // potential_outcomes.insert(outcome_id, end.)
             }
         }
 
-        todo!()
+        let termination = &self.execution_termination;
+        match termination {
+            CommandTerminationReason::Interrupted(command_interrupt_end) => {
+                let outcome_id = PathLocalOutcomeId {
+                    at_step: self.step_with_termination(),
+                    from_interrupt: PathLocalInterruptId::InterruptAtIndex(
+                        command_interrupt_end.interrupt_index,
+                    ),
+                };
+                potential_outcomes.insert(outcome_id, &command_interrupt_end.terminating_world);
+            }
+            CommandTerminationReason::MaxStep(x) => {
+                let outcome_id = PathLocalOutcomeId {
+                    at_step: *x,
+                    from_interrupt: PathLocalInterruptId::MaxStep,
+                };
+
+
+                potential_outcomes.insert(outcome_id, &self.last_possible_state);
+            }
+        }
+
+        CommandOutcomes { potential_outcomes  }
     }
 
     // pub fn at_step(&self, )
 }
 
-pub struct CommandOutcomes<const N: usize> {
-    pub potential_outcomes: HashMap<PathLocalOutcomeId, PartialWorldData<N>>,
+pub struct FilterUpgradeError;
+
+pub struct CommandOutcomes<'a, const N: usize> {
+    pub potential_outcomes: HashMap<PathLocalOutcomeId, &'a PartialWorldData<N>>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -317,4 +431,8 @@ pub enum PathLocalInterruptId {
 pub struct CommandApplicationIterator<const N: usize> {
     next_step: usize,
     application: FilteredCommandApplication<N>,
+}
+
+pub struct RejectedOutcomes {
+    pub rejected_outcome_ids: HashSet<PathLocalOutcomeId>,
 }

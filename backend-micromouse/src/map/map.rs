@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::{Deref, DerefMut}};
 
 use console::Style;
 use serde::{Deserialize, Serialize};
@@ -376,3 +376,23 @@ impl<const N: usize> Display for Map<N> {
     }
 }
 
+
+impl<const N: usize> Deref for PartialMap<N> {
+    type Target = Map<N>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+impl<const N: usize> DerefMut for PartialMap<N> {
+
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<const N: usize> From<Map<N>> for PartialMap<N> {
+    fn from(value: Map<N>) -> Self {
+        Self(value)
+    }
+}
