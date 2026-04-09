@@ -23,7 +23,7 @@ use incr_stats;
 
 use crate::comm::{ChannelConnConfig, ChannelConnError};
 #[cfg(feature = "comm_stats")]
-use crate::stats::StatAccumulator;
+use crate::utils::stats::StatAccumulator;
 
 pub struct WsChannel {
     // There is no specific read-request, as we are reading continuously

@@ -2,8 +2,8 @@ use std::fmt::Display;
 
 use crate::{
     comm::micromouse_message::FormatError,
-    direction::{Direction, RelativeDirection},
-    position::Position,
+    transform::direction::{Direction, RelativeDirection},
+    transform::position::Position,
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

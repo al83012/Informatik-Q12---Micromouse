@@ -8,11 +8,11 @@ use crate::{
         Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
         TransformedMovement,
     },
-    direction::RelativeDirection,
-    logging::run_test,
-    map::WallDiscoveryStatus,
+    transform::direction::RelativeDirection,
+    utils::logging::run_test,
+    map::map::WallDiscoveryStatus,
     tests::{self, test_map, test_world, TEST_MAP_SIZE},
-    world_data::{CommandExecution, CommandStepResult, EndState, PartialWorldData, WorldData},
+    map::world_data::{CommandExecution, CommandStepResult, EndState, PartialWorldData, WorldData},
 };
 
 #[test]

@@ -4,10 +4,10 @@ use rand::Rng;
 use tracing::debug;
 
 use crate::{
-    direction::{Direction, DirectionNormalizedVector},
-    map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
-    position::{MouseTransform, Position, PositionOffset},
-    world_data::{SIM_MAX_DEPTH, WorldData},
+    transform::direction::{Direction, DirectionNormalizedVector},
+    map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
+    transform::position::{MouseTransform, Position, PositionOffset},
+    map::world_data::{SIM_MAX_DEPTH, WorldData},
 };
 
 mod random_move;
@@ -96,7 +96,7 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
         };
 
         let wall = map.wall_mut(&rand_key, &conn_dir).expect("should exist");
-        *wall = crate::map::WallDiscoveryStatus::Exists(false);
+        *wall = crate::map::map::WallDiscoveryStatus::Exists(false);
 
         let source_group = groups[rand_key.y as usize][rand_key.x as usize];
         debug!(target: "tests/map/gen", "Source group = {source_group}");

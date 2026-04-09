@@ -4,10 +4,10 @@ use tracing::debug;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
-    direction::RelativeDirection,
-    map::{Map, PartialMap, WallDiscoveryStatus},
-    position::MouseTransform,
-    world_data::{PartialWorldData, WorldData},
+    transform::direction::RelativeDirection,
+    map::map::{Map, PartialMap, WallDiscoveryStatus},
+    transform::position::MouseTransform,
+    map::world_data::{PartialWorldData, WorldData},
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]

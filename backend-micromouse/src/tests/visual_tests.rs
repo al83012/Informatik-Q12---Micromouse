@@ -3,11 +3,11 @@ use std::io::Write;
 use tracing::{debug, info};
 
 use super::*;
-use crate::direction::Direction;
-use crate::logging::run_test;
-use crate::map::Map;
-use crate::measurement::{Measurement, MeasurementValue};
-use crate::position::Position;
+use crate::transform::direction::Direction;
+use crate::utils::logging::run_test;
+use crate::map::map::Map;
+use crate::map::measurement::{Measurement, MeasurementValue};
+use crate::transform::position::Position;
 
 #[test]
 fn large_discovery_visual_test() {

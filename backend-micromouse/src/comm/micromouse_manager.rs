@@ -15,10 +15,10 @@ use crate::{
         website::DiscoveryMessage,
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
     },
-    map::Map,
-    nonempty::NonEmptyVec,
-    position::MouseTransform,
-    world_data::WorldData,
+    map::map::Map,
+    utils::nonempty::NonEmptyVec,
+    transform::position::MouseTransform,
+    map::world_data::WorldData,
 };
 
 pub struct MicromouseManager<const N: usize> {

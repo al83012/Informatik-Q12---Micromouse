@@ -11,11 +11,11 @@ use crate::{
         Command, InterruptAction, MeasurementInterrupt, MovementType, StepNum, TransformedCommand,
         TransformedMovement,
     },
-    direction::{Direction, RelativeDirection},
-    map::{self, Map, PartialMap, WallDiscoveryStatus},
-    map_display::{MapDisplay, MapDisplayWrite},
-    measurement::{self, Measurement},
-    position::MouseTransform,
+    transform::direction::{Direction, RelativeDirection},
+    map::map::{self, Map, PartialMap, WallDiscoveryStatus},
+    utils::map_display::{MapDisplay, MapDisplayWrite},
+    map::measurement::{self, Measurement},
+    transform::position::MouseTransform,
 };
 
 #[derive(Clone)]
@@ -406,3 +406,5 @@ impl<const N: usize> Display for WorldData<N> {
         write!(f, "{}", map_display)
     }
 }
+
+

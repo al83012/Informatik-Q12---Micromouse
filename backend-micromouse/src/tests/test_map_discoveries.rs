@@ -1,8 +1,8 @@
 use crate::{
-    direction::Direction,
-    map::{Map, MapInconsistencyError, WallDiscoveryStatus},
-    measurement::{Measurement, MeasurementValue},
-    position::Position,
+    transform::direction::Direction,
+    map::map::{Map, MapInconsistencyError, WallDiscoveryStatus},
+    map::measurement::{Measurement, MeasurementValue},
+    transform::position::Position,
 };
 
 type TestMap = Map<4>;

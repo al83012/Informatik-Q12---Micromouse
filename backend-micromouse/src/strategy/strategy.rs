@@ -2,11 +2,11 @@ use std::{fmt::Display, ops::Deref};
 
 use crate::{
     comm::micromouse_message::{Command, InterruptAction},
-    direction::RelativeDirection,
-    map::{PartialMap, WallDiscoveryStatus},
-    nonempty::NonEmptyVec,
-    position::{MouseTransform, Position},
-    world_data::{PartialWorldData, WorldData},
+    transform::direction::RelativeDirection,
+    map::map::{PartialMap, WallDiscoveryStatus},
+    utils::nonempty::NonEmptyVec,
+    transform::position::{MouseTransform, Position},
+    map::world_data::{PartialWorldData, WorldData},
 };
 
 pub trait FromConfig {

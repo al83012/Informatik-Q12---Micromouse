@@ -7,24 +7,15 @@ use tracing::info;
 use tokio::time;
 
 use crate::{comm::{
-    heartbeat_channel::{self, HeartbeatWifiChannel, HeartbeatWifiChannelConfig},
     websocket::{self, WsChannelConfig},
-    wifi_channel::WifiChannel,
-}, logging::init_logging};
+}, utils::logging::init_logging};
 
 pub mod comm;
-pub mod direction;
 pub mod map;
-pub mod measurement;
-pub mod nonempty;
-pub mod position;
-pub mod stats;
+pub mod utils;
 pub mod strategy;
-pub mod world_data;
-pub mod logging;
-pub mod map_display;
-pub mod check;
-pub mod command_world_state;
+pub mod transform;
+
 
 #[cfg(test)]
 pub mod tests;

@@ -3,7 +3,7 @@ use std::ops::Deref;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
-use crate::{comm::micromouse_message::MovementType, direction::{Direction, DirectionNormalizedVector}};
+use crate::{comm::micromouse_message::MovementType, transform::direction::{Direction, DirectionNormalizedVector}};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {

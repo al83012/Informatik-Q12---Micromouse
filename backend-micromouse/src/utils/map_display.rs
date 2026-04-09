@@ -8,9 +8,9 @@ use tokio::io::stdout;
 use tracing::{debug, trace};
 
 use crate::{
-    direction::{self, Direction},
-    map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
-    position::{self, Position},
+    transform::direction::{self, Direction},
+    map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
+    transform::position::{self, Position},
 };
 
 pub struct MapDisplay {

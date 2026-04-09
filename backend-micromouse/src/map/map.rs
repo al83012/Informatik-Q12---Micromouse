@@ -6,10 +6,10 @@ use tracing::{debug, error};
 
 use crate::{
     comm::website::DiscoveryMessage,
-    direction::{Direction, DirectionNormalizedVector},
-    map_display::{MapDisplay, MapDisplayWrite},
-    measurement::Measurement,
-    position::Position,
+    transform::direction::{Direction, DirectionNormalizedVector},
+    utils::map_display::{MapDisplay, MapDisplayWrite},
+    map::measurement::Measurement,
+    transform::position::Position, map::world_data::PartialWorldData,
 };
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq)]
@@ -210,10 +210,10 @@ impl<const N: usize> Map<N> {
         *cell_status = CellDiscoveryStatus::Visited;
 
         let (no_walls_up_to_depth, hit_wall_at_end) = match value {
-            crate::measurement::MeasurementValue::OutsideRange { at_least_cells } => {
+            crate::map::measurement::MeasurementValue::OutsideRange { at_least_cells } => {
                 (at_least_cells, false)
             }
-            crate::measurement::MeasurementValue::Value { cells } => (cells, true),
+            crate::map::measurement::MeasurementValue::Value { cells } => (cells, true),
         };
         debug!(target: "map", "MEASUREMENT depth={no_walls_up_to_depth}, hits_wall={hit_wall_at_end}");
 
@@ -373,5 +373,24 @@ impl<const N: usize> Display for Map<N> {
         writeln!(f, "{}", display)?;
 
         Ok(())
+    }
+}
+
+pub struct WorldCombinationError;
+
+
+impl<const N: usize> PartialWorldData<N> {
+
+    // Every element x of the resulting map will be such, that it is both an upgrade from its
+    // equivalient in self and other
+    //
+    // --> (Exists(true) & Undiscovered) -> Exists(true)
+    // --> (Discovered & Visited) -> Visited
+    pub fn union(other: Self) -> Result<Self, WorldCombinationError> {
+        todo!()
+    }
+
+    pub fn intersect(other: Self) -> WorldCombinationError {
+        todo!()
     }
 }

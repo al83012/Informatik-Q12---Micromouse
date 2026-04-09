@@ -1,8 +1,8 @@
 use crate::{
     comm::micromouse_message::TransformedCommandResult,
-    map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus},
-    position::Position,
-    world_data::{PartialWorldData, WorldData},
+    map::map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus},
+    transform::position::Position,
+    map::world_data::{PartialWorldData, WorldData},
 };
 
 pub trait PotentiallyEq {
@@ -36,25 +36,25 @@ impl<const N: usize> PotentiallyEq for Map<N> {
                     x: x as u32,
                     y: y as u32,
                 };
-                let a1 = self.wall(&pos, &crate::direction::Direction::PosX);
+                let a1 = self.wall(&pos, &crate::transform::direction::Direction::PosX);
                 if a1.is_none() {
                     return false;
                 }
                 let a1 = a1.unwrap();
 
-                let a2 = self.wall(&pos, &crate::direction::Direction::PosY);
+                let a2 = self.wall(&pos, &crate::transform::direction::Direction::PosY);
                 if a2.is_none() {
                     return false;
                 }
                 let a2 = a2.unwrap();
 
-                let b1 = inner_map.wall(&pos, &crate::direction::Direction::PosX);
+                let b1 = inner_map.wall(&pos, &crate::transform::direction::Direction::PosX);
                 if b1.is_none() {
                     return false;
                 }
                 let b1 = b1.unwrap();
 
-                let b2 = inner_map.wall(&pos, &crate::direction::Direction::PosY);
+                let b2 = inner_map.wall(&pos, &crate::transform::direction::Direction::PosY);
                 if b2.is_none() {
                     return false;
                 }
