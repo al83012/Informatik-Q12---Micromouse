@@ -1,63 +1,15 @@
-
 use crate::{
-    comm::micromouse_message::Command, map::world_data::{PartialWorldData, WorldData}, transform::position::Position, utils::nonempty::NonEmpty
+    comm::micromouse_message::Command, map::world_data::{PartialWorldData, WorldData},
+    transform::position::Position,
 };
 
+pub struct GoalPosition(pub Position);
 pub trait FromConfig {
     type Config;
     fn from_config(config: Self::Config) -> Self;
 }
 
-pub struct GoalPosition(pub Position);
-
-
-
-// pub enum StrategyStepResult<const N: usize> {
-//     // There is no next step which leads closer to the problem resolution
-//     Impossible,
-//     Known(StrategyStep<N>),
-//     Unknown(Vec<StrategyStep<N>>),
-// }
-//
-// pub struct StrategyStep<const N: usize> {
-//     cmds: Vec<Command>,
-//     end_state: PartialMap<N>,
-// }
-
-pub struct CommandStep<S: Strategy, const N: usize> {
-    command: Command,
-    /// One single command may have multiple end-states due to interrupts
-    results: NonEmpty<Vec<CommandEndState<S, N>>>,
-}
-
-pub struct CommandEndState<S: Strategy, const N: usize> {
-    internal_state: S,
-    partial_world: PartialWorldData<N>,
-}
-
-pub enum StrategyError {
-    ImpossibleWithStrategy,
-    Canceled,
-    Other(String),
-}
-
-// While we normally just return 1 command (and its end-state), we can also clump them together (in
-// order to streamline some strategies, such as wall-following)
-pub type CommandSteps<S, const N: usize> = NonEmpty<Vec<CommandStep<S, N>>>;
-
-pub type StrategyStepResult<S, const N: usize> =
-    Result<CommandSteps<S, N>, StrategyError>;
-
-// Strategies are derived from configs (even if that config turns out to be ()), furthermore, they
-// need to be sized as the CommandEndState also needs to create new copies of the Strategy Internal
-// State
-pub trait Strategy: FromConfig + Sized {
-    /// Takes in an internal state and partial (or complete, if the micromouse caught up to the
-    /// command scheduling) world data, trying to create a new command, which brings it closer to
-    /// the goal
-    fn moves_from_state<const N: usize>(
-        self,
-        world_data: impl Into<WorldData<N>>,
-        goal: GoalPosition,
-    ) -> StrategyStepResult<Self, N>;
+pub trait Strategy<const N: usize>: FromConfig + Sized {
+    fn next_cmd_from_partial(world: PartialWorldData<N>) -> Option<Command>;
+    fn next_cmd(world: WorldData<N>) -> Command;
 }

@@ -20,18 +20,18 @@ use std::{
     ops::Sub,
 };
 
-
 use crate::{
-    comm::{micromouse_message::{
-        Command, InterruptType,
-        StepNum, TransformedMovement,
-    }, website::DiscoveryMessage},
+    comm::{
+        micromouse_message::{Command, InterruptType, StepNum, TransformedMovement},
+        website::DiscoveryMessage,
+    },
     map::{
         map::{Map, MapInconsistencyError},
         measurement::Measurement,
         upgrade::IsUpgradeable,
         world_data::{PartialWorldData, WorldData},
-    }, utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
+    },
+    utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
 };
 
 pub struct FilteredCommandApplication<const N: usize> {
@@ -323,8 +323,10 @@ impl<const N: usize> FilteredCommandApplication<N> {
         let mut current_potential_outcome_ids = HashSet::new();
         for (step_num, step) in self.execution_steps.iter().enumerate() {
             for pot_outcome in step.interrupts.iter() {
-                let InterruptType { direction: _, action } =
-                    pot_outcome.potentially_terminating_interrupt;
+                let InterruptType {
+                    direction: _,
+                    action,
+                } = pot_outcome.potentially_terminating_interrupt;
                 if !action.could_interrupt() {
                     // Continue-Action; Not a potential Command-Outcome: Command cannot stop here
                     continue;
@@ -384,7 +386,10 @@ impl<const N: usize> FilteredCommandApplication<N> {
         // steps 0..<n
         for (step_num, step) in self.execution_steps.iter().enumerate() {
             for end in step.interrupts.iter() {
-                let InterruptType { direction: _, action } = end.potentially_terminating_interrupt;
+                let InterruptType {
+                    direction: _,
+                    action,
+                } = end.potentially_terminating_interrupt;
                 if !action.could_interrupt() {
                     // Continue-Action; Not a potential Command-Outcome: Command cannot stop here
                     continue;
@@ -455,18 +460,19 @@ pub struct CommandOutcomeIds {
     pub potential_outcome_ids: HashSet<PathLocalOutcomeId>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub struct PathLocalOutcomeId {
     pub at_step: usize,
     pub from_interrupt: PathLocalInterruptId,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum PathLocalInterruptId {
     MaxStep,
     InterruptAtIndex(usize),
 }
 
+// TODO:
 pub struct CommandApplicationIterator<const N: usize> {
     next_step: usize,
     application: FilteredCommandApplication<N>,
@@ -495,10 +501,20 @@ impl Sub for CommandOutcomeIds {
     }
 }
 
-
-
 impl PotentiallyNonEmpty for RejectedOutcomes {
     fn is_empty(&self) -> bool {
         self.rejected_outcome_ids.is_empty()
+    }
+}
+
+pub struct LazyFilteredCommandApplication<const N: usize> {
+    pub command: Command,
+    pub in_world: WorldData<N>,
+}
+
+
+impl<const N: usize> From<LazyFilteredCommandApplication<N>> for FilteredCommandApplication<N> {
+    fn from(value: LazyFilteredCommandApplication<N>) -> Self {
+        Self::new(Some(value.in_world), value.command)
     }
 }

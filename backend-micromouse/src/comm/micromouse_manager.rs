@@ -1,15 +1,12 @@
-use std::{
-    collections::HashMap,
-    sync::atomic::AtomicU32,
-};
+use std::{collections::HashMap, sync::atomic::AtomicU32};
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 use crate::{
     comm::{
         micromouse_message::{
-            Command, CommandId, CommandMessage, FormatError,
-            MeasurementMessage, MicromouseResponse, StepNum,
+            Command, CommandId, CommandMessage, FormatError, MeasurementMessage,
+            MicromouseResponse, StepNum,
         },
         website::DiscoveryMessage,
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
@@ -31,7 +28,7 @@ pub struct MicromouseManager<const N: usize> {
     unconfirmed_cmd: Mutex<HashMap<CommandId, CommandMessage>>,
     mode: Mutex<MicromouseMode>,
     current_command: Mutex<Option<(FilteredCommandApplication<N>, CommandId)>>,
-    current_world: Mutex<WorldData<N>>,
+    current_world: RwLock<WorldData<N>>,
     battery: Mutex<f32>,
 }
 
@@ -50,7 +47,7 @@ impl<const N: usize> MicromouseManager<N> {
             unconfirmed_cmd: Mutex::new(HashMap::new()),
             mode: Mutex::new(MicromouseMode::Stopped),
             current_command: Mutex::new(None),
-            current_world: Mutex::new(WorldData::default()),
+            current_world: RwLock::new(WorldData::default()),
             battery: Mutex::new(100.0),
         })
     }
@@ -162,10 +159,11 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
     pub async fn restart(&self) {
-        self.next_cmd_id.store(0, std::sync::atomic::Ordering::SeqCst);
+        self.next_cmd_id
+            .store(0, std::sync::atomic::Ordering::SeqCst);
         *self.mode.lock().await = MicromouseMode::Running;
         *self.current_command.lock().await = None;
-        *self.current_world.lock().await = WorldData::default();
+        *self.current_world.write().await = WorldData::default();
     }
 
     /// Uses a measurement or a command finished message (-> measurment = None) to update the
@@ -188,7 +186,7 @@ impl<const N: usize> MicromouseManager<N> {
             .map_err(MicromouseManagerError::from)?;
 
         let new_transf = {
-            if world_at_step.mouse != self.current_world.lock().await.mouse {
+            if world_at_step.mouse != self.current_world.read().await.mouse {
                 Some(world_at_step.mouse)
             } else {
                 None
@@ -206,12 +204,12 @@ impl<const N: usize> MicromouseManager<N> {
             let new_map = current_cmd_application
                 .at_step(step_number)
                 .map_err(MicromouseManagerError::from)?;
-            *self.current_world.lock().await = new_map.clone().into();
+            *self.current_world.write().await = new_map.clone().into();
             filter_update
         } else {
             // since there is no new measurement, we can just take the world_at_step as the new
             // world
-            *self.current_world.lock().await = world_at_step.clone().into();
+            *self.current_world.write().await = world_at_step.clone().into();
             // RejectedOutcomes::empty()
             FilterUpdate {
                 discoveries: None,
@@ -258,7 +256,7 @@ impl<const N: usize> MicromouseManager<N> {
             // where the mouse currently is
             *current_cmd = Some((
                 FilteredCommandApplication::new(
-                    Some(self.current_world.lock().await.clone()),
+                    Some(self.current_world.read().await.clone()),
                     new_cmd.cmd,
                 ),
                 response_cmd_id,
@@ -278,6 +276,10 @@ impl<const N: usize> MicromouseManager<N> {
                 unfinished_cmd: current_cmd_id,
             })
         }
+    }
+
+    pub async fn current_world_lock(&self) -> RwLockReadGuard<'_, WorldData<N>> {
+        self.current_world.read().await
     }
 }
 
