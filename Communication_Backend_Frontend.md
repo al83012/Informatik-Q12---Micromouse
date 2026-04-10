@@ -1,35 +1,43 @@
-## Attribut
-### CELL
-#### VISITED
-- `unknown` --> Zelle wurde bisher noch nicht gesehen von Micromouse
-- `discovered` --> Sensor hat in die Zelle reingesehen, wurde von der Micromouse aber noch nicht besucht
-- `visited` --> Micromouse war physisch innerhalb des Feldes
-#### COST
-- `NaN` --> Zell-kosten wurden vom Algorithmus für diese Zelle noch nicht bestimmt
-- x (Wert im Bereich von 0-100)
+# Nachrichten vom Backend
 
-#### IS_INTERSECTION
-- `true` --> Die Zelle ist eine Kreuzung
-- `false` --> Die Zelle ist keine Kreuzung (oder wurde noch nicht als eine solche identifiziert) 
+## MicromouseManagerEvent
 
-### WALL
-#### EXISTS
-- `true` --> Wand wurde durch Kollision mit einer Messung erkannt
-- `false` --> Messung hat Ort der potentiellen Wand durchquert, keine Wand vorhanden
-- `unknown` --> Bisher noch nicht mit potentieller Wand interagiert --> Könnte existieren
+```json
+{
+    manager_event: <EVENT>,
+}
+```
 
-### PATH
-#### COMPLETION
-- `future` --> Pfad wurde bisher noch nicht angefangen
-- `in_process(x,y)` --> Wobei`(x,y)` die Koordinaten darstellen, bis zu denen der Pfad abgehandelt wurde
-- `completed` --> Pfad wurde schon vollständig abgearbeitet
+### Error
 
-#### CERTAINTY
-- `required` --> Der Algorithmus ist sicher, dass dieser Pfad genommen werden muss
-- `optional` --> Der Pfad ist nicht unbedingt notwendig, sondern nur eine der Alternativen, die berücksichtigt wird
-- `rejected` --> Der Pfad war mal optional, ist jetzt aber nicht mehr aktuell
+`<EVENT>` =
 
+```json
+{
+    "MicromouseManagerError": <ERROR>
+}
+```
 
+- `"ConnectionClosedPermanently"`
+  The connection was closed internally (The thread used to run the messaging was dropped, the program exited standard execution and will restart)
+- `{"UnknownResponse": {"faulty_text": <TEXT>}}`
+  A message received from the micromouse does not match the formatting guidelines / could not be read
+- `"CmdConfirmThenRequested"`
+  Indicates an error in the Desync-Communication: The execution of a command was confirmed to have started, but then a request to resend that command arrived
+- `{"CmdStartBeforeFinish": {"new_cmd": <COMMAND_ID>, "unfinished_cmd": <COMMAND_ID>}}`
+  The micromouse sent the signs of starting a new command, but never confirmed finishing the last command that was started
+- `{"CmdNotKnown": <COMMAND_ID>}`
+  The start of a command was confirmed, but the command id is unknown to the backend
+- `"MeasurementWithoutAssociatedCmd"`
+  Tried to transform a Measurement to the current position of the micromouse, but the current command was empty internally
+- `{"CmdTooLong": <COMMAND_ID>}`
+  Tried to process a measurement, but the given measurement-step exceeds the maximum number of steps that command could have performed
+- `{"ImpossiblePosition": <COMMAND_ID>}`
+  The position which was calculated for the micromouse at the current moment is impossible as it is outside map bounds
 
+### Finished Command
 
-Ich brauche noch ein beispiel von der formatierung + mögliche attribute für "aktion beginnt" und "aktion endet" und ich brauche noch eine formatierung für folgende Aktionen, die ich dir schicke: algorithm_selected + algorithm ; new_goal + goal ; start ; stop ; pause ; continue
+`<EVENT>` =
+
+`{"FinishedCommand": {"cmd_id": <COMMAND_ID>, "require_new": <REQUIRE_NEW>}}`
+  Just received the feedback from the micromouse that a command with the given command id was finished, if require_new is `true`, it indicates that the internal command queue of the micromouse is empty and it will need a new command before it can do anything
