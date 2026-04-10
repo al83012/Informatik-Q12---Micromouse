@@ -27,6 +27,7 @@ pub enum MicromouseResponse {
     CommandFinished(CommandFinishedMessage),
     Desync(Vec<CommandId>),
     Stop,
+    Continue,
     Restart,
     Battery(Battery),
 }

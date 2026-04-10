@@ -17,7 +17,9 @@ use crate::{
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
     },
     map::{
-        command_world_state::{CannotReachStep, FilteredCommandApplication, RejectedOutcomes},
+        command_world_state::{
+            CannotReachStep, FilterUpdate, FilteredCommandApplication, RejectedOutcomes,
+        },
         map::{Map, MapInconsistencyError},
         measurement::{self, Measurement},
         world_data::{PartialWorldData, WorldData},
@@ -30,11 +32,10 @@ pub struct MicromouseManager<const N: usize> {
     channel: WsChannel,
     next_cmd_id: AtomicU32,
     unconfirmed_cmd: Mutex<HashMap<CommandId, CommandMessage>>,
-    mode: MicromouseMode,
+    mode: Mutex<MicromouseMode>,
     current_command: Mutex<Option<(FilteredCommandApplication<N>, CommandId)>>,
     current_world: Mutex<WorldData<N>>,
-    // battery: f32,
-    // current_world_data: Mutex<WorldData<N>>,
+    battery: Mutex<f32>,
 }
 
 pub struct InternalMapUpdate {
@@ -45,18 +46,19 @@ pub struct InternalMapUpdate {
 
 impl<const N: usize> MicromouseManager<N> {
     pub async fn new() -> Result<Self, WsChannelConnError> {
-        todo!();
-        // Ok(Self {
-        //     channel: WsChannel::new(WsChannelConfig::default(), 9001).await?,
-        //     next_cmd_id: AtomicU32::new(0),
-        //     unfinished_messages: Mutex::new(HashMap::new()),
-        // })
+        let new_channel = WsChannel::new(WsChannelConfig::default(), 9001).await?;
+        Ok(Self {
+            channel: new_channel,
+            next_cmd_id: AtomicU32::new(0),
+            unconfirmed_cmd: Mutex::new(HashMap::new()),
+            mode: Mutex::new(MicromouseMode::Stopped),
+            current_command: Mutex::new(None),
+            current_world: Mutex::new(WorldData::default()),
+            battery: Mutex::new(100.0),
+        })
     }
 
     pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
-        if self.mode == MicromouseMode::Stopped {
-            return Err(CommandSendError::StoppedExecution);
-        }
         let cmd_id = CommandId(
             self.next_cmd_id
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
@@ -64,7 +66,6 @@ impl<const N: usize> MicromouseManager<N> {
         let msg = CommandMessage { cmd, cmd_id };
         self.channel.send((&msg).into()).await;
         self.unconfirmed_cmd.lock().await.insert(cmd_id, msg);
-        // todo!("Add to command queue");
         Ok(cmd_id)
     }
 
@@ -136,29 +137,42 @@ impl<const N: usize> MicromouseManager<N> {
                         require_new: self.unconfirmed_cmd.lock().await.is_empty(),
                     }));
                 }
-                MicromouseResponse::Desync(command_ids) => todo!(),
-                MicromouseResponse::Stop => todo!(),
-                MicromouseResponse::Restart => todo!(),
-                MicromouseResponse::Battery(_) => todo!(),
+                MicromouseResponse::Desync(command_ids) => {
+                    for c in command_ids {
+                        if !self.resend(c).await {
+                            return Err(MicromouseManagerError::CmdConfirmThenReqested(c));
+                        }
+                    }
+                }
+                MicromouseResponse::Stop => {
+                    *self.mode.lock().await = MicromouseMode::Stopped;
+                    return Ok(NonEmpty::<_>::one(MicromouseEvent::Stop));
+                }
+                MicromouseResponse::Restart => {
+                    *self.mode.lock().await = MicromouseMode::Running;
+                    self.restart().await;
+                    return Ok(NonEmpty::<_>::one(MicromouseEvent::Restart));
+                }
+                MicromouseResponse::Continue => {
+                    *self.mode.lock().await = MicromouseMode::Running;
+                    return Ok(NonEmpty::<_>::one(MicromouseEvent::Continue));
+                }
+                MicromouseResponse::Battery(b_100) => {
+                    let f_b = b_100 as f32 / 100.0;
+                    *self.battery.lock().await = f_b;
+                }
             }
-
-            //             todo!(
-            //             "Processing all the events which can be handled internally -->
-            // Automatically adjust the position after each substep, so that measurements can be transformed and applied to the map;
-            // (Only cause event if there is a nonempty discovery message);
-            // Update the map (like clearing it), also with Stop and Restart;
-            // Clear commands that are sent while the micromouse is stopped / error on send-attempt;
-            // Clear queue etc. on stop;
-            //
-            // On Desync: automatically resend all the commands; keep lock to prevent writing new tasks
-            // "
-            //         )
         }
+    }
+    pub async fn restart(&self) {
+        self.next_cmd_id.store(0, std::sync::atomic::Ordering::SeqCst);
+        *self.mode.lock().await = MicromouseMode::Running;
+        *self.current_command.lock().await = None;
+        *self.current_world.lock().await = WorldData::default();
     }
 
     /// Uses a measurement or a command finished message (-> measurment = None) to update the
     /// current position (as those messages carry a step-number)
-
     async fn update_cmd_application(
         &self,
         step_number: StepNum,
@@ -202,7 +216,10 @@ impl<const N: usize> MicromouseManager<N> {
             // world
             *self.current_world.lock().await = world_at_step.clone().into();
             // RejectedOutcomes::empty()
-            todo!()
+            FilterUpdate {
+                discoveries: None,
+                rejections: None,
+            }
         };
 
         let internal_map_update = InternalMapUpdate {
@@ -282,6 +299,7 @@ pub enum MicromouseEvent<const N: usize> {
     },
     Stop,
     Restart,
+    Continue,
     Error(MicromouseManagerError),
     DebugMessage(String),
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),
@@ -295,7 +313,7 @@ pub enum CommandSendError {
 pub enum MicromouseManagerError {
     ConnectionClosedPermanently,
     UnknownResponse(FormatError<MicromouseResponse>),
-    CmdConfirmThenReqested,
+    CmdConfirmThenReqested(CommandId),
     CmdStartBeforeFinish {
         new_cmd: CommandId,
         unfinished_cmd: CommandId,
