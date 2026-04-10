@@ -2,19 +2,16 @@ use std::{
     collections::VecDeque,
     io::{Error, ErrorKind},
     net::{IpAddr, SocketAddr},
-    str::Utf8Error,
     string::FromUtf8Error,
-    sync::{atomic::AtomicBool, Arc},
     time::Duration,
 };
 
-use futures_util::FutureExt;
 use tracing::{error, info, warn};
 use tokio::{
-    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, BufWriter, Lines},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter},
     net::{
         tcp::{OwnedReadHalf, OwnedWriteHalf},
-        TcpListener, TcpStream, ToSocketAddrs,
+        TcpListener,
     },
 };
 
@@ -218,7 +215,7 @@ impl WifiChannel {
 
         info!(target: "comm", "TEST current buf = {:?}", self.read_test_buffer);
 
-        return Ok(());
+        Ok(())
     }
 
     pub async fn send(&mut self, msg: &str, test_read_delim: u8, error_search_time: Duration) -> Result<(), WifiConnError> {

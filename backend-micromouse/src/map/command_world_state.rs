@@ -16,19 +16,18 @@
 // See notes on ipad
 
 use std::{
-    collections::{hash_map, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     ops::Sub,
 };
 
-use tungstenite::http::header::MaxSizeReached;
 
 use crate::{
     comm::{micromouse_message::{
-        Command, InterruptOccurence, InterruptType, MeasurementInterrupt, MeasurementOccurence,
+        Command, InterruptType,
         StepNum, TransformedMovement,
     }, website::DiscoveryMessage},
     map::{
-        map::{Map, MapInconsistencyError, PartialMap},
+        map::{Map, MapInconsistencyError},
         measurement::Measurement,
         upgrade::IsUpgradeable,
         world_data::{PartialWorldData, WorldData},
@@ -296,7 +295,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
     pub fn apply_measurement_to_filter(
         &mut self,
-        measurement: Measurement,
+        _measurement: Measurement,
     ) -> Result<FilterUpdate, MapInconsistencyError> {
         todo!()
 
@@ -324,7 +323,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         let mut current_potential_outcome_ids = HashSet::new();
         for (step_num, step) in self.execution_steps.iter().enumerate() {
             for pot_outcome in step.interrupts.iter() {
-                let InterruptType { direction, action } =
+                let InterruptType { direction: _, action } =
                     pot_outcome.potentially_terminating_interrupt;
                 if !action.could_interrupt() {
                     // Continue-Action; Not a potential Command-Outcome: Command cannot stop here
@@ -385,7 +384,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         // steps 0..<n
         for (step_num, step) in self.execution_steps.iter().enumerate() {
             for end in step.interrupts.iter() {
-                let InterruptType { direction, action } = end.potentially_terminating_interrupt;
+                let InterruptType { direction: _, action } = end.potentially_terminating_interrupt;
                 if !action.could_interrupt() {
                     // Continue-Action; Not a potential Command-Outcome: Command cannot stop here
                     continue;
@@ -439,7 +438,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         CommandOutcomes { potential_outcomes }
     }
 
-    pub fn at_step(&self, step_number: StepNum) -> Result<&PartialWorldData<N>, CannotReachStep> {
+    pub fn at_step(&self, _step_number: StepNum) -> Result<&PartialWorldData<N>, CannotReachStep> {
         todo!()
     }
 }

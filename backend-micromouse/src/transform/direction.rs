@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::transform::position::{Position, PositionOffset};
+use crate::transform::position::PositionOffset;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Direction {

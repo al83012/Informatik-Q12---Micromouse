@@ -1,16 +1,15 @@
 use std::{
     io::Write,
-    ops::{Range, RangeInclusive},
+    ops::RangeInclusive,
 };
 
-use console::{style, Style};
-use tokio::io::stdout;
+use console::Style;
 use tracing::{debug, trace};
 
 use crate::{
-    transform::direction::{self, Direction},
+    transform::direction::Direction,
     map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
-    transform::position::{self, Position},
+    transform::position::Position,
 };
 
 pub struct MapDisplay {

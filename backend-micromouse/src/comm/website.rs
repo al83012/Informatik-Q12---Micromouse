@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{map::map::{CellDiscovery, WallDiscovery}, utils::nonempty::{NonEmpty, PotentiallyNonEmpty}};
+use crate::{map::map::{CellDiscovery, WallDiscovery}, utils::nonempty::PotentiallyNonEmpty};
 
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]

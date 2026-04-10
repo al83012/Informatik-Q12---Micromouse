@@ -12,14 +12,10 @@ use tokio::{
 use tokio_tungstenite::{accept_async, WebSocketStream};
 use tokio_util::{bytes::Buf, sync::CancellationToken};
 use tracing::{debug, error, info, warn};
-use tracing_log::log::Level;
 use tungstenite::{
-    protocol::{frame::coding::CloseCode, CloseFrame},
-    Bytes, Error, Message, Utf8Bytes,
+    protocol::{frame::coding::CloseCode, CloseFrame}, Error, Message,
 };
 
-#[cfg(feature = "comm_stats")]
-use incr_stats;
 
 use crate::comm::{ChannelConnConfig, ChannelConnError};
 #[cfg(feature = "comm_stats")]
@@ -293,7 +289,7 @@ impl WsChannelInternal {
                     self.last_pong = Instant::now();
                 }
                 Message::Ping(_bytes) => self.handle_ping().await,
-                Message::Close(c) => {
+                Message::Close(_c) => {
                     if let Err(e) = self.reconnect().await {
                         self.e_sender
                             .send(e)

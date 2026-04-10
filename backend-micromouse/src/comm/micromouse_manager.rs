@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
-    ops::{Deref, DerefMut},
-    sync::atomic::{AtomicU32, AtomicUsize},
+    sync::atomic::AtomicU32,
 };
 
 use tokio::sync::Mutex;
@@ -9,9 +8,8 @@ use tokio::sync::Mutex;
 use crate::{
     comm::{
         micromouse_message::{
-            Command, CommandFinishedMessage, CommandId, CommandMessage, FormatError, InterruptStep,
-            MeasurementMessage, MicromouseResponse, StepNum, TransformedCommand,
-            TransformedMovement,
+            Command, CommandId, CommandMessage, FormatError,
+            MeasurementMessage, MicromouseResponse, StepNum,
         },
         website::DiscoveryMessage,
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
@@ -20,9 +18,8 @@ use crate::{
         command_world_state::{
             CannotReachStep, FilterUpdate, FilteredCommandApplication, RejectedOutcomes,
         },
-        map::{Map, MapInconsistencyError},
-        measurement::{self, Measurement},
-        world_data::{PartialWorldData, WorldData},
+        map::MapInconsistencyError,
+        world_data::WorldData,
     },
     transform::position::MouseTransform,
     utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
@@ -188,7 +185,7 @@ impl<const N: usize> MicromouseManager<N> {
         }
         let world_at_step = current_cmd_application
             .at_step(step_number)
-            .map_err(|e| MicromouseManagerError::from(e))?;
+            .map_err(MicromouseManagerError::from)?;
 
         let new_transf = {
             if world_at_step.mouse != self.current_world.lock().await.mouse {
@@ -208,7 +205,7 @@ impl<const N: usize> MicromouseManager<N> {
                 current_cmd_application.apply_measurement_to_filter(transf_measurement)?;
             let new_map = current_cmd_application
                 .at_step(step_number)
-                .map_err(|e| MicromouseManagerError::from(e))?;
+                .map_err(MicromouseManagerError::from)?;
             *self.current_world.lock().await = new_map.clone().into();
             filter_update
         } else {

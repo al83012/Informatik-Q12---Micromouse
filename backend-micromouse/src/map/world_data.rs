@@ -8,8 +8,7 @@ use tracing::{debug, info};
 
 use crate::{
     comm::micromouse_message::{
-        Command, InterruptAction, MeasurementInterrupt, MovementType, StepNum, TransformedCommand,
-        TransformedMovement,
+        Command, InterruptAction, MeasurementInterrupt, StepNum,
     },
     transform::direction::{Direction, RelativeDirection},
     map::map::{self, Map, PartialMap, WallDiscoveryStatus},
@@ -221,7 +220,7 @@ impl<const N: usize> PartialWorldData<N> {
         let current_pos = self.0.mouse.pos;
         let checked_dir = &interrupt_dir.transform_by(&self.0.mouse.dir);
 
-        let deciding_wall = (&mut self.0.map).wall_mut(&current_pos, checked_dir)?;
+        let deciding_wall = self.0.map.wall_mut(&current_pos, checked_dir)?;
         *deciding_wall = match (*deciding_wall, condition) {
             // Interrupt will never be triggered
             (_, InterruptAction::Continue) => {

@@ -2,7 +2,7 @@
 // Some incremental processing
 // Avg, sum, count, variance, std_dev, percentiles, range
 
-use std::{collections::VecDeque, fmt::Display, ops::Add};
+use std::{collections::VecDeque, fmt::Display};
 
 pub struct StatAccumulator {
     values: VecDeque<f64>,

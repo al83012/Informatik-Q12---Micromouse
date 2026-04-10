@@ -1,10 +1,10 @@
-use std::{marker::PhantomData, usize};
+use std::{marker::PhantomData};
 
 use tracing::debug;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
-    map::{map::{Map, PartialMap, WallDiscoveryStatus}, measurement::{Measurement, MeasurementValue}, world_data::{PartialWorldData, WorldData}}, transform::{direction::RelativeDirection, position::MouseTransform}
+    map::{map::{PartialMap, WallDiscoveryStatus}, measurement::{Measurement, MeasurementValue}, world_data::{PartialWorldData, WorldData}}, transform::{direction::RelativeDirection, position::MouseTransform}
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -446,7 +446,7 @@ impl<const N: usize> TransformedCommand<N> {
         let max_step = transf_movement.max_step_count();
         let mut results = vec![];
 
-        let mut step_start = PartialWorldData::new(self.starting_map.clone(), self.start_transform);
+        let mut step_start = PartialWorldData::new(self.starting_map, self.start_transform);
         // let mut step_start_transf = self.start_transform;
 
         for i in 0..max_step {

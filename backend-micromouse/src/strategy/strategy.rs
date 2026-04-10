@@ -1,7 +1,6 @@
-use std::{fmt::Display, ops::Deref};
 
 use crate::{
-    comm::micromouse_message::{Command, InterruptAction}, map::{map::{PartialMap, WallDiscoveryStatus}, world_data::{PartialWorldData, WorldData}}, transform::{direction::RelativeDirection, position::{MouseTransform, Position}}, utils::nonempty::NonEmpty
+    comm::micromouse_message::Command, map::world_data::{PartialWorldData, WorldData}, transform::position::Position, utils::nonempty::NonEmpty
 };
 
 pub trait FromConfig {
@@ -44,9 +43,9 @@ pub enum StrategyError {
 
 // While we normally just return 1 command (and its end-state), we can also clump them together (in
 // order to streamline some strategies, such as wall-following)
-pub type CommandSteps<S: Strategy, const N: usize> = NonEmpty<Vec<CommandStep<S, N>>>;
+pub type CommandSteps<S, const N: usize> = NonEmpty<Vec<CommandStep<S, N>>>;
 
-pub type StrategyStepResult<S: Strategy, const N: usize> =
+pub type StrategyStepResult<S, const N: usize> =
     Result<CommandSteps<S, N>, StrategyError>;
 
 // Strategies are derived from configs (even if that config turns out to be ()), furthermore, they

@@ -1,15 +1,14 @@
 use std::{fmt::Display, ops::{Deref, DerefMut}};
 
-use console::Style;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error};
 
 use crate::{
     comm::website::DiscoveryMessage,
     transform::direction::{Direction, DirectionNormalizedVector},
-    utils::map_display::{MapDisplay, MapDisplayWrite},
+    utils::map_display::MapDisplay,
     map::measurement::Measurement,
-    transform::position::Position, map::world_data::PartialWorldData,
+    transform::position::Position,
 };
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq)]

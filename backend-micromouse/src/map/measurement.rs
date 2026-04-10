@@ -45,7 +45,7 @@ impl Display for MeasurementValue {
                 MeasurementValue::OutsideRange { at_least_cells } => at_least_cells,
                 MeasurementValue::Value { cells } => cells,
             },
-            if let MeasurementValue::Value { cells } = self {
+            if let MeasurementValue::Value { cells: _ } = self {
                 "|"
             } else {
                 "+"

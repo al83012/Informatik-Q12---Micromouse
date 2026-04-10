@@ -1,6 +1,5 @@
 use crate::{
-    comm::micromouse_message::TransformedCommandResult,
-    map::map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus},
+    map::map::{Map, PartialMap, WallDiscoveryStatus},
     transform::position::Position,
     map::world_data::{PartialWorldData, WorldData},
 };

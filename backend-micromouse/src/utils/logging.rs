@@ -1,9 +1,8 @@
-use std::{fmt::Debug, time::Instant};
+use std::time::Instant;
 
-use tracing::{Event, Instrument, Level, Subscriber, field::{Field, Visit}};
-use tracing_log::log::LevelFilter;
+use tracing::{Event, Subscriber, field::{Field, Visit}};
 use tracing_subscriber::{
-    fmt::{self, format::Writer, time, FmtContext, FormatEvent, FormatFields},
+    fmt::{self, format::Writer, FmtContext, FormatEvent, FormatFields},
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
@@ -141,7 +140,7 @@ where
 {
     fn format_event(
         &self,
-        ctx: &FmtContext<'_, S, N>,
+        _ctx: &FmtContext<'_, S, N>,
         mut writer: Writer<'_>,
         event: &Event<'_>,
     ) -> std::fmt::Result {
@@ -156,7 +155,7 @@ where
         let msg = visitor.msg.unwrap_or_default();
         let module = meta.module_path().unwrap_or("");
 
-        let level_color = level_color(level);
+        let _level_color = level_color(level);
         let level_bg_color = level_bg_color(level);
 
         let level = format!("{level_bg_color} {level:<6} {STD_BG}");

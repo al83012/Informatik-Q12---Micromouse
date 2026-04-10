@@ -1,17 +1,9 @@
-use std::{
-    sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::time::Duration;
 
-use futures_util::lock::Mutex;
 use tracing::{error, info};
 use tokio::{
-    select,
     sync::mpsc::{Receiver, Sender},
-    time::{self, interval_at, Instant},
+    time::{self, Instant},
 };
 use tokio_util::sync::CancellationToken;
 
