@@ -4,10 +4,7 @@ use tracing::debug;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
-    transform::direction::RelativeDirection,
-    map::map::{Map, PartialMap, WallDiscoveryStatus},
-    transform::position::MouseTransform,
-    map::world_data::{PartialWorldData, WorldData},
+    map::{map::{Map, PartialMap, WallDiscoveryStatus}, measurement::{Measurement, MeasurementValue}, world_data::{PartialWorldData, WorldData}}, transform::{direction::RelativeDirection, position::MouseTransform}
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -549,5 +546,24 @@ impl MeasurementInterrupt {
 impl InterruptAction {
     pub fn could_interrupt(&self) -> bool {
         *self != Self::Continue
+    }
+}
+
+
+impl MeasurementMessage {
+    pub fn transform_by(&self, from_transform: &MouseTransform) -> Measurement {
+        let pos = from_transform.pos;
+
+        let occurence = self.interrupt;
+        let rel_dir = occurence.direction;
+
+        let dir = rel_dir.transform_by(&from_transform.dir);
+
+        let value = if self.is_sensorlimit {
+            MeasurementValue::Value { cells: self.depth }
+        } else {
+            MeasurementValue::OutsideRange { at_least_cells: self.depth }
+        };
+        Measurement { value, direction: dir, position: pos }
     }
 }

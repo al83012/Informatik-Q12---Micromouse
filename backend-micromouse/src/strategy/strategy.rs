@@ -1,12 +1,7 @@
 use std::{fmt::Display, ops::Deref};
 
 use crate::{
-    comm::micromouse_message::{Command, InterruptAction},
-    transform::direction::RelativeDirection,
-    map::map::{PartialMap, WallDiscoveryStatus},
-    utils::nonempty::NonEmptyVec,
-    transform::position::{MouseTransform, Position},
-    map::world_data::{PartialWorldData, WorldData},
+    comm::micromouse_message::{Command, InterruptAction}, map::{map::{PartialMap, WallDiscoveryStatus}, world_data::{PartialWorldData, WorldData}}, transform::{direction::RelativeDirection, position::{MouseTransform, Position}}, utils::nonempty::NonEmpty
 };
 
 pub trait FromConfig {
@@ -33,7 +28,7 @@ pub struct GoalPosition(pub Position);
 pub struct CommandStep<S: Strategy, const N: usize> {
     command: Command,
     /// One single command may have multiple end-states due to interrupts
-    results: NonEmptyVec<CommandEndState<S, N>>,
+    results: NonEmpty<Vec<CommandEndState<S, N>>>,
 }
 
 pub struct CommandEndState<S: Strategy, const N: usize> {
@@ -49,7 +44,7 @@ pub enum StrategyError {
 
 // While we normally just return 1 command (and its end-state), we can also clump them together (in
 // order to streamline some strategies, such as wall-following)
-pub type CommandSteps<S: Strategy, const N: usize> = NonEmptyVec<CommandStep<S, N>>;
+pub type CommandSteps<S: Strategy, const N: usize> = NonEmpty<Vec<CommandStep<S, N>>>;
 
 pub type StrategyStepResult<S: Strategy, const N: usize> =
     Result<CommandSteps<S, N>, StrategyError>;

@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     sync::atomic::{AtomicU32, AtomicUsize},
 };
 
@@ -10,15 +10,20 @@ use crate::{
     comm::{
         micromouse_message::{
             Command, CommandFinishedMessage, CommandId, CommandMessage, FormatError, InterruptStep,
-            MicromouseResponse, StepNum, TransformedCommand, TransformedMovement,
+            MeasurementMessage, MicromouseResponse, StepNum, TransformedCommand,
+            TransformedMovement,
         },
         website::DiscoveryMessage,
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
     },
-    map::map::Map,
-    utils::nonempty::NonEmptyVec,
+    map::{
+        command_world_state::{CannotReachStep, FilteredCommandApplication, RejectedOutcomes},
+        map::{Map, MapInconsistencyError},
+        measurement::{self, Measurement},
+        world_data::{PartialWorldData, WorldData},
+    },
     transform::position::MouseTransform,
-    map::world_data::WorldData,
+    utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
 };
 
 pub struct MicromouseManager<const N: usize> {
@@ -26,10 +31,16 @@ pub struct MicromouseManager<const N: usize> {
     next_cmd_id: AtomicU32,
     unconfirmed_cmd: Mutex<HashMap<CommandId, CommandMessage>>,
     mode: MicromouseMode,
-    current_command: Mutex<Option<(TransformedMovement, CommandId)>>,
-    /// 0.0 to 1.0
+    current_command: Mutex<Option<(FilteredCommandApplication<N>, CommandId)>>,
+    current_world: Mutex<WorldData<N>>,
     // battery: f32,
-    current_world_data: Mutex<WorldData<N>>,
+    // current_world_data: Mutex<WorldData<N>>,
+}
+
+pub struct InternalMapUpdate {
+    new_transf: Option<MouseTransform>,
+    discoveries: Option<NonEmpty<DiscoveryMessage>>,
+    rejected_outcomes: Option<NonEmpty<RejectedOutcomes>>,
 }
 
 impl<const N: usize> MicromouseManager<N> {
@@ -70,7 +81,7 @@ impl<const N: usize> MicromouseManager<N> {
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
     /// communication to continue (even though the channel will spin up a separate thread to keep
     /// the connection alive, it won't handle desyncs and the like)
-    pub async fn next(&self) -> Result<NonEmptyVec<MicromouseEvent<N>>, MicromouseManagerError> {
+    pub async fn next(&self) -> Result<NonEmpty<Vec<MicromouseEvent<N>>>, MicromouseManagerError> {
         loop {
             let next_response = &self.channel.read().await;
             if next_response.is_none() {
@@ -80,17 +91,51 @@ impl<const N: usize> MicromouseManager<N> {
                 next_response.as_ref().unwrap().to_string().try_into()?;
             match next_response {
                 MicromouseResponse::Debug(msg) => {
-                    return Ok(NonEmptyVec::one(MicromouseEvent::DebugMessage(msg)))
+                    return Ok(NonEmpty::<_>::one(MicromouseEvent::DebugMessage(msg)));
                 }
                 MicromouseResponse::Measurement(measurement_message) => {
                     // Check whether command is new
                     self.update_current_command_id(measurement_message.from_cmd)
                         .await?;
-                    todo!("Update current transform, update map")
+                    let map_update = self
+                        .update_cmd_application(
+                            measurement_message.interrupt.at_step,
+                            Some(measurement_message),
+                        )
+                        .await?;
+                    if let Some(map_update_events) = map_update.into() {
+                        return Ok(map_update_events);
+                    }
                 }
                 MicromouseResponse::CommandFinished(command_finished_message) => {
-                    todo!("Update current transform, delete current cmd");
-                },
+                    let just_finished_cmd = self.current_command.lock().await;
+                    if just_finished_cmd.is_none() {
+                        return Err(MicromouseManagerError::CmdNotKnown(
+                            command_finished_message.cmd_id,
+                        ));
+                    }
+                    let (just_finished_cmd, just_finished_cmd_id) =
+                        just_finished_cmd.as_ref().expect("Already checked");
+                    let step_num = match command_finished_message.reason {
+                        Some(i) => i.occurence.at_step,
+                        None => {
+                            // The step at which it ended must have been the max step that way
+                            // available (since the max step is per definition the step at which an
+                            // interrupt or max_step is triggered)
+                            just_finished_cmd.max_step() as u32
+                        }
+                    };
+                    // do a last position-update (in case we didn't get a measurement in the last
+                    // step and have to update it to its last transf that way)
+                    self.update_cmd_application(step_num, None).await?;
+                    self.clear_current_command().await;
+                    return Ok(NonEmpty::<_>::one(MicromouseEvent::FinishedCommand {
+                        cmd_id: *just_finished_cmd_id,
+                        // If we are not aware of a command in the queue, we will have to get a new
+                        // one
+                        require_new: self.unconfirmed_cmd.lock().await.is_empty(),
+                    }));
+                }
                 MicromouseResponse::Desync(command_ids) => todo!(),
                 MicromouseResponse::Stop => todo!(),
                 MicromouseResponse::Restart => todo!(),
@@ -111,23 +156,69 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
-    async fn update_current_transform(
+    /// Uses a measurement or a command finished message (-> measurment = None) to update the
+    /// current position (as those messages carry a step-number)
+
+    async fn update_cmd_application(
         &self,
         step_number: StepNum,
-    ) -> Result<(), MicromouseManagerError> {
+        measurement: Option<MeasurementMessage>,
+    ) -> Result<InternalMapUpdate, MicromouseManagerError> {
         let mut current_cmd = self.current_command.lock().await;
 
-        let (transf_mov, id) = current_cmd
+        let (current_cmd_application, id) = current_cmd
             .as_mut()
             .ok_or(MicromouseManagerError::MeasurementWithoutAssociatedCmd)?;
-        if step_number > transf_mov.max_step_count() as u32 {
+        if step_number > current_cmd_application.step_with_termination() as u32 {
             return Err(MicromouseManagerError::CmdTooLong(*id));
         }
-        let new_pos = transf_mov
-            .at_step(step_number as usize)
-            .ok_or(MicromouseManagerError::ImpossiblePosition(*id))?;
-        self.current_world_data.lock().await.mouse = new_pos;
-        Ok(())
+        let world_at_step = current_cmd_application
+            .at_step(step_number)
+            .map_err(|e| MicromouseManagerError::from(e))?;
+
+        let new_transf = {
+            if world_at_step.mouse != self.current_world.lock().await.mouse {
+                Some(world_at_step.mouse)
+            } else {
+                None
+            }
+        };
+
+        let filter_update = if let Some(m) = measurement {
+            // First get the transform to transform the measurement (first reaches the cell, then does
+            // the measurement)
+            let new_transf = world_at_step.mouse;
+            let transf_measurement = m.transform_by(&new_transf);
+
+            let filter_update =
+                current_cmd_application.apply_measurement_to_filter(transf_measurement)?;
+            let new_map = current_cmd_application
+                .at_step(step_number)
+                .map_err(|e| MicromouseManagerError::from(e))?;
+            *self.current_world.lock().await = new_map.clone().into();
+            filter_update
+        } else {
+            // since there is no new measurement, we can just take the world_at_step as the new
+            // world
+            *self.current_world.lock().await = world_at_step.clone().into();
+            // RejectedOutcomes::empty()
+            todo!()
+        };
+
+        let internal_map_update = InternalMapUpdate {
+            rejected_outcomes: filter_update.rejections,
+            discoveries: filter_update.discoveries,
+            new_transf,
+        };
+
+        Ok(internal_map_update)
+    }
+
+    /// Sets the current_cmd to none, returns the old one; Should NEVER return None
+    async fn clear_current_command(&self) -> Option<FilteredCommandApplication<N>> {
+        let mut current_cmd = self.current_command.lock().await;
+        let old_cmd = current_cmd.take();
+        old_cmd.map(|x| x.0)
     }
 
     /// Checks whether the cmd_id contained in the response is a new one --> Would mean, that the
@@ -152,9 +243,9 @@ impl<const N: usize> MicromouseManager<N> {
             // Storing the starting state of the new command, so that we can easily calculate,
             // where the mouse currently is
             *current_cmd = Some((
-                TransformedMovement::new(
-                    new_cmd.cmd.ty,
-                    self.current_world_data.lock().await.mouse,
+                FilteredCommandApplication::new(
+                    Some(self.current_world.lock().await.clone()),
+                    new_cmd.cmd,
                 ),
                 response_cmd_id,
             ));
@@ -167,6 +258,7 @@ impl<const N: usize> MicromouseManager<N> {
             // No change; current command = new command
             Ok(())
         } else {
+            // Started a new command without exiting the previous one
             Err(MicromouseManagerError::CmdStartBeforeFinish {
                 new_cmd: response_cmd_id,
                 unfinished_cmd: current_cmd_id,
@@ -182,8 +274,8 @@ pub enum MicromouseMode {
 }
 
 pub enum MicromouseEvent<const N: usize> {
-    UpdatePosition,
-    UpdatedMap(Map<N>, DiscoveryMessage),
+    UpdatePosition(MouseTransform),
+    UpdatedMap(NonEmpty<DiscoveryMessage>),
     FinishedCommand {
         cmd_id: CommandId,
         require_new: bool,
@@ -192,6 +284,7 @@ pub enum MicromouseEvent<const N: usize> {
     Restart,
     Error(MicromouseManagerError),
     DebugMessage(String),
+    RejectedOutcomes(NonEmpty<RejectedOutcomes>),
 }
 
 pub enum CommandSendError {
@@ -211,10 +304,40 @@ pub enum MicromouseManagerError {
     MeasurementWithoutAssociatedCmd,
     CmdTooLong(CommandId),
     ImpossiblePosition(CommandId),
+    CannotReachStep(CannotReachStep),
+    MapInconsistency(MapInconsistencyError),
 }
 
 impl From<FormatError<MicromouseResponse>> for MicromouseManagerError {
     fn from(value: FormatError<MicromouseResponse>) -> Self {
         Self::UnknownResponse(value)
+    }
+}
+
+impl From<CannotReachStep> for MicromouseManagerError {
+    fn from(value: CannotReachStep) -> Self {
+        Self::CannotReachStep(value)
+    }
+}
+
+impl From<MapInconsistencyError> for MicromouseManagerError {
+    fn from(value: MapInconsistencyError) -> Self {
+        Self::MapInconsistency(value)
+    }
+}
+
+impl<const N: usize> From<InternalMapUpdate> for Option<NonEmpty<Vec<MicromouseEvent<N>>>> {
+    fn from(value: InternalMapUpdate) -> Self {
+        let mut vec = Vec::with_capacity(3);
+        if let Some(x) = value.new_transf {
+            vec.push(MicromouseEvent::UpdatePosition(x))
+        }
+        if let Some(x) = value.discoveries {
+            vec.push(MicromouseEvent::UpdatedMap(x))
+        }
+        if let Some(x) = value.rejected_outcomes {
+            vec.push(MicromouseEvent::RejectedOutcomes(x))
+        }
+        vec.non_empty()
     }
 }

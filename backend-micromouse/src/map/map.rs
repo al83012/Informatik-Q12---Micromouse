@@ -396,3 +396,10 @@ impl<const N: usize> From<Map<N>> for PartialMap<N> {
         Self(value)
     }
 }
+
+impl<const N: usize> From<PartialMap<N>> for Map<N> {
+    fn from(value: PartialMap<N>) -> Self {
+        value.0 
+    }
+}
+

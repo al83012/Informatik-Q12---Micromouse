@@ -408,3 +408,9 @@ impl<const N: usize> Display for WorldData<N> {
 }
 
 
+impl<const N:usize> From<PartialWorldData<N>> for WorldData<N> {
+    fn from(value: PartialWorldData<N>) -> Self {
+        Self { map: value.map, mouse: value.mouse }
+    }
+}
+

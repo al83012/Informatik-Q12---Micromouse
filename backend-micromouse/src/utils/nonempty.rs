@@ -1,38 +1,73 @@
 
-
-pub struct NonEmptyVec<T: Sized>(Vec<T>);
-
-
-pub struct VecEmptyError;
+pub struct NonEmpty<T: Sized>(T);
 
 
-impl<T:Sized> TryFrom<Vec<T>> for NonEmptyVec<T> {
-    type Error = VecEmptyError;
+pub trait PotentiallyNonEmpty : Sized{
 
-    fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            return Err(VecEmptyError);
+    fn is_empty(&self) -> bool;
+    fn non_empty(self) -> Option<NonEmpty<Self>> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(NonEmpty(self))
         }
-        Ok(Self(value))
-    }
-}
-
-impl<T: Sized> Into<Vec<T>> for NonEmptyVec<T> {
-    fn into(self) -> Vec<T> {
-        self.0
     }
 }
 
 
-impl<'a, T: Sized> Into<&'a Vec<T>> for &'a NonEmptyVec<T> {
-    fn into(self) -> &'a Vec<T> {
-        &self.0
+impl<T: Sized> PotentiallyNonEmpty for Vec<T> {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
     }
 }
 
-
-impl<T: Sized> NonEmptyVec<T> {
+impl<T: Sized> NonEmpty<Vec<T>> {
     pub fn one(element: T) -> Self {
         Self(vec![element])
     }
 }
+
+// pub struct NonEmptyVec<T: Sized>(Vec<T>);
+//
+//
+// pub struct VecEmptyError;
+//
+//
+// impl<T:Sized> TryFrom<Vec<T>> for NonEmptyVec<T> {
+//     type Error = VecEmptyError;
+//
+//     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
+//         if value.is_empty() {
+//             return Err(VecEmptyError);
+//         }
+//         Ok(Self(value))
+//     }
+// }
+//
+// impl<T: Sized> Into<Vec<T>> for NonEmptyVec<T> {
+//     fn into(self) -> Vec<T> {
+//         self.0
+//     }
+// }
+//
+//
+// impl<'a, T: Sized> Into<&'a Vec<T>> for &'a NonEmptyVec<T> {
+//     fn into(self) -> &'a Vec<T> {
+//         &self.0
+//     }
+// }
+//
+//
+// impl<T: Sized> NonEmptyVec<T> {
+//     pub fn one(element: T) -> Self {
+//         Self(vec![element])
+//     }
+// }
+
+// impl<T: Sized> From<T> for NonEmptyVec<T> {
+//     fn from(value: T) -> Self {
+//         Self::one(value)
+//     }
+// }
+
+

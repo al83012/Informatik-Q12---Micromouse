@@ -15,21 +15,24 @@
 // WARN:
 // See notes on ipad
 
-use std::collections::{hash_map, HashMap, HashSet};
+use std::{
+    collections::{hash_map, HashMap, HashSet},
+    ops::Sub,
+};
 
 use tungstenite::http::header::MaxSizeReached;
 
 use crate::{
-    comm::micromouse_message::{
+    comm::{micromouse_message::{
         Command, InterruptOccurence, InterruptType, MeasurementInterrupt, MeasurementOccurence,
         StepNum, TransformedMovement,
-    },
+    }, website::DiscoveryMessage},
     map::{
-        map::{Map, PartialMap},
+        map::{Map, MapInconsistencyError, PartialMap},
         measurement::Measurement,
         upgrade::IsUpgradeable,
         world_data::{PartialWorldData, WorldData},
-    },
+    }, utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
 };
 
 pub struct FilteredCommandApplication<const N: usize> {
@@ -50,6 +53,8 @@ pub struct FilteredCommandApplication<const N: usize> {
     filter: Map<N>,
 
     transformed_move: TransformedMovement,
+
+    potential_outcome_ids: CommandOutcomeIds,
 
     command: Command,
 }
@@ -161,6 +166,8 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
         let mut execution_steps = Vec::with_capacity(max_step_count + 1);
 
+        let mut potential_outcome_ids = HashSet::new();
+
         // The condition for the next step to happen is that **NO** interrupt was triggered before
         // that point --> next_step_start_requirements is the running toll of how the map would
         // have to look like to make it past a certain point
@@ -191,7 +198,8 @@ impl<const N: usize> FilteredCommandApplication<N> {
                         potential_end_reason.action,
                     );
 
-                let terminating_world = next_step_start_requirements.clone()
+                let terminating_world = next_step_start_requirements
+                    .clone()
                     .with_interrupt_termination_triggered(
                         true,
                         potential_end_reason.direction,
@@ -217,21 +225,27 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     execution_steps.push(ExecutionStep {
                         interrupts: step_potential_ends,
                     });
+                    potential_outcome_ids.insert(PathLocalOutcomeId {
+                        at_step: i,
+                        from_interrupt: PathLocalInterruptId::InterruptAtIndex(interrupt_index),
+                    });
                     return Self {
                         execution_steps,
                         execution_termination: end_of_command,
                         filter,
                         command,
                         transformed_move,
-                        last_possible_state: next_step_start_requirements
+                        last_possible_state: next_step_start_requirements,
+                        potential_outcome_ids: CommandOutcomeIds {
+                            potential_outcome_ids,
+                        },
                     };
                 }
 
-
                 // INFO: Adding the current interrupt as a normal interrupt, which could activate
                 // or not
-                let continuing_world =
-                    continuing_world.expect("Already handled forced end; This path **has** to continue");
+                let continuing_world = continuing_world
+                    .expect("Already handled forced end; This path **has** to continue");
                 next_step_start_requirements = continuing_world.clone();
 
                 // Even registers `Continue`-Interrupts (Which is why terminating world is optional)
@@ -242,11 +256,20 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     interrupt_index,
                     terminating_world,
                 });
+                potential_outcome_ids.insert(PathLocalOutcomeId {
+                    at_step: i,
+                    from_interrupt: PathLocalInterruptId::InterruptAtIndex(interrupt_index),
+                });
             }
             execution_steps.push(ExecutionStep {
                 interrupts: step_potential_ends,
             });
         }
+
+        potential_outcome_ids.insert(PathLocalOutcomeId {
+            at_step: max_step_count,
+            from_interrupt: PathLocalInterruptId::MaxStep,
+        });
 
         Self {
             execution_steps,
@@ -256,7 +279,10 @@ impl<const N: usize> FilteredCommandApplication<N> {
             filter,
             command,
             transformed_move,
-            last_possible_state: next_step_start_requirements
+            last_possible_state: next_step_start_requirements,
+            potential_outcome_ids: CommandOutcomeIds {
+                potential_outcome_ids,
+            },
         }
     }
 
@@ -264,9 +290,14 @@ impl<const N: usize> FilteredCommandApplication<N> {
         self.execution_steps.len()
     }
 
-    pub fn update_filter(measurement: Measurement)
-    /* -> Result --> can upgrade current filter to this? + Return all the newly discarded stops  */
-    {
+    pub fn command_unfiltered_max_step(&self) -> usize {
+        self.command.max_step_count()
+    }
+
+    pub fn apply_measurement_to_filter(
+        &mut self,
+        measurement: Measurement,
+    ) -> Result<FilterUpdate, MapInconsistencyError> {
         todo!()
 
         //TODO: *self = Self::new(new_filter, self.command);
@@ -289,7 +320,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         //TODO: *self = Self::new(new_filter, self.command);
     }
 
-    fn potential_outcome_ids(&self) -> HashSet<PathLocalOutcomeId> {
+    fn potential_outcome_ids(&self) -> CommandOutcomeIds {
         let mut current_potential_outcome_ids = HashSet::new();
         for (step_num, step) in self.execution_steps.iter().enumerate() {
             for pot_outcome in step.interrupts.iter() {
@@ -333,7 +364,9 @@ impl<const N: usize> FilteredCommandApplication<N> {
             }
         };
 
-        current_potential_outcome_ids
+        CommandOutcomeIds {
+            potential_outcome_ids: current_potential_outcome_ids,
+        }
     }
 
     // The max-step / last step which will (at least partially) be executed
@@ -399,21 +432,28 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     from_interrupt: PathLocalInterruptId::MaxStep,
                 };
 
-
                 potential_outcomes.insert(outcome_id, &self.last_possible_state);
             }
         }
 
-        CommandOutcomes { potential_outcomes  }
+        CommandOutcomes { potential_outcomes }
     }
 
-    // pub fn at_step(&self, )
+    pub fn at_step(&self, step_number: StepNum) -> Result<&PartialWorldData<N>, CannotReachStep> {
+        todo!()
+    }
 }
 
 pub struct FilterUpgradeError;
 
+pub struct CannotReachStep(pub StepNum);
+
 pub struct CommandOutcomes<'a, const N: usize> {
     pub potential_outcomes: HashMap<PathLocalOutcomeId, &'a PartialWorldData<N>>,
+}
+
+pub struct CommandOutcomeIds {
+    pub potential_outcome_ids: HashSet<PathLocalOutcomeId>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -435,4 +475,31 @@ pub struct CommandApplicationIterator<const N: usize> {
 
 pub struct RejectedOutcomes {
     pub rejected_outcome_ids: HashSet<PathLocalOutcomeId>,
+}
+
+pub struct FilterUpdate {
+    pub discoveries: Option<NonEmpty<DiscoveryMessage>>,
+    pub rejections: Option<NonEmpty<RejectedOutcomes>>,
+}
+
+impl Sub for CommandOutcomeIds {
+    type Output = RejectedOutcomes;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        RejectedOutcomes {
+            rejected_outcome_ids: self
+                .potential_outcome_ids
+                .difference(&rhs.potential_outcome_ids)
+                .cloned()
+                .collect(),
+        }
+    }
+}
+
+
+
+impl PotentiallyNonEmpty for RejectedOutcomes {
+    fn is_empty(&self) -> bool {
+        self.rejected_outcome_ids.is_empty()
+    }
 }
