@@ -16,7 +16,7 @@ use crate::{
 
 #[ignore]
 #[test]
-pub fn test_conn_and_always_right() {
+pub fn follow_r_and_conn() {
     init_logging();
     // run_test("trace", || {
     let rt = tokio::runtime::Runtime::new().unwrap();
