@@ -4,7 +4,7 @@ use tracing::{error, info};
 
 use crate::{
     comm::{
-        micromouse_manager::MicromouseManager,
+        micromouse_manager::{MicromouseEvent, MicromouseManager},
         micromouse_message::{
             Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
         },
@@ -82,7 +82,10 @@ pub fn follow_r_and_conn() {
                     match events {
                         Ok(events) => {
                             for event in events.deref().iter() {
-                                info!(target: "comm/mng/event", "RECEIVED EVENT: {event:?}");
+                                info!(target: "comm/mng/event", "RECEIVED EVENT:\n{event:#?}");
+                                if let MicromouseEvent::UpdatedMap(_) = event {
+                                    info!(target: "comm/mng/event", "MAP UPDATE:\n{}", micromouse_manager.current_world_lock().await);
+                                }
                             }
                         }
                         Err(e) => {

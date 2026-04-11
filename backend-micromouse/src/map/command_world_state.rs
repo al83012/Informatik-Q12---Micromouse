@@ -286,9 +286,9 @@ impl<const N: usize> FilteredCommandApplication<N> {
         }
     }
 
-    pub fn max_step(&self) -> usize {
-        self.execution_steps.len()
-    }
+    // pub fn max_step(&self) -> usize {
+    //     self.execution_steps.len()
+    // }
 
     pub fn command_unfiltered_max_step(&self) -> usize {
         self.command.max_step_count()
@@ -336,7 +336,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         Ok(rejected)
     }
 
-    fn potential_outcome_ids(&self) -> CommandOutcomeIds {
+    pub fn potential_outcome_ids(&self) -> CommandOutcomeIds {
         let mut current_potential_outcome_ids = HashSet::new();
         for (step_num, step) in self.execution_steps.iter().enumerate() {
             for pot_outcome in step.interrupts.iter() {

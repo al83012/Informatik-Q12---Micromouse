@@ -1,6 +1,9 @@
 use std::time::Instant;
 
-use tracing::{Event, Subscriber, field::{Field, Visit}};
+use tracing::{
+    field::{Field, Visit},
+    Event, Subscriber,
+};
 use tracing_subscriber::{
     fmt::{self, format::Writer, FmtContext, FormatEvent, FormatFields},
     layer::{Context, SubscriberExt},
@@ -99,8 +102,7 @@ where
 
         let level = format!("{level_bg_color} {level:<6} {STD_BG}");
 
-        let info =
-            format!("[{time:>8.2}] [{BLACK} {level} {module:<10} {target:<6}");
+        let info = format!("[{time:>8.2}] [{BLACK} {level} {module:<10} {target:<6}");
 
         let info_len = console::measure_text_width(info.as_str());
 
@@ -114,7 +116,13 @@ where
 
         write!(writer, "{level_color}")?;
 
-        ctx.format_fields(writer.by_ref(), event)?;
+        let mut visitor = MessageVisitor { msg: None };
+        event.record(&mut visitor);
+        let msg = visitor.msg.unwrap_or_default();
+
+        write!(writer, " {msg}")?;
+
+        // ctx.format_fields(writer.by_ref(), event)?;
 
         write!(writer, "{RESET_COLOR}")?;
 
@@ -165,10 +173,7 @@ where
             format!("[{elapsed:>8.2}] [{BLACK} {level} {module:<10} {target:<6} {RESET_COLOR}]");
 
         // header
-        write!(
-            writer,
-            "{info} {msg} ",
-        )?;
+        write!(writer, "{info} {msg} ",)?;
 
         // ctx.format_fields(writer.by_ref(), event)?;
 
@@ -218,5 +223,3 @@ pub fn run_test<T>(env_filter: &str, f: impl FnOnce() -> T) -> T {
     let subscriber = test_logging(env_filter);
     tracing::subscriber::with_default(subscriber, f)
 }
-
-

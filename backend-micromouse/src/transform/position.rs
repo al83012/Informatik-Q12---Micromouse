@@ -1,6 +1,6 @@
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 use crate::{comm::micromouse_message::MovementType, transform::direction::{Direction, DirectionNormalizedVector}};
 
@@ -61,7 +61,7 @@ impl MouseTransform {
     pub fn rotated(self, intervals_counter_clockwise: i8) -> Self {
         let old_dir = self.dir;
         let new_dir = self.dir.rotated(intervals_counter_clockwise);
-        debug!(target: "tests/op", "ROTATED: {intervals_counter_clockwise} & {old_dir} --> {new_dir}");
+        trace!(target: "tests/op", "ROTATED: {intervals_counter_clockwise} & {old_dir} --> {new_dir}");
         MouseTransform {
             pos: self.pos,
             dir: new_dir,
@@ -70,7 +70,7 @@ impl MouseTransform {
     pub fn moved(self, fwd_steps: u8) -> Option<Self> {
         let old_pos = self.pos;
         let new_pos = (old_pos + self.dir.steps_in_dir(fwd_steps))?;
-        debug!(target: "tests/op", "MOVED: {fwd_steps} & {old_pos} --> {new_pos}");
+        trace!(target: "tests/op", "MOVED: {fwd_steps} & {old_pos} --> {new_pos}");
         Some(MouseTransform {
             pos: new_pos,
             dir: self.dir,

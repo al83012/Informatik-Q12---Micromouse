@@ -1,8 +1,10 @@
 use std::{
     collections::{HashMap, HashSet},
+    ops::Deref,
     sync::atomic::{AtomicBool, AtomicU32},
 };
 
+use console::Style;
 use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, warn};
 
@@ -38,7 +40,7 @@ pub struct MicromouseManager<const N: usize> {
     battery: Mutex<f32>,
     start_marker: AtomicBool,
 }
-
+#[derive(Debug)]
 pub struct InternalMapUpdate {
     new_transf: Option<MouseTransform>,
     discoveries: Option<NonEmpty<DiscoveryMessage>>,
@@ -108,7 +110,7 @@ impl<const N: usize> MicromouseManager<N> {
                     return Ok(NonEmpty::<_>::one(MicromouseEvent::DebugMessage(msg)));
                 }
                 MicromouseResponse::Measurement(measurement_message) => {
-                    debug!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
+                    info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
                     // Check whether command is new
                     self.update_current_command_id(measurement_message.from_cmd)
                         .await?;
@@ -118,8 +120,8 @@ impl<const N: usize> MicromouseManager<N> {
                             Some(measurement_message),
                         )
                         .await?;
+                    debug!(target: "comm/mng/map", "Updated Map\n{:#?}", &map_update);
                     if let Some(map_update_events) = map_update.into() {
-                        debug!(target: "comm/mng/map", "Updated Map");
                         return Ok(map_update_events);
                     }
                 }
@@ -140,12 +142,18 @@ impl<const N: usize> MicromouseManager<N> {
                             // The step at which it ended must have been the max step that way
                             // available (since the max step is per definition the step at which an
                             // interrupt or max_step is triggered)
-                            just_finished_cmd.max_step() as u32
+                            let max_step = just_finished_cmd.step_with_termination() as u32;
+                            debug!(target: "comm/mng/cmd", "No step_num given: max_step = {max_step}");
+                            max_step
                         }
                     };
                     debug!(target: "comm/mng/cmd", "FINISHED AT STEP {step_num}");
                     // do a last position-update (in case we didn't get a measurement in the last
                     // step and have to update it to its last transf that way)
+                    if self.unconfirmed_cmd.lock().await.is_empty() {
+                        debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
+                        self.notify_empty_queue.notify_waiters();
+                    }
                     self.update_cmd_application(step_num, None).await?;
                     self.clear_current_command().await;
                     let require_new = self.unconfirmed_cmd.lock().await.is_empty();
@@ -260,6 +268,13 @@ impl<const N: usize> MicromouseManager<N> {
             }
         };
 
+        if let Some(rej) = &filter_update.rejections {
+            for rej in rej.deref().rejected_outcome_ids.iter() {
+                let style = Style::new().strikethrough();
+                debug!(target: "comm/mng/cmd", "REJECTED = {}", style.apply_to( format!("{rej:?}")));
+            }
+        }
+
         let internal_map_update = InternalMapUpdate {
             rejected_outcomes: filter_update.rejections,
             discoveries: filter_update.discoveries,
@@ -285,6 +300,11 @@ impl<const N: usize> MicromouseManager<N> {
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None
     async fn clear_current_command(&self) -> Option<FilteredCommandApplication<N>> {
+        debug!(target: "comm/mng/cmd", "CLEARING CURRENT COMMAND");
+        if self.unconfirmed_cmd.lock().await.is_empty() {
+            debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
+            self.notify_empty_queue.notify_waiters();
+        }
         let mut current_cmd = self.current_command.lock().await;
         let old_cmd = current_cmd.take();
         old_cmd.map(|x| x.0)
@@ -311,13 +331,15 @@ impl<const N: usize> MicromouseManager<N> {
 
             // Storing the starting state of the new command, so that we can easily calculate,
             // where the mouse currently is
-            *current_cmd = Some((
-                FilteredCommandApplication::new(
-                    Some(self.current_world.read().await.clone()),
-                    new_cmd.cmd,
-                ),
-                response_cmd_id,
-            ));
+            let new_cmd = FilteredCommandApplication::new(
+                Some(self.current_world.read().await.clone()),
+                new_cmd.cmd,
+            );
+            debug!(target: "comm/mng/cmd", "CONFIRMATION: STARTED NEW CMD");
+            for outcome in new_cmd.potential_outcome_ids().potential_outcome_ids {
+                debug!(target: "comm/mng/cmd", "POT. OUTCOME = {outcome:?}");
+            }
+            *current_cmd = Some((new_cmd, response_cmd_id));
             return Ok(());
         }
 
