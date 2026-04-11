@@ -150,6 +150,7 @@ impl<const N: usize> MicromouseManager<N> {
                     debug!(target: "comm/mng/cmd", "FINISHED AT STEP {step_num}");
                     // do a last position-update (in case we didn't get a measurement in the last
                     // step and have to update it to its last transf that way)
+                    debug!(target: "comm/mng/cmd", "Currently unconfirmed {:?}", self.unconfirmed_cmd.lock().await);
                     if self.unconfirmed_cmd.lock().await.is_empty() {
                         debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
                         self.notify_empty_queue.notify_waiters();
