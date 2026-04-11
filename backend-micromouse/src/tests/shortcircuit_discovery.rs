@@ -1,8 +1,12 @@
-use std::{ops::DerefMut, process::Command};
+use std::{ops::DerefMut, process::Command, sync::atomic::AtomicUsize};
 
-use tokio::sync::{Mutex, Notify, mpsc::{self, Receiver, Sender}};
+use tokio::sync::{
+    mpsc::{self, Receiver, Sender},
+    Mutex, Notify,
+};
 
 use crate::{
+    comm::micromouse_message::StepNum,
     map::{
         command_world_state::FilteredCommandApplication,
         map::{Map, PartialMap},
@@ -60,6 +64,9 @@ impl<const N: usize> DirectSimulationEnvironment<N> {
             self.empty_queue_notification.notify_one();
             return;
         };
+        let measurements_to_perform =
+            current_command.ordered_measurement_directions_at_step(*next_step as StepNum).expect("The command should be reachable as any termination should have been detected before");
+
         // let measurement_directions_to_perform = current_command.measurement_directions_at_step(next_step);
 
         todo!()

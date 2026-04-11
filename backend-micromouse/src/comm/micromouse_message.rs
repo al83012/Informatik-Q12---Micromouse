@@ -65,6 +65,12 @@ impl<T> std::fmt::Display for FormatError<T> {
     }
 }
 
+impl<T> std::fmt::Debug for FormatError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(FormatError: {})", self.faulty_text)
+    }
+}
+
 impl TryFrom<String> for MicromouseResponse {
     type Error = FormatError<MicromouseResponse>;
 
@@ -358,6 +364,7 @@ pub struct CommandMessage {
     pub cmd_id: CommandId,
 }
 
+#[derive(Debug)]
 pub struct MeasurementMessage {
     pub from_cmd: CommandId,
     pub interrupt: MeasurementOccurence,

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 
 pub struct NonEmpty<T: Sized>(T);
 
@@ -71,3 +73,19 @@ impl<T: Sized> NonEmpty<Vec<T>> {
 // }
 
 
+impl<T> Display for NonEmpty<T>
+    where T: Display
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl<T> std::fmt::Debug for NonEmpty<T>
+    where T: std::fmt::Debug
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NonEmpty({:?})", self.0)
+        // f.debug_tuple("NonEmpty").field(&self.0).finish()
+    }
+}

@@ -668,6 +668,7 @@ pub enum MaxSubstepTermination {
     Terminated(PathLocalInterruptId),
 }
 
+#[derive(Debug)]
 pub enum CertainStepError {
     CannotReachStep(CannotReachStep),
     Uncertainty(UncertainStepError),
@@ -684,13 +685,16 @@ impl From<UncertainStepError> for CertainStepError {
     }
 }
 
+#[derive(Debug)]
 pub struct UncertainStepError {
     pub tried_to_reach_step: StepNum,
     pub but_could_terminate_at: StepNum,
 }
 
+#[derive(Debug)]
 pub struct FilterUpgradeError;
 
+#[derive(Debug)]
 pub enum FilterMeasurementUpgradeError {
     NotValidUpgrade(FilterUpgradeError),
     NotValidMeasurement(MapInconsistencyError),
@@ -707,12 +711,14 @@ impl From<FilterUpgradeError> for FilterMeasurementUpgradeError {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct CannotReachStep(pub StepNum);
 
 pub struct CommandOutcomes<'a, const N: usize> {
     pub potential_outcomes: HashMap<PathLocalOutcomeId, &'a PartialWorldData<N>>,
 }
 
+#[derive(Debug)]
 pub struct CommandOutcomeIds {
     pub potential_outcome_ids: HashSet<PathLocalOutcomeId>,
 }
@@ -735,10 +741,12 @@ pub struct CommandApplicationIterator<const N: usize> {
     application: FilteredCommandApplication<N>,
 }
 
+#[derive(Debug)]
 pub struct RejectedOutcomes {
     pub rejected_outcome_ids: HashSet<PathLocalOutcomeId>,
 }
 
+#[derive(Debug)]
 pub struct FilterUpdate {
     pub discoveries: Option<NonEmpty<DiscoveryMessage>>,
     pub rejections: Option<NonEmpty<RejectedOutcomes>>,
