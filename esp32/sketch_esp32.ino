@@ -1,57 +1,232 @@
+
+#include <ArduinoWebsockets.h>
 #include "WiFi.h"
 #include "HTTPClient.h"
+#include <map>
+#include <vector>
+
+//Websocket
+using namespace websockets;
+using namespace std;
+WebsocketsClient client;
+String websockets_server = "ws://";
+unsigned long lastReconnectAttempt = 0;
+const unsigned long reconnectInterval = 2000;
+
+//Network information
+const char* ssid= "++++";
+const char* password="++++";
+uint16_t port = 9001;
+char serverName[] = "172.13.1.1";
 
 
-bool wallLeft;
-bool wallRight;
-bool wallFront;
+//Simulation params
+int SIM_SIZE = 8;
 int cellSize = 18;
 int  stepFreq = 1;
-WiFiClient client;
-int counter = 0;
+int X = 1;
+int Y = 1;
+enum directions {
+  posX,
+  posY,
+  negX,
+  negY
 
+};
+
+enum directions dir = posX;
+
+
+int SIM_FIELD[8][8] = {
+    {9, 1, 1, 1, 1, 1, 1, 1},   
+    {8, 0, 2, 0, 10, 0, 0, 2},  
+    {8, 0, 2, 0, 0, 0, 0, 2},
+    {8, 0, 0, 0, 11, 5, 5, 2},  
+    {8, 0, 10, 0, 0, 0, 0, 2},
+    {8, 0, 10, 0, 10, 0, 10, 2},
+    {8, 0, 10, 0, 10, 0, 0, 2},
+    {12, 4, 4, 4, 4, 4, 4, 6}  
+};
+
+//Live vars
+bool desync_mode = false;
 int lastCMD_ID = -1;
 int currCMD_ID = -1;
 
 
-const char* ssid= "SSID";
-const char* password="PASSWORD";
 
-char serverName[] = "172.13.1.1";
+//Command config
+int MAX_CMD_ARGS = 15;
 
-WiFiServer server(10000);
+int MAX_SUB_STEPS = 256;
+int DISTANCE_THRESHOLD = 0;
+int SENSORLIMIT = 5;
+
+std::map<int, char> measurements;
+std::map<int, int> reactions;
 
 
-void setup() {
-  Serial.begin(115200);
-  Serial.println("# ESP32 boot starting...");
+//IDs
+int STOP_IF_OPEN_ID = 10;
+int STOP_IF_CLOSED_ID = 11;
+int CONTINUE_ID = 12;
 
-  
-  Serial.println("# Initializing WiFi...");
-  WiFi.mode(WIFI_STA);
-  scanNetworks();
+//---- Simulation methods start ----
 
-  initNetwork();
+void printField() {
+  for(int i = 0; i < SIM_SIZE; i++) {
+    for(int j = 0; j < SIM_SIZE; j++) {
+      if(X == i & Y == j) {
+         Serial.print("@");
+      } else {
+        Serial.print(SIM_FIELD[i][j]);
+      }
+    }
+    Serial.println("");
+  }
+}
 
-  Serial.println("# Setup done!");
-  connectToServer();
+void sim_move(int n) {
+    int newX = X;
+    int newY = Y;
+    int dir_flag;
+    if(dir == posX) {
+      newX+=1;
+      dir_flag = 1;
+    } else if(dir == posY) {
+      newY+=1;
+      dir_flag = 4;
+    } else if(dir == negX) {
+      newX-=1;
+      dir_flag = 8;
+    } else if(dir == negY) {
+      newY-=1;
+      dir_flag = 2;
+    }
 
-  handleCommand("MOVE #0 2$");
-  handleCommand("MOVE #1 3$");
-  handleCommand("MOVE #5 3$");
-  handleCommand("MOVE #5 3$ Randomstuff");
-  handleCommand("TURN #6 3$");
-  handleCommand("ALIVE 41$");
-  handleCommand("RANDOMSTUFF");
-  handleCommand("RANDOM #1 3$");
+    if(can_move(newX ,newY, dir_flag) && newX < SIM_SIZE && newY < SIM_SIZE) {
+      X = newX;
+      Y = newY;
+    } else {
+      Serial.println("# CANNOT MOVE");
+    }
 
+
+}
+
+void sim_turn(int turns) {
+  if(turns < 0) {
+    turns = turns*-1;
+    for(int i = 1; i <=turns; i++) {
+      if(dir == posX) { dir = posY; } else
+      if(dir == posY) { dir = negX; } else
+      if(dir == negX) { dir = negY; } else
+      if(dir == negY) { dir = posX; } 
+    }
+
+  } else {
+    for(int i = 1; i <=turns; i++) {
+      if(dir == posX) { dir = negY; } else
+      if(dir == negY) { dir = negX; } else
+      if(dir == negX) { dir = posY; } else
+      if(dir == posY) { dir = posX; } 
+  }
+}
+}
+
+int sim_measure(char scan_dir) {
+  int distance = 0;
+  int checkX = X;
+  int checkY = Y;
+  directions lookDir = dir;
+
+  if(scan_dir == 'F') {
+    
+
+  } else if (scan_dir == 'L') {
+        if (dir == posX) lookDir = posY;
+        else if (dir == posY) lookDir = negX;
+        else if (dir == negX) lookDir = negY;
+        else if (dir == negY) lookDir = posX;
+    }
+
+   else if(scan_dir == 'R') {
+      if (dir == posX) lookDir = negY;
+        else if (dir == negY) lookDir = negX;
+        else if (dir == negX) lookDir = posY;
+        else if (dir == posY) lookDir = posX;
+  }
+
+  while(true) {
+    int wall_flag = 0;
+    int nextX = checkX;
+    int nextY = checkY;
+
+    if (lookDir == posX) { wall_flag = 1; nextX++; }
+        else if (lookDir == posY) { wall_flag = 4; nextY++; }
+        else if (lookDir == negX) { wall_flag = 8; nextX--; }
+        else if (lookDir == negY) { wall_flag = 2; nextY--; }
+
+    if (nextX < 0 || nextX >= SIM_SIZE || nextY < 0 || nextY >= SIM_SIZE) {break;}    
+    if (SIM_FIELD[checkY][checkX] & wall_flag) {break;}
+    if (distance >= SIM_SIZE) break;
+
+    checkX = nextX;
+    checkY = nextY;
+    distance++;
+  }
+
+  return distance;
 
 }
 
 
 
+bool can_move(int x, int y, int direction_flag) {
+    if (SIM_FIELD[y][x] & direction_flag) {
+        return false; 
+    }
+    return true;
+}
+
+
+
+
+// ---- Simulation methods end ----
+
+
+
+
+//---- Network methods start ----
+
+String get_ws_url() {
+  return websockets_server + WiFi.gatewayIP().toString() + ":" + port + "/";
+}
+
+
+void connectWS() {
+  String ws_ip = get_ws_url();
+  Serial.println("#Connecting to... " + ws_ip);
+
+  client = WebsocketsClient();
+
+  client.onMessage(handleCommand);
+  client.onEvent(handleEvent);
+
+  bool connected = client.connect(ws_ip);
+
+  if (connected) {
+    Serial.println("# CN SUCC!");
+    client.send("DEB");
+    client.ping();
+  } else {
+    Serial.println("# CN FAIL!");
+  }
+}
+
+
 void initNetwork() {
-  Serial.println("# Initializing network connection...");
+  Serial.println("# INIT NTW CN...");
   WiFi.begin(ssid, password);
   Serial.println("# Connecting");
   while(WiFi.status() != WL_CONNECTED) {
@@ -59,23 +234,26 @@ void initNetwork() {
     Serial.print(".");
   }
   Serial.println("");
-  Serial.println("# Success! My IP is: ");
+  Serial.println("# SUCC! MY IP: ");
   Serial.println(WiFi.localIP());
-  server.begin();
+
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(true);
+  WiFi.setSleep(false);
 
 }
 
 void scanNetworks() {
-  Serial.println("# Scanning for networks...");
+  Serial.println("# SCAN FOR NW...");
 
   int n = WiFi.scanNetworks();
-  Serial.println("# Scan done!");
+  Serial.println("# SCAN DONE!");
   if (n == 0) {
-    Serial.println("# No networks found.");
+    Serial.println("# NO NW FOUND.");
   } else {
     Serial.println();
     Serial.print(n);
-    Serial.println(" networks found");
+    Serial.println(" NW FOUND");
     for (int i = 0; i < n; ++i) {
       Serial.print(i + 1);
       Serial.print(": ");
@@ -89,75 +267,212 @@ void scanNetworks() {
   }
   Serial.println("");
 }
+//---- Network methods end ----
 
+void setup() {
+  Serial.begin(115200);
+  Serial.println("# ESP32 boot starting...");
 
+  
+  Serial.println("# Initializing WiFi...");
+  WiFi.mode(WIFI_STA);
+  scanNetworks();
+  initNetwork();
 
-void connectToServer() {
-   Serial.println("# Trying to connect to websocket...");
+  client = WebsocketsClient();
 
-  if(!client.connect(serverName, 9001)) {
-    Serial.println("# Connection to host failed");
-    delay(1000);
-    return;
-  }
+  client.onMessage(handleCommand);
+  client.onEvent(handleEvent);
+  connectWS();
 
-   debug("Hello from ESP32! Praise the Omnissiah!");
-   debug("From the moment i understood the weakness of my flesh, it disgusted me");
-   debug("For the machine is immortal");
+  Serial.println("# Setup done!");
+
+  /*handleCommand("MOVE #0 2$");
+  handleCommand("MOVE #1 3$");
+  handleCommand("MOVE #5 3$");
+  handleCommand("MOVE #5 3$ Randomstuff");
+  handleCommand("TURN #6 3$");
+  handleCommand("RANDOMSTUFF");
+  handleCommand("RANDOM #1 3$");*/
 
 
 }
 
-void moveNoMeasure(int cells) {
+
+//---- Sensor-actor-methods start ----
+
+int measure(char dir) {
+
+  if(dir == 'F') {
+    //read processed value of sensor -> return distance in walls
+  }
+
+  if(dir == 'R') {
+    //read processed value of sensor -> return distance in walls
+  }
+
+  if(dir == 'L') {
+    //read processed value of sensor -> return distance in walls
+  }
+
+
+  return sim_measure(dir); 
+}
+
+
+void movePassive(int cells) {
+  sim_move(cells); //REMOVE AFTER SIM
   Serial.println("# MV NO MSR > SRV");
   finishedAll();
 }
 
-void moveMeasurePassive(int cells) {
-  String content = "MEASUREMENT #" + currCMD_ID;
-  content = content +  + " S_D DISTANCE$";
-  Serial.println("# MOV MSR > SRV");
-  client.print(content);
+void moveActive(int cells) {
+    int sub_step = 0;
+    
+
+    for(int i = 0; i < cells; i++) {
+
+        if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
+          int distance = measure(measurements[sub_step]);
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + measurements[sub_step] + distance;
+          if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
+          Serial.println("# MSR > SRV");      
+          client.send(content);
+
+          if(distance > DISTANCE_THRESHOLD ) {
+            if(reactions[sub_step] == STOP_IF_OPEN_ID) {
+              debug("Interrupt at substep " + sub_step); //TODO: Attach interrupt to finished message
+              return;
+            }
+
+            if(reactions[sub_step] != CONTINUE_ID) {
+              turnPassive(1);
+              return;
+            }
+            
+          } else if(distance <= DISTANCE_THRESHOLD ) {
+            
+          if(distance > DISTANCE_THRESHOLD ) {
+            if(reactions[sub_step] == STOP_IF_CLOSED_ID) {
+               debug("Interrupt at substep " + sub_step); //TODO: Attach interrupt to finished message
+              return;
+            }
+
+            if(reactions[sub_step] != CONTINUE_ID) {
+              turnPassive(1);
+              return;
+            }
+
+
+
+        }
+
+      }
+    } 
+      movePassive(1);
+    
+  }
+}
+
+void turnPassive(int turns) {
+ /* if(turns < 0) {
+    turns = turns*-1;
+    for(int i = 1; i <=turns; i++) {
+      //turn counter-clockwise
+
+  }
+
+
+  } else {
+    for(int i = 1; i <=turns; i++) {
+      //turn clockwise
+  }
+
+
+  }*/
+  sim_turn(turns); //REMOVE AFTER SIM
 
   finishedAll();
 }
 
-void turn() {
-  finishedAll();
+void turnActive(int turns) {
+      int sub_step = 0;
+
+    for(int i = 0; i < turns; i++) {
+
+        if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
+          int distance = measure(measurements[sub_step]);
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + measurements[sub_step] + distance;
+          if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
+          Serial.println("# MSR > SRV");      
+          client.send(content);
+
+          if(distance > DISTANCE_THRESHOLD ) {
+            if(reactions[sub_step] == STOP_IF_OPEN_ID) {
+              debug("Interrupt at substep " + sub_step); //TODO: Attach interrupt to finished message
+              return;
+            }
+
+            else if(reactions[sub_step] != CONTINUE_ID) {
+              return;
+            }
+            
+          } else if(distance <= DISTANCE_THRESHOLD ) {
+            
+          if(distance > DISTANCE_THRESHOLD ) {
+            if(reactions[sub_step] == STOP_IF_CLOSED_ID) {
+               debug("Interrupt at substep " + sub_step); //TODO: Attach interrupt to finished message
+              return;
+            }
+
+            else if(reactions[sub_step] != CONTINUE_ID) {
+              return;
+            }
+        }
+      }
+    } 
+      turnPassive(1);
+    
+  }
 }
 
-void alive(String message) {
-  Serial.println("# CNF_ALV > SRV");
-  client.print("CONFIRM-" + message);
+//---- Sensor-actor-methods end ----
 
-}
+
+
+//---- Status messages start ----
 
 void stop() {
   Serial.println("# STP > SRV");
-  client.print("STOP$");
+  client.send("STOP");
 }
 
 void battery() {
   Serial.println("# BTRY > SRV");
-  client.print("BATTERY 0$");
+  client.send("BATTERY 0");
 }
 
 void restart() {
   Serial.println("# RSTRT > SRV");
-  client.print("RESTART$");
+
+  measurements.clear();
+  reactions.clear();
+  lastCMD_ID = -1;
+  currCMD_ID = -1;
+
+  client.send("RESTART");
 }
 
 void debug(String message) {
-  String content = "DBG " + message + "\n$";
-  client.print(content);
+  String content = "DBG " + message + "\n";
+  client.send(content);
 }
 
 void finishedAll(){
   String message = "CMD-FINISHED #";
-  Serial.println("# DONE > SRV");
+  Serial.println("# CMD DONE > SRV");
   message = message + currCMD_ID;
-  message = message + "$";
-  client.print(message);
+  client.send(message);
 
 }
 
@@ -169,28 +484,45 @@ void desync() {
       error = error + "#";
       error = error + i;
       error = error + " ";
-      if(i == currCMD_ID-1) {
-          error = error+"$";
-      }
+   
 
   }
-  Serial.println(error); //sts
-  Serial.println("# AWAIT RCV...KEEP ALV");
-
+  client.send(error);
+  Serial.println("# AWAIT RESYNC...");
+  desync_mode = true;
 
 }
 
-void handleCommand(String message) {
+//---- Status messages end ----
 
+//---- Message-handling start ----
+
+void handleEvent(WebsocketsEvent event, String data) {
+  if (event == WebsocketsEvent::ConnectionOpened) {
+    Serial.println("# CN OPENED");
+  } else if (event == WebsocketsEvent::ConnectionClosed) {
+    Serial.println("# CN CLOSED");
+  } else if (event == WebsocketsEvent::GotPing) {
+    Serial.println("PONG " + data);
+    
+    client.pong(data);
+  } else if (event == WebsocketsEvent::GotPong) {
+    Serial.println("# PONG RCV!");
+  }
+}
+
+
+
+void handleCommand(WebsocketsMessage WSmessage) {
+  String message = WSmessage.data();
   Serial.println(">> " + message);
-  message.remove(message.length()-1, 1);
-  String arguments[15]; 
+  String arguments[MAX_CMD_ARGS]; 
   int words = 0;
-
+  //Collect words
     int lastIndex = 0;
     for (int i = 0; i <= message.length(); i++) {
       if (message[i] == ' ' || i == message.length()) {
-        if (words < 15) { 
+        if (words < MAX_CMD_ARGS) { 
           arguments[words] = message.substring(lastIndex, i);
           words++;
         }
@@ -198,37 +530,74 @@ void handleCommand(String message) {
       lastIndex = i + 1;
     }
   }
-  
-  for (int i = 0; i < words; i++) {
-
-    
-
-    if(arguments[i].indexOf("#") != -1) {
+  if(!desync_mode) {
+  //Scanning for command type
+    if(arguments[1].indexOf("#") != -1) {
         Serial.println("# CMD RCV");
-        arguments[i].remove(0, 1);
+        arguments[1].remove(0, 1);
         lastCMD_ID = currCMD_ID;
-        currCMD_ID = arguments[i].toInt();
+        currCMD_ID = arguments[1].toInt();
 
         if(lastCMD_ID == currCMD_ID-1) {
             Serial.print("# CMD_ID VALID:");
             Serial.println(currCMD_ID);
 
-            if(arguments[0] == "MOVE") {
-                int cells = arguments[2].toInt();
-                if(words == 3) {
-                    moveNoMeasure(cells);
-                } else {
-
-                }          
+              if(words == 3) {
+                  if(arguments[0] == "MOVE") {
+                    movePassive(arguments[2].toInt());
+                  } 
+                  else if(arguments[0] == "TURN") {
+                    turnPassive(arguments[2].toInt());
+                  }
+              } else {
+                  int cells = arguments[2].toInt();
                 
+                    if(arguments[3] == "MEASURE") {
+                      
+                      for(int j = 4; j < words; j++) {
+                      String word = arguments[j];
+                      int sub_step;
+                      if(word[0] != 'X') {
+                         sub_step = String(word[0]).toInt();
+                      } else {
+                         sub_step = MAX_SUB_STEPS;
+                      }
+                      char dir = word[1];
 
-            } else if (arguments[0] == "TURN") {
-                turn();
-            } else {
-              Serial.println("UNKWN CMD!!");
-              debug("UNKWN CMD!!");
-            }
+                      measurements[sub_step] = dir;
 
+                      if(word.indexOf("STOP-IF-OPEN") != -1) {
+                        reactions[sub_step] = STOP_IF_OPEN_ID;
+                      } else if(word.indexOf("STOP-IF-CLOSED") != -1) {
+                        reactions[sub_step] = STOP_IF_CLOSED_ID;
+                      } else if(word.indexOf("TURN-IF-BLOCKED") != -1) {
+                        reactions[sub_step] = String(word[word.length() -1]).toInt();
+                      } else if(word.indexOf("CONTINUE") != -1) {
+                        reactions[sub_step] = CONTINUE_ID;
+                      }
+
+                      }
+
+                      if(arguments[0] == "MOVE") {
+                        moveActive(cells);
+                      }
+                      else if(arguments[0] == "TURN"){
+                        turnActive(cells);
+                      }
+
+                      reactions.clear();
+                      measurements.clear();
+
+            
+                      finishedAll(); //TODO: Attach interrupt to finished message
+
+                    } else {
+                      Serial.println("# INVLD MOV ARGS > SRV");
+                      debug("# INVLD MOV ARGS");
+
+                    }
+              }
+              
 
         } else {
           desync();
@@ -236,50 +605,29 @@ void handleCommand(String message) {
 
 
     } else {
-      if(arguments[i].indexOf("ALIVE") != -1) {
-          alive(message);
-       }
+      Serial.println("# INVLD CMD-ID > SRV");
+      debug("# INVLD CMD-ID");
 
     }
     
-   // Serial.print(i);
-   // Serial.println(": " + arguments[i]);
-
-  }
-  
-}
-
-
-
-void executeClient() {
-
- counter++;
-  if(client.connected()) {
-   
-
-    char c = client.read();
-    String message = "";
-
-    while(c != '$' && client.connected()) {
-      message+=c;
-     c = client.read();
-  }
-
-
-    Serial.print("# RCV < SRV:");
-    Serial.println(message);
-    Serial.println("# Handling message...");
-
   } else {
-    Serial.println("# Connection lost! Try reconnecting...");
-    client.connect(serverName, 9001);
+
   }
-  
+
+
 }
+
+
+//---- Message-handling end ----
+
+
 
 void loop() {
 
-  executeClient();
-  delay(1000/stepFreq);
+  if(client.available()) {
+    client.poll();
+  }
+
+ // delay(1000/stepFreq);
 
 }
