@@ -15,7 +15,7 @@ fn unbuffered_stdout() -> impl Write {
     io::stdout()
 }
 
-pub const ENABLED_LOG_TARGETS: [&str; 3] = ["comm", "strat", "main"];
+pub const ENABLED_LOG_TARGETS: [&str; 4] = ["comm", "strat", "main", "test"];
 
 struct TargetFilter;
 
@@ -100,16 +100,17 @@ where
         let level = format!("{level_bg_color} {level:<6} {STD_BG}");
 
         let info =
-            format!("[{time:>8.2}] [{BLACK} {level} {module:<10} {target:<6} {RESET_COLOR}]");
+            format!("[{time:>8.2}] [{BLACK} {level} {module:<10} {target:<6}");
 
         let info_len = console::measure_text_width(info.as_str());
 
-        let target_len = 50;
+        let target_len = 55;
         let pad = target_len - usize::min(target_len, info_len);
 
         let pad_str = " ".repeat(pad);
 
         write!(writer, "{info}{pad_str}   ")?;
+        write!(writer, " {RESET_COLOR} ] ")?;
 
         write!(writer, "{level_color}")?;
 

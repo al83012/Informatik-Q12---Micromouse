@@ -48,24 +48,24 @@ async fn main() {
     //     .filter(None, LevelFilter::Info)
     //     .init();
 
-    let conn = websocket::WsChannel::new(WsChannelConfig::default(), 9001)
-        .await
-        .expect("EXITED WITH ERROR");
-
-    let mut write_tick = time::interval(Duration::from_millis(1500));
-
-    loop {
-        tokio::select! {
-            e = conn.next_nonresolved_error() => {
-                panic!("Unable to resolve error: {e:?}");
-            }
-            read = conn.read() => {
-                info!(target: "comm", "READ (at high level): {read:?}");
-            }
-            _ = write_tick.tick() => {
-                conn.send(tungstenite::Message::Text("AAAAHHHHHHHH".into())).await
-            }
-
-        }
-    }
+    // let conn = websocket::WsChannel::new(WsChannelConfig::default(), 9001)
+    //     .await
+    //     .expect("EXITED WITH ERROR");
+    //
+    // let mut write_tick = time::interval(Duration::from_millis(1500));
+    //
+    // loop {
+    //     tokio::select! {
+    //         e = conn.next_nonresolved_error() => {
+    //             panic!("Unable to resolve error: {e:?}");
+    //         }
+    //         read = conn.read() => {
+    //             info!(target: "comm", "READ (at high level): {read:?}");
+    //         }
+    //         _ = write_tick.tick() => {
+    //             conn.send(tungstenite::Message::Text("AAAAHHHHHHHH".into())).await
+    //         }
+    //
+    //     }
+    // }
 }
