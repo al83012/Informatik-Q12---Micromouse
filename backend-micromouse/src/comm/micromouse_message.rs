@@ -1,10 +1,15 @@
-use std::{marker::PhantomData};
+use std::marker::PhantomData;
 
 use tracing::debug;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
-    map::{map::{PartialMap, WallDiscoveryStatus}, measurement::{Measurement, MeasurementValue}, world_data::{PartialWorldData, WorldData}}, transform::{direction::RelativeDirection, position::MouseTransform}
+    map::{
+        map::{PartialMap, WallDiscoveryStatus},
+        measurement::{Measurement, MeasurementValue},
+        world_data::{PartialWorldData, WorldData},
+    },
+    transform::{direction::RelativeDirection, position::MouseTransform},
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -21,6 +26,7 @@ pub enum MicromouseMessage {
     MicromouseResponse(MicromouseResponse),
 }
 
+#[derive(Debug)]
 pub enum MicromouseResponse {
     Debug(String),
     Measurement(MeasurementMessage),
@@ -76,6 +82,7 @@ impl TryFrom<String> for MicromouseResponse {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.trim() {
+            "CONTINUE" => Ok(MicromouseResponse::Continue),
             "STOP" => Ok(MicromouseResponse::Stop),
             "RESTART" => Ok(MicromouseResponse::Restart),
             v => {
@@ -557,7 +564,6 @@ impl InterruptAction {
     }
 }
 
-
 impl MeasurementMessage {
     pub fn transform_by(&self, from_transform: &MouseTransform) -> Measurement {
         let pos = from_transform.pos;
@@ -570,8 +576,14 @@ impl MeasurementMessage {
         let value = if self.is_sensorlimit {
             MeasurementValue::Value { cells: self.depth }
         } else {
-            MeasurementValue::OutsideRange { at_least_cells: self.depth }
+            MeasurementValue::OutsideRange {
+                at_least_cells: self.depth,
+            }
         };
-        Measurement { value, direction: dir, position: pos }
+        Measurement {
+            value,
+            direction: dir,
+            position: pos,
+        }
     }
 }

@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, ops::Deref};
 
 
 pub struct NonEmpty<T: Sized>(T);
@@ -87,5 +87,13 @@ impl<T> std::fmt::Debug for NonEmpty<T>
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NonEmpty({:?})", self.0)
         // f.debug_tuple("NonEmpty").field(&self.0).finish()
+    }
+}
+
+
+impl<T> Deref for NonEmpty<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

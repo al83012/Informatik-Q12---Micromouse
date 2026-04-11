@@ -1,4 +1,6 @@
-use tracing::info;
+use std::ops::Deref;
+
+use tracing::{error, info};
 
 use crate::{
     comm::{
@@ -12,14 +14,17 @@ use crate::{
     utils::logging::run_test,
 };
 
-#[tokio::test]
 #[ignore]
-async fn test_conn_and_always_right() {
-    run_test("debug", || {
-        tokio::runtime::Handle::current().block_on(async {
-            let micromouse_manager  = MicromouseManager::<TEST_MAP_SIZE>::new().await.expect("MICROMOUSE CONN ERR");
+#[test]
+fn test_conn_and_always_right() {
+    run_test("trace", || {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let micromouse_manager = MicromouseManager::<TEST_MAP_SIZE>::new()
+                .await
+                .expect("MICROMOUSE CONN ERR");
 
-            let ALWAYS_RIGHT_COMMANDS: [Command; _] = [
+            let always_right_commands: [Command; _] = [
                 Command {
                     // Go forwards until you encounter a blockade or an opening on the right
                     ty: MovementType::Move(TEST_MAP_SIZE as u8),
@@ -62,17 +67,26 @@ async fn test_conn_and_always_right() {
             let mut next_cmd_id = 0;
 
             loop {
+                info!(target: "test/comm", "TEST TICK");
                 tokio::select! {
                     _ = micromouse_manager.notified_empty_queue() => {
-                        let next_cmd = ALWAYS_RIGHT_COMMANDS[next_cmd_id].clone();
+                        info!(target: "comm/mng", "EMPTY QUEUE");
+                        let next_cmd = always_right_commands[next_cmd_id].clone();
                         info!(target: "comm/mng/cmd", "SENT NEXT COMMAND: {next_cmd:?}");
-                        next_cmd_id = (next_cmd_id + 1) % ALWAYS_RIGHT_COMMANDS.len();
+                        next_cmd_id = (next_cmd_id + 1) % always_right_commands.len();
                         micromouse_manager.send_command(next_cmd).await.expect("SENDING FAILED");
                         // Need next command
                     }
                     events = micromouse_manager.next() => {
-                        for event in events {
-                            info!(target: "comm/mng/event", "RECV EVENT: {event:?}");
+                        match events {
+                            Ok(events) => {
+                                for event in events.deref().iter() {
+                                    info!(target: "comm/mng/event", "RECEIVED EVENT: {event:?}");
+                                }
+                            } 
+                            Err(e) => {
+                                error!(target: "comm/mng/event", "ERROR: {e:?}")
+                            }
                         }
                     }
                 }

@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::atomic::AtomicU32,
+    sync::atomic::{AtomicBool, AtomicU32},
 };
 
 use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, RwLockReadGuard};
@@ -36,6 +36,7 @@ pub struct MicromouseManager<const N: usize> {
     current_world: RwLock<WorldData<N>>,
     notify_empty_queue: Notify,
     battery: Mutex<f32>,
+    start_marker: AtomicBool,
 }
 
 pub struct InternalMapUpdate {
@@ -57,6 +58,7 @@ impl<const N: usize> MicromouseManager<N> {
             current_world: RwLock::new(WorldData::default()),
             battery: Mutex::new(100.0),
             notify_empty_queue: Notify::new(),
+            start_marker: AtomicBool::from(true),
         })
     }
 
@@ -94,10 +96,12 @@ impl<const N: usize> MicromouseManager<N> {
         loop {
             let next_response = &self.channel.read().await;
             if next_response.is_none() {
+                error!(target: "comm/mng", "CONNECTION CLOSED DELIBERATELY & PERMANENTLY");
                 return Err(MicromouseManagerError::ConnectionClosedPermanently);
             }
             let next_response: MicromouseResponse =
                 next_response.as_ref().unwrap().to_string().try_into()?;
+            info!(target: "comm/mng", "NEXT RESPONSE: {next_response:?}");
             match next_response {
                 MicromouseResponse::Debug(msg) => {
                     debug!(target: "comm/mng/dbg", "READ DEBUG {msg}");
@@ -197,7 +201,8 @@ impl<const N: usize> MicromouseManager<N> {
         *self.current_command.lock().await = None;
         *self.current_world.write().await = WorldData::default();
         *self.unconfirmed_cmd.lock().await = HashMap::new();
-        self.notify_empty_queue.notify_waiters();
+        self.start_marker.store(true, std::sync::atomic::Ordering::SeqCst);
+        // self.notify_empty_queue.notify_waiters();
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }
 
@@ -264,7 +269,14 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     pub async fn notified_empty_queue(&self) {
+        if self.start_marker.swap(false, std::sync::atomic::Ordering::SeqCst) {
+            return;
+        }
         self.notify_empty_queue.notified().await
+    }
+
+    pub async fn once_after_init(&self) {
+        
     }
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None
