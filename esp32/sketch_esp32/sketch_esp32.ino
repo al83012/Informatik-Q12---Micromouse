@@ -13,9 +13,9 @@ String websockets_server = "ws://";
 unsigned long lastReconnectAttempt = 0;
 const unsigned long reconnectInterval = 2000;
 
-//Network information HOTSPOT-TEST
-const char* ssid= "HOTSPOT-TEST";
-const char* password="012345678";
+//Network information
+const char* ssid= "++++";
+const char* password="++++";
 uint16_t port = 9001;
 char serverName[] = "172.13.1.1";
 
@@ -217,7 +217,7 @@ void connectWS() {
 
   if (connected) {
     Serial.println("# CN SUCC!");
-    client.send("DBG Test");
+    client.send("DBG");
     client.ping();
   } else {
     Serial.println("# CN FAIL!");
@@ -327,14 +327,14 @@ void movePassive(int cells) {
 }
 
 void moveActive(int cells) {
-    int sub_step = 0;
+    
     
 
     for(int i = 0; i < cells; i++) {
-
+        int sub_step = i;
         if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
           int distance = measure(measurements[sub_step]);
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + measurements[sub_step] + distance;
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + distance;
           if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
           Serial.println("# MSR > SRV");      
           client.send(content);
@@ -396,13 +396,13 @@ void turnPassive(int turns) {
 }
 
 void turnActive(int turns) {
-      int sub_step = 0;
+      
 
     for(int i = 0; i < turns; i++) {
-
+        int sub_step = i;
         if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
           int distance = measure(measurements[sub_step]);
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + measurements[sub_step] + distance;
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + distance;
           if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
           Serial.println("# MSR > SRV");      
           client.send(content);
@@ -505,7 +505,7 @@ void handleEvent(WebsocketsEvent event, String data) {
   } else if (event == WebsocketsEvent::GotPing) {
     Serial.println("PONG " + data);
     
-    //client.pong(data);
+    client.pong(data);
   } else if (event == WebsocketsEvent::GotPong) {
     Serial.println("# PONG RCV!");
   }
