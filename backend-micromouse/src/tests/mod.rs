@@ -13,6 +13,7 @@ use crate::{
 mod random_move;
 mod test_map_discoveries;
 mod visual_tests;
+mod shortcircuit_discovery;
 
 pub const TEST_MAP_SIZE: usize = 12;
 

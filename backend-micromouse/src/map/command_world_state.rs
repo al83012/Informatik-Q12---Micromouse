@@ -31,6 +31,7 @@ use crate::{
         upgrade::IsUpgradeable,
         world_data::{PartialWorldData, WorldData},
     },
+    transform::direction::RelativeDirection,
     utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
 };
 
@@ -295,11 +296,15 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
     pub fn apply_measurement_to_filter(
         &mut self,
-        _measurement: Measurement,
-    ) -> Result<FilterUpdate, MapInconsistencyError> {
-        todo!()
+        measurement: Measurement,
+    ) -> Result<FilterUpdate, FilterMeasurementUpgradeError> {
+        let discoveries = self.filter.apply_measurement(&measurement)?.non_empty();
+        let rejections = self.upgrade_filter(self.filter)?.non_empty();
 
-        //TODO: *self = Self::new(new_filter, self.command);
+        Ok(FilterUpdate {
+            discoveries,
+            rejections,
+        })
     }
 
     pub fn upgrade_filter(
@@ -312,11 +317,23 @@ impl<const N: usize> FilteredCommandApplication<N> {
             return Err(FilterUpgradeError);
         }
 
+        let new_filter = WorldData {
+            map: upgraded_filter,
+            mouse: self
+                .transformed_move
+                .at_step(0)
+                .expect("Step 0 is always valid"),
+        };
+        let old_outcomes = self.potential_outcome_ids();
+
         // for
 
-        todo!()
+        // todo!()
 
-        //TODO: *self = Self::new(new_filter, self.command);
+        *self = Self::new(Some(new_filter), self.command.clone());
+        let new_outcomes = self.potential_outcome_ids();
+        let rejected = old_outcomes - new_outcomes;
+        Ok(rejected)
     }
 
     fn potential_outcome_ids(&self) -> CommandOutcomeIds {
@@ -375,6 +392,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
     // terminate by the filter
     pub fn step_with_termination(&self) -> usize {
         // The execution_steps go from 0..=step_with_termination
+        // Can do this as even steps without interrupts are noted
         self.execution_steps.len() - 1
     }
 
@@ -443,12 +461,251 @@ impl<const N: usize> FilteredCommandApplication<N> {
         CommandOutcomes { potential_outcomes }
     }
 
-    pub fn at_step(&self, _step_number: StepNum) -> Result<&PartialWorldData<N>, CannotReachStep> {
-        todo!()
+    // Will only return Ok, if the path to the given step is certain
+    //
+    // Will return the starting condition of that step (without any measurements applied)
+    pub fn at_start_certain_step(
+        &self,
+        step_number: StepNum,
+    ) -> Result<PartialWorldData<N>, CertainStepError> {
+        self.reach_step(step_number)?;
+
+        // All steps before the one we are targetting have to be non-interrupted (at this point)
+        // -->
+        for i in 0..step_number {
+            let step = self
+                .execution_steps
+                .get(i as usize)
+                .expect("Step has to exist");
+            for interrupt in step.interrupts.iter() {
+                // WARN: Found a branching step in the past
+                if interrupt.terminating_world.is_some() {
+                    return Err(CertainStepError::Uncertainty(UncertainStepError {
+                        tried_to_reach_step: step_number,
+                        but_could_terminate_at: i,
+                    }));
+                }
+            }
+        }
+
+        Ok(if step_number == 0 {
+            PartialWorldData::new(
+                self.filter.clone().into(),
+                self.transformed_move
+                    .at_step(0)
+                    .expect("Step 0 always valid"),
+            )
+        } else {
+            let max_step_before = self.max_substep_in_step(step_number - 1)?;
+            // The previous step has to be continuing
+            assert!(max_step_before.potential_termination == MaxSubstepTermination::Continuing);
+            let map_continued = max_step_before.world_at_substep;
+
+            let mouse_transf_at_step = self
+                .transformed_move
+                .at_step(step_number as usize)
+                .expect("Already checked");
+            PartialWorldData::new(map_continued.map(), mouse_transf_at_step)
+        })
+
+        // todo!()
+    }
+
+    pub fn max_substep_in_step(
+        &self,
+        step_number: StepNum,
+    ) -> Result<MaxSubstep<N>, CannotReachStep> {
+        self.reach_step(step_number)?;
+        let step = self
+            .execution_steps
+            .get(step_number as usize)
+            .expect("Already checked");
+        let potential_terminations = &step.interrupts;
+        if potential_terminations.is_empty() {
+            // Have to look at previous steps
+            // This step did not contain any map-updates or measurements
+            if step_number == 0 {
+                // There is no previous step
+                return Ok(MaxSubstep {
+                    potential_termination: if step_number as usize == self.step_with_termination() {
+                        //There is only step 0
+                        MaxSubstepTermination::Terminated(PathLocalInterruptId::MaxStep)
+                    } else {
+                        MaxSubstepTermination::Continuing
+                    },
+                    world_at_substep: WorldData {
+                        map: self.filter,
+                        mouse: self
+                            .transformed_move
+                            .at_step(0)
+                            .expect("Step 0 is always valid"),
+                    }
+                    .into(),
+                });
+            }
+            let mut last_continuing = None;
+            for step_before_idx in step_number as usize - 1..=0 {
+                let step_before = self
+                    .execution_steps
+                    .get(step_before_idx)
+                    .expect("Smaller than checked step_num");
+                if step_before.interrupts.is_empty() {
+                    // This interrupt has not had any measurements either
+                    continue;
+                }
+                last_continuing = Some(
+                    step_before
+                        .interrupts
+                        .last()
+                        .expect("Already checked")
+                        .continuing_world
+                        .map(),
+                );
+                break;
+            }
+            // The last known map during command execution --> Is all the information we have about
+            // this step's map
+            let last_continuing = last_continuing.unwrap_or(self.filter.into());
+            return Ok(MaxSubstep {
+                potential_termination: if step_number as usize == self.step_with_termination() {
+                    MaxSubstepTermination::Terminated(PathLocalInterruptId::MaxStep)
+                } else {
+                    MaxSubstepTermination::Continuing
+                },
+                world_at_substep: WorldData {
+                    map: last_continuing.into(),
+                    mouse: self
+                        .transformed_move
+                        .at_step(step_number as usize)
+                        .expect("Already checked"),
+                }
+                .into(),
+            });
+        } else {
+            // There are worlds in this step
+
+            if step_number as usize == self.step_with_termination() {
+                // This step is the last step --> The last substep is some form of interruption
+                let last_state = self.last_possible_state.clone();
+                return Ok(MaxSubstep {
+                    potential_termination: MaxSubstepTermination::Terminated(
+                        match &self.execution_termination {
+                            CommandTerminationReason::Interrupted(i) => {
+                                PathLocalInterruptId::InterruptAtIndex(i.interrupt_index)
+                            }
+                            CommandTerminationReason::MaxStep(i) => PathLocalInterruptId::MaxStep,
+                        },
+                    ),
+                    world_at_substep: last_state,
+                });
+            } else {
+                let last_world = potential_terminations
+                    .last()
+                    .expect("vec nonempty")
+                    .continuing_world
+                    .clone();
+
+                return Ok(MaxSubstep {
+                    potential_termination: MaxSubstepTermination::Continuing,
+                    world_at_substep: last_world,
+                });
+            }
+        }
+    }
+
+    pub fn reach_step(&self, step_number: StepNum) -> Result<(), CannotReachStep> {
+        if step_number > self.step_with_termination() as u32 {
+            Err(CannotReachStep(step_number))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn measurement_directions_at_step(
+        &self,
+        step_number: StepNum,
+    ) -> Result<HashSet<RelativeDirection>, CannotReachStep> {
+        self.reach_step(step_number)?;
+        let mut directions = HashSet::new();
+        for i in self.command.interrupts.iter() {
+            if i.at_step.matches(step_number as usize) {
+                directions.insert(i.direction);
+            }
+        }
+        Ok(directions)
+    }
+
+    /// For use in simulation-environments --> Will give the measurement-directives in an ordered
+    /// form, so that we can properly terminate early if an interrupt is triggered (that behaviour
+    /// isn't useful, but it is closest to what we have to do)
+    /// Returns every relative direction with their associated interrupt_index in ascending order
+    pub fn ordered_measurement_directions_at_step(
+        &self,
+        step_number: StepNum,
+    ) -> Result<Vec<(usize, RelativeDirection)>, CannotReachStep> {
+        self.reach_step(step_number)?;
+        let mut directions = Vec::new();
+        for (i_num, i) in self.command.interrupts.iter().enumerate() {
+            if i.at_step.matches(step_number as usize) {
+                directions.push((i_num, i.direction));
+            }
+        }
+        Ok(directions)
     }
 }
 
+pub struct MaxSubstep<const N: usize> {
+    potential_termination: MaxSubstepTermination,
+    // transf. is the same as the entire step
+    // map matches that of the last possible continuing_world
+    world_at_substep: PartialWorldData<N>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MaxSubstepTermination {
+    // The substep is the very last possible continuing_world of the step since it never stopped
+    Continuing,
+    Terminated(PathLocalInterruptId),
+}
+
+pub enum CertainStepError {
+    CannotReachStep(CannotReachStep),
+    Uncertainty(UncertainStepError),
+}
+
+impl From<CannotReachStep> for CertainStepError {
+    fn from(value: CannotReachStep) -> Self {
+        Self::CannotReachStep(value)
+    }
+}
+impl From<UncertainStepError> for CertainStepError {
+    fn from(value: UncertainStepError) -> Self {
+        Self::Uncertainty(value)
+    }
+}
+
+pub struct UncertainStepError {
+    pub tried_to_reach_step: StepNum,
+    pub but_could_terminate_at: StepNum,
+}
+
 pub struct FilterUpgradeError;
+
+pub enum FilterMeasurementUpgradeError {
+    NotValidUpgrade(FilterUpgradeError),
+    NotValidMeasurement(MapInconsistencyError),
+}
+
+impl From<MapInconsistencyError> for FilterMeasurementUpgradeError {
+    fn from(value: MapInconsistencyError) -> Self {
+        Self::NotValidMeasurement(value)
+    }
+}
+impl From<FilterUpgradeError> for FilterMeasurementUpgradeError {
+    fn from(value: FilterUpgradeError) -> Self {
+        Self::NotValidUpgrade(value)
+    }
+}
 
 pub struct CannotReachStep(pub StepNum);
 
@@ -511,7 +768,6 @@ pub struct LazyFilteredCommandApplication<const N: usize> {
     pub command: Command,
     pub in_world: WorldData<N>,
 }
-
 
 impl<const N: usize> From<LazyFilteredCommandApplication<N>> for FilteredCommandApplication<N> {
     fn from(value: LazyFilteredCommandApplication<N>) -> Self {

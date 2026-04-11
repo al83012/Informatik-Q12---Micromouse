@@ -90,6 +90,25 @@ impl<const N: usize> Map<N> {
         }
     }
 
+    pub fn is_fully_discovered(&self) -> bool {
+        for col in self.cell_discovery_status.iter() {
+            for cell in col.iter() {
+                if *cell == CellDiscoveryStatus::Undiscovered {
+                    return false;
+                }
+            }
+        }
+        for col in self.wall_discovery_status.iter() {
+            for (w_0, w_1) in col.iter() {
+                if *w_0 == WallDiscoveryStatus::Undiscovered || *w_1 == WallDiscoveryStatus::Undiscovered {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
     pub fn wall(
         &self,
         position: &Position,

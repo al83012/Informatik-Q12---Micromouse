@@ -1,15 +1,12 @@
-use std::{
-    io::Write,
-    ops::RangeInclusive,
-};
+use std::{io::Write, ops::RangeInclusive};
 
 use console::Style;
 use tracing::{debug, trace};
 
 use crate::{
-    transform::direction::Direction,
     map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
-    transform::position::Position,
+    transform::{direction::Direction, position::Position},
+    utils::map_display,
 };
 
 pub struct MapDisplay {
@@ -44,6 +41,7 @@ pub struct CharRange {
     pub range_col: RangeInclusive<usize>,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct CharPos {
     pub row: usize,
     pub col: usize,
@@ -95,6 +93,9 @@ impl MapDisplay {
 
     fn pos_invalid(&self, position: Position) -> bool {
         position.x as usize > self.map_size + 1 || position.y as usize > self.map_size + 1
+    }
+    fn char_pos_invalid(&self, position: CharPos) -> bool {
+        position.row + 1 > self.lines.len() || position.col + 1 > self.lines.len()
     }
 
     pub fn inner_cell_char_range(&self, position: Position) -> Option<CharRange> {
@@ -157,6 +158,17 @@ impl MapDisplay {
         }
 
         self.lines[char_row][char_col] = c;
+    }
+
+    pub fn line<'a>(&'a mut self, start: CharPos, end: CharPos) -> Option<CharLineReference<'a>> {
+        if self.char_pos_invalid(start) || self.char_pos_invalid(end) {
+            return None;
+        }
+        Some(CharLineReference {
+            map: self,
+            start,
+            end,
+        })
     }
 }
 
@@ -335,7 +347,6 @@ impl std::fmt::Display for MapDisplay {
 
 impl<const N: usize> From<&Map<N>> for MapDisplay {
     fn from(value: &Map<N>) -> Self {
-
         let dim = N;
         let mut display = MapDisplay::new(dim, 9, 5);
 
@@ -452,4 +463,60 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
     }
 }
 
+impl<'a> CharRangeReference<'a> {
+    pub fn center(self) -> Self {
+        let range = self.range;
+        let range_col = range.range_col;
+        let range_row = range.range_row;
+        let center_col = (range_col.start() + range_col.end()) / 2;
+        let center_row = (range_row.start() + range_row.end()) / 2;
+        Self {
+            map: self.map,
+            range: CharRange {
+                range_row: center_row..=center_row,
+                range_col: center_col..=center_col,
+            },
+        }
+    }
 
+    pub fn center_point(self) -> CharPos {
+        self.range.center_point()
+    }
+}
+
+impl CharRange {
+    pub fn center_point(self) -> CharPos {
+        let range_col = self.range_col;
+        let range_row = self.range_row;
+        let center_col = (range_col.start() + range_col.end()) / 2;
+        let center_row = (range_row.start() + range_row.end()) / 2;
+        CharPos {
+            row: center_row,
+            col: center_col,
+        }
+    }
+}
+
+pub struct CharLineReference<'a> {
+    map: &'a mut MapDisplay,
+    start: CharPos,
+    end: CharPos,
+}
+
+impl<'a> MapDisplayWrite for CharLineReference<'a> {
+    fn apply_style(&mut self, style: Style) {
+        for c_row in self.start.row..=self.end.row {
+            for c_col in self.start.col..=self.start.col {
+                self.map.apply_style(c_row, c_col, style.clone());
+            }
+        }
+    }
+
+    fn set_char(&mut self, c: char) {
+        for c_row in self.start.row..=self.end.row {
+            for c_col in self.start.col..=self.start.col {
+                self.map.set_char(c_row, c_col, c);
+            }
+        }
+    }
+}

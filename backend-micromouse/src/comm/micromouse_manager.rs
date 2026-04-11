@@ -13,7 +13,7 @@ use crate::{
     },
     map::{
         command_world_state::{
-            CannotReachStep, FilterUpdate, FilteredCommandApplication, RejectedOutcomes,
+            CannotReachStep, CertainStepError, FilterMeasurementUpgradeError, FilterUpdate, FilteredCommandApplication, RejectedOutcomes
         },
         map::MapInconsistencyError,
         world_data::WorldData,
@@ -182,7 +182,7 @@ impl<const N: usize> MicromouseManager<N> {
             return Err(MicromouseManagerError::CmdTooLong(*id));
         }
         let world_at_step = current_cmd_application
-            .at_step(step_number)
+            .at_start_certain_step(step_number)
             .map_err(MicromouseManagerError::from)?;
 
         let new_transf = {
@@ -202,7 +202,7 @@ impl<const N: usize> MicromouseManager<N> {
             let filter_update =
                 current_cmd_application.apply_measurement_to_filter(transf_measurement)?;
             let new_map = current_cmd_application
-                .at_step(step_number)
+                .at_start_certain_step(step_number)
                 .map_err(MicromouseManagerError::from)?;
             *self.current_world.write().await = new_map.clone().into();
             filter_update
@@ -322,7 +322,8 @@ pub enum MicromouseManagerError {
     CmdTooLong(CommandId),
     ImpossiblePosition(CommandId),
     CannotReachStep(CannotReachStep),
-    MapInconsistency(MapInconsistencyError),
+    MapInconsistency(FilterMeasurementUpgradeError),
+    PathNotProven(CertainStepError)
 }
 
 impl From<FormatError<MicromouseResponse>> for MicromouseManagerError {
@@ -337,11 +338,21 @@ impl From<CannotReachStep> for MicromouseManagerError {
     }
 }
 
-impl From<MapInconsistencyError> for MicromouseManagerError {
-    fn from(value: MapInconsistencyError) -> Self {
+impl From<FilterMeasurementUpgradeError> for MicromouseManagerError {
+    fn from(value: FilterMeasurementUpgradeError) -> Self {
         Self::MapInconsistency(value)
     }
 }
+
+impl From<CertainStepError> for MicromouseManagerError {
+    fn from(value: CertainStepError) -> Self {
+        // While updating the internal position to match the new one, it was discovered that the
+        // measurements that were received do not prove, that this step was allowed
+        // (We didn't prove that the micromouse would not have interrupted before)
+        Self::PathNotProven(value) 
+    }
+}
+
 
 impl<const N: usize> From<InternalMapUpdate> for Option<NonEmpty<Vec<MicromouseEvent<N>>>> {
     fn from(value: InternalMapUpdate) -> Self {
