@@ -323,7 +323,6 @@ int measure(char dir) {
 void movePassive(int cells) {
   sim_move(cells); //REMOVE AFTER SIM
   Serial.println("# MV NO MSR > SRV");
-  finishedAll();
 }
 
 void moveActive(int cells) {
@@ -336,7 +335,7 @@ void moveActive(int cells) {
           int distance = measure(measurements[sub_step]);
           String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + " " + distance;
           if(measurements.count(MAX_SUB_STEPS) == 1) {
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[MAX_SUB_STEPS] + " " + distance;
+           content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[MAX_SUB_STEPS] + " " + distance;
           }
           if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
           Serial.println("# MSR > SRV");      
@@ -355,7 +354,7 @@ void moveActive(int cells) {
             
           } else if(distance <= DISTANCE_THRESHOLD ) {
             
-          if(distance > DISTANCE_THRESHOLD ) {
+        
             if(reactions[sub_step] == STOP_IF_CLOSED_ID) {
                debug("Interrupt at substep " + sub_step); //TODO: Attach interrupt to finished message
               return;
@@ -368,7 +367,7 @@ void moveActive(int cells) {
 
 
 
-        }
+        
 
       }
     } 
@@ -395,7 +394,6 @@ void turnPassive(int turns) {
   }*/
   sim_turn(turns); //REMOVE AFTER SIM
 
-  finishedAll();
 }
 
 void turnActive(int turns) {
@@ -408,7 +406,7 @@ void turnActive(int turns) {
           int distance = measure(measurements[sub_step]);
           String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + " " + distance;
           if(measurements.count(MAX_SUB_STEPS) == 1) {
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[MAX_SUB_STEPS] + " " + distance;
+            content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[MAX_SUB_STEPS] + " " + distance;
           }
 
 
@@ -428,7 +426,6 @@ void turnActive(int turns) {
             
           } else if(distance <= DISTANCE_THRESHOLD ) {
             
-          if(distance > DISTANCE_THRESHOLD ) {
             if(reactions[sub_step] == STOP_IF_CLOSED_ID) {
                debug("Interrupt at substep " + sub_step); //TODO: Attach interrupt to finished message
               return;
@@ -437,7 +434,7 @@ void turnActive(int turns) {
             else if(reactions[sub_step] != CONTINUE_ID) {
               return;
             }
-        }
+        
       }
     } 
       turnPassive(1);
@@ -554,9 +551,13 @@ void handleCommand(WebsocketsMessage WSmessage) {
               if(words == 3) {
                   if(arguments[0] == "MOVE") {
                     movePassive(arguments[2].toInt());
+                    finishedAll();
+
                   } 
                   else if(arguments[0] == "TURN") {
                     turnPassive(arguments[2].toInt());
+                    finishedAll();
+
                   }
               } else {
                   int cells = arguments[2].toInt();
