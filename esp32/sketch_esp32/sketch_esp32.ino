@@ -571,11 +571,23 @@ void handleCommand(WebsocketsMessage WSmessage) {
                       String word = arguments[j];
                       int sub_step;
                       if(word[0] != 'X') {
-                         sub_step = String(word[0]).toInt();
+                        int dirIndex = -1;
+                        for(int k = 0; k < word.length(); k++) {
+                          if(word[k] == '_') {
+                            dirIndex = k;
+                            break;
+                          }
+
+                        }
+                    if(dirIndex != -1) {
+                        sub_step = word.substring(0, dirIndex).toInt();
+                      }
+
+
                       } else {
                          sub_step = MAX_SUB_STEPS;
                       }
-                      char dir = word[1];
+                      char dir = word[2];
 
                       measurements[sub_step] = dir;
 
