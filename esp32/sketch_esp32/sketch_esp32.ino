@@ -217,7 +217,7 @@ void connectWS() {
 
   if (connected) {
     Serial.println("# CN SUCC!");
-    client.send("DBG TEST");
+    client.send("DBG From the moment i understood the weakness of my flesh, it disgusted me...");
     client.ping();
   } else {
     Serial.println("# CN FAIL!");
@@ -334,7 +334,10 @@ void moveActive(int cells) {
         int sub_step = i;
         if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
           int distance = measure(measurements[sub_step]);
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + distance;
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + " " + distance;
+          if(measurements.count(MAX_SUB_STEPS) == 1) {
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[MAX_SUB_STEPS] + " " + distance;
+          }
           if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
           Serial.println("# MSR > SRV");      
           client.send(content);
@@ -401,8 +404,14 @@ void turnActive(int turns) {
     for(int i = 0; i < turns; i++) {
         int sub_step = i;
         if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
+          
           int distance = measure(measurements[sub_step]);
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + distance;
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[sub_step] + " " + distance;
+          if(measurements.count(MAX_SUB_STEPS) == 1) {
+          String content = String("MEASUREMENT #") + currCMD_ID + " " + sub_step + "_" + measurements[MAX_SUB_STEPS] + " " + distance;
+          }
+
+
           if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
           Serial.println("# MSR > SRV");      
           client.send(content);
