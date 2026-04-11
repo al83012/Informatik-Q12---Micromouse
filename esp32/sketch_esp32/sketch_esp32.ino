@@ -333,9 +333,11 @@ void moveActive(int cells) {
         int sub_step = i;
         if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
           int distance = measure(measurements[sub_step]);
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + measurements[sub_step] + " " + String(distance);
+          String content;
           if(measurements.count(MAX_SUB_STEPS) == 1) {
            content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + measurements[MAX_SUB_STEPS] + " " + String(distance);
+          } else {
+            content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + measurements[sub_step] + " " + String(distance);
           }
           if(distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
           Serial.println("# MSR > SRV");      
@@ -402,11 +404,12 @@ void turnActive(int turns) {
     for(int i = 0; i < turns; i++) {
         int sub_step = i;
         if(measurements.count(sub_step) == 1 || measurements.count(MAX_SUB_STEPS) == 1) {
-          
+          String content;
           int distance = measure(measurements[sub_step]);
-          String content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + measurements[sub_step] + " " + String(distance);
           if(measurements.count(MAX_SUB_STEPS) == 1) {
             content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + measurements[MAX_SUB_STEPS] + " " + String(distance);
+          } else {
+            content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + measurements[sub_step] + " " + String(distance);
           }
 
 
