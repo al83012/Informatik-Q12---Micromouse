@@ -14,8 +14,8 @@ unsigned long lastReconnectAttempt = 0;
 const unsigned long reconnectInterval = 2000;
 
 //Network information
-const char* ssid= "++++";
-const char* password="++++";
+const char* ssid= "HOTSPOT-TEST";
+const char* password="012345678";
 uint16_t port = 9001;
 char serverName[] = "172.13.1.1";
 
@@ -505,7 +505,7 @@ void handleEvent(WebsocketsEvent event, String data) {
   } else if (event == WebsocketsEvent::GotPing) {
     Serial.println("PONG " + data);
     
-    client.pong(data);
+    //client.pong(data);
   } else if (event == WebsocketsEvent::GotPong) {
     Serial.println("# PONG RCV!");
   }
