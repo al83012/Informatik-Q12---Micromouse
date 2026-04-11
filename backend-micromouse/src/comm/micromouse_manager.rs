@@ -201,7 +201,8 @@ impl<const N: usize> MicromouseManager<N> {
         *self.current_command.lock().await = None;
         *self.current_world.write().await = WorldData::default();
         *self.unconfirmed_cmd.lock().await = HashMap::new();
-        self.start_marker.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.start_marker
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         // self.notify_empty_queue.notify_waiters();
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }
@@ -269,14 +270,17 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     pub async fn notified_empty_queue(&self) {
-        if self.start_marker.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        if self
+            .start_marker
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
             return;
         }
         self.notify_empty_queue.notified().await
     }
 
     pub async fn once_after_init(&self) {
-        
+        todo!()
     }
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None

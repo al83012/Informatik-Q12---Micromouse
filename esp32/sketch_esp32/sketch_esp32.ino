@@ -217,7 +217,7 @@ void connectWS() {
 
   if (connected) {
     Serial.println("# CN SUCC!");
-    client.send("DBG");
+    client.send("DBG TEST");
     client.ping();
   } else {
     Serial.println("# CN FAIL!");
