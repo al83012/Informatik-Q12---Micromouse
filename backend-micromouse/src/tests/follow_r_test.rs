@@ -1,5 +1,6 @@
-use std::ops::Deref;
+use std::{ops::Deref, time::Duration};
 
+use tokio::time::{self, Instant, Interval};
 use tracing::{error, info};
 
 use crate::{
@@ -67,6 +68,8 @@ pub fn follow_r_and_conn() {
 
         let mut next_cmd_id = 0;
 
+        let mut recheck_cmd_tick = time::interval(Duration::from_millis(500));
+
         loop {
             info!(target: "test/comm", "TEST TICK");
             tokio::select! {
@@ -92,6 +95,13 @@ pub fn follow_r_and_conn() {
                             error!(target: "comm/mng/event", "ERROR: {e:?}")
                         }
                     }
+                }
+                _ = recheck_cmd_tick.tick() => {
+                    // Periodic updates so that we don't have to just rely on the chain of updates
+                    // to continue
+                    info!(target: "comm/mng/cmd", "RECHECKING QUEUE COUNT");
+                    micromouse_manager.update_queue_count().await;
+                    info!(target: "comm/mng/cmd", "FINISHED RECHECKING");
                 }
             }
         }

@@ -5,7 +5,7 @@ use std::{
 };
 
 use console::Style;
-use tokio::sync::{Mutex, MutexGuard, Notify, RwLock, RwLockReadGuard};
+use tokio::sync::{watch, Mutex, MutexGuard, Notify, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, warn};
 
 use crate::{
@@ -36,7 +36,9 @@ pub struct MicromouseManager<const N: usize> {
     mode: Mutex<MicromouseMode>,
     current_command: Mutex<Option<(FilteredCommandApplication<N>, CommandId)>>,
     current_world: RwLock<WorldData<N>>,
-    notify_empty_queue: Notify,
+    queue_length_sender: tokio::sync::watch::Sender<usize>,
+    queue_length_receiver: Mutex<tokio::sync::watch::Receiver<usize>>,
+    target_queue_length: usize,
     battery: Mutex<f32>,
     start_marker: AtomicBool,
 }
@@ -51,6 +53,8 @@ impl<const N: usize> MicromouseManager<N> {
     pub async fn new() -> Result<Self, WsChannelConnError> {
         info!(target: "comm/mng", "CREATING NEW MicromouseManager");
         let new_channel = WsChannel::new(WsChannelConfig::default(), 9001).await?;
+        let (queue_length_sender, queue_length_receiver) = watch::channel(0);
+        queue_length_sender.send(0).expect("Stays const, shouldn't panic");
         Ok(Self {
             channel: new_channel,
             next_cmd_id: AtomicU32::new(0),
@@ -59,8 +63,11 @@ impl<const N: usize> MicromouseManager<N> {
             current_command: Mutex::new(None),
             current_world: RwLock::new(WorldData::default()),
             battery: Mutex::new(100.0),
-            notify_empty_queue: Notify::new(),
+
             start_marker: AtomicBool::from(true),
+            queue_length_sender,
+            queue_length_receiver: Mutex::new(queue_length_receiver),
+            target_queue_length: 3,
         })
     }
 
@@ -74,7 +81,12 @@ impl<const N: usize> MicromouseManager<N> {
         debug!(target: "comm/mng/cmd", "Got Id {cmd_id:?}");
         let msg = CommandMessage { cmd, cmd_id };
         self.channel.send((&msg).into()).await;
-        self.unconfirmed_cmd.lock().await.insert(cmd_id, msg);
+        let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
+        unconfirmed_cmd_queue.insert(cmd_id, msg);
+        debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
+        self.queue_length_sender
+            .send(unconfirmed_cmd_queue.len())
+            .expect("Channels stay const");
         Ok(cmd_id)
     }
 
@@ -151,17 +163,17 @@ impl<const N: usize> MicromouseManager<N> {
                     // do a last position-update (in case we didn't get a measurement in the last
                     // step and have to update it to its last transf that way)
                     debug!(target: "comm/mng/cmd", "Currently unconfirmed {:?}", self.unconfirmed_cmd.lock().await);
-                    if self.unconfirmed_cmd.lock().await.is_empty() {
-                        debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
-                        self.notify_empty_queue.notify_waiters();
-                    }
+                    // if self.unconfirmed_cmd.lock().await.is_empty() {
+                    //     debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
+                    //     self.notify_empty_queue.notify_waiters();
+                    // }
                     self.update_cmd_application(step_num, None).await?;
                     self.clear_current_command().await;
                     let require_new = self.unconfirmed_cmd.lock().await.is_empty();
-                    if require_new {
-                        debug!(target: "comm/mng/cmd", "REQUIRE NEW");
-                        self.notify_empty_queue.notify_waiters();
-                    }
+                    // if require_new {
+                    //     debug!(target: "comm/mng/cmd", "REQUIRE NEW");
+                    // self.notify_empty_queue.notify_waiters();
+                    // }
                     return Ok(NonEmpty::<_>::one(MicromouseEvent::FinishedCommand {
                         cmd_id: *just_finished_cmd_id,
                         // If we are not aware of a command in the queue, we will have to get a new
@@ -285,27 +297,35 @@ impl<const N: usize> MicromouseManager<N> {
         Ok(internal_map_update)
     }
 
+    // WARN: LOCKS THE QUEUE RECEIVER
     pub async fn notified_empty_queue(&self) {
-        if self
-            .start_marker
-            .swap(false, std::sync::atomic::Ordering::SeqCst)
-        {
-            return;
+        loop {
+            let mut queue_length_receiver = self.queue_length_receiver.lock().await;
+            queue_length_receiver.changed().await.expect("Please no");
+            debug!(target: "comm/mng", "NOTIFY QUEUE CHANGE");
+            let val = queue_length_receiver.borrow_and_update();
+            if *val < self.target_queue_length {
+                debug!(target: "comm/mng", ">>> BELOW TARGET");
+                break;
+            }
         }
-        self.notify_empty_queue.notified().await
     }
 
-    pub async fn once_after_init(&self) {
-        todo!()
+    pub async fn update_queue_count(&self) {
+        self.queue_length_sender.send(self.unconfirmed_cmd.lock().await.len()).expect("Stays const, shouldn't error");
+        // let mut queue_length_receiver = self.queue_length_receiver.lock().await;
+        // let val = queue_length_receiver.borrow_and_update();
+        //
+        // if *val < self.target_queue_length {
+        //     // Re-updating to get the attention
+        //     self.queue_length_sender.send(*val).expect("Stays const, shouldn't error");
+        // }
     }
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None
     async fn clear_current_command(&self) -> Option<FilteredCommandApplication<N>> {
         debug!(target: "comm/mng/cmd", "CLEARING CURRENT COMMAND");
-        if self.unconfirmed_cmd.lock().await.is_empty() {
-            debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
-            self.notify_empty_queue.notify_waiters();
-        }
+        debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
         let mut current_cmd = self.current_command.lock().await;
         let old_cmd = current_cmd.take();
         old_cmd.map(|x| x.0)
@@ -323,12 +343,20 @@ impl<const N: usize> MicromouseManager<N> {
             // Get the command we just started from the list of unconfirmed commands (commands that
             // were sent but have not yet sent any processing information) --> Should exist, error
             // otherwise
-            let new_cmd = self
-                .unconfirmed_cmd
-                .lock()
-                .await
-                .remove(&response_cmd_id)
-                .ok_or(MicromouseManagerError::CmdNotKnown(response_cmd_id))?;
+
+            let new_cmd = {
+                let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
+                let new_cmd = unconfirmed_cmd_queue
+                    .remove(&response_cmd_id)
+                    .ok_or(MicromouseManagerError::CmdNotKnown(response_cmd_id))?;
+
+                debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
+                // Queue decreased in length:
+                self.queue_length_sender
+                    .send(unconfirmed_cmd_queue.len())
+                    .expect("Channels stay const");
+                new_cmd
+            };
 
             // Storing the starting state of the new command, so that we can easily calculate,
             // where the mouse currently is
