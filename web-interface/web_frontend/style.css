@@ -571,7 +571,55 @@ body {
 .sys-arm_arm.on {
     background: var(--arm);
     box-shadow: 0 0 8px var(--arm-glow), 0 0 2px var(--arm);
+    transition: background-color 0.25s ease-in;
 }
+
+.sys-arm_arm.repl {
+    transition: background-color 0.25s ease-in;
+    background: #1a1e2e;
+}
+
+.sys-arm_node.repl {
+    transition: background-color 0.25s ease-in;
+    background: #1e2438;
+}
+
+.sys-arm_arm.highlight {
+    background: /*#00FF0F;*/#00FFFFFF;
+    transition: background-color 0.25s ease-in;
+    box-shadow: 0 0 10px var(--arm-glow), 0 0 4px var(--arm);
+}
+
+.sys-arm_node.highlight {
+    background: /*#00FF0F;*/#00FFFFFF;
+    transition: background-color 0.25s ease-in;
+    box-shadow: 0 0 12px var(--arm-glow), 0 0 25px rgba(0,207,255,0.25);
+}
+
+.sys-arm_arm.add {
+    background: #00FF0F;
+    transition: background-color 0.25s ease-in;
+    box-shadow: 0 0 10px #00FF0F, 0 0 4px var(--arm);
+}
+
+.sys-arm_node.add {
+    background: #00FF0F;
+    transition: background-color 0.25s ease-in;
+    box-shadow: 0 0 12px #00FF0F, 0 0 25px rgba(0,207,255,0.25);
+}
+
+.sys-arm_arm.remove {
+    background: #F00F0F;
+    transition: background-color 0.25s ease-in;
+    box-shadow: 0 0 10px #F00F0F, 0 0 4px #F00F0F;
+}
+
+.sys-arm_node.remove {
+    background: #F00F0F;
+    transition: background-color 0.25s ease-in;
+    box-shadow: 0 0 12px #F00F0F, 0 0 25px rgba(0,207,255,0.25);
+}
+
 
 .sys-arm_node {
     width: 9px; height: 9px;
