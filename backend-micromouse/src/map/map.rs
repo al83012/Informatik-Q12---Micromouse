@@ -1,14 +1,17 @@
-use std::{fmt::Display, ops::{Deref, DerefMut}};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
 
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error};
 
 use crate::{
     comm::website::DiscoveryMessage,
-    transform::direction::{Direction, DirectionNormalizedVector},
-    utils::map_display::MapDisplay,
     map::measurement::Measurement,
+    transform::direction::{Direction, DirectionNormalizedVector},
     transform::position::Position,
+    utils::map_display::MapDisplay,
 };
 
 #[derive(Copy, Clone, PartialEq, Debug, Eq)]
@@ -100,7 +103,9 @@ impl<const N: usize> Map<N> {
         }
         for col in self.wall_discovery_status.iter() {
             for (w_0, w_1) in col.iter() {
-                if *w_0 == WallDiscoveryStatus::Undiscovered || *w_1 == WallDiscoveryStatus::Undiscovered {
+                if *w_0 == WallDiscoveryStatus::Undiscovered
+                    || *w_1 == WallDiscoveryStatus::Undiscovered
+                {
                     return false;
                 }
             }
@@ -344,7 +349,9 @@ impl<const N: usize> Map<N> {
         if hit_wall_at_end {
             // If it is none, that is ok (the left and top edge return none)
             if let Some(wall) = self.wall_mut(&pos, &direction) {
-                if *wall == WallDiscoveryStatus::Exists(false) || *wall == WallDiscoveryStatus::Visited{
+                if *wall == WallDiscoveryStatus::Exists(false)
+                    || *wall == WallDiscoveryStatus::Visited
+                {
                     // Wall found which was already assumed to not exists
                     inconsistencies.push(pos);
                 } else if *wall != WallDiscoveryStatus::Exists(true) {
@@ -374,6 +381,11 @@ impl<const N: usize> Map<N> {
             wall_discoveries,
         })
     }
+
+    pub fn is_pos_map_boundary(&self, position: &Position, direction: &Direction) -> bool {
+        (position.x == 0 && *direction == Direction::NegX)
+            || (position.y == 0 && *direction == Direction::NegY)
+    }
 }
 
 impl<const N: usize> Default for Map<N> {
@@ -394,7 +406,6 @@ impl<const N: usize> Display for Map<N> {
     }
 }
 
-
 impl<const N: usize> Deref for PartialMap<N> {
     type Target = Map<N>;
 
@@ -403,7 +414,6 @@ impl<const N: usize> Deref for PartialMap<N> {
     }
 }
 impl<const N: usize> DerefMut for PartialMap<N> {
-
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
@@ -417,7 +427,6 @@ impl<const N: usize> From<Map<N>> for PartialMap<N> {
 
 impl<const N: usize> From<PartialMap<N>> for Map<N> {
     fn from(value: PartialMap<N>) -> Self {
-        value.0 
+        value.0
     }
 }
-

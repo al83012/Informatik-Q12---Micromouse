@@ -7,14 +7,12 @@ use console::Style;
 use tracing::{debug, info};
 
 use crate::{
-    comm::micromouse_message::{
-        Command, InterruptAction, MeasurementInterrupt, StepNum,
-    },
-    transform::direction::{Direction, RelativeDirection},
+    comm::micromouse_message::{Command, InterruptAction, MeasurementInterrupt, StepNum},
     map::map::{self, Map, PartialMap, WallDiscoveryStatus},
-    utils::map_display::{MapDisplay, MapDisplayWrite},
     map::measurement::{self, Measurement},
+    transform::direction::{Direction, RelativeDirection},
     transform::position::MouseTransform,
+    utils::map_display::{MapDisplay, MapDisplayWrite},
 };
 
 #[derive(Clone)]
@@ -220,6 +218,19 @@ impl<const N: usize> PartialWorldData<N> {
         let current_pos = self.0.mouse.pos;
         let checked_dir = &interrupt_dir.transform_by(&self.0.mouse.dir);
 
+        let deciding_wall_always_exists = self.0.map.is_pos_map_boundary(&current_pos, checked_dir);
+        if condition == InterruptAction::Continue {
+            // WILL ALWAYS CONTINUE, no way around
+            return if should_trigger { None } else { Some(self) };
+        }
+        if deciding_wall_always_exists {
+            match (should_trigger, condition) {
+                (true, InterruptAction::StopIfBlocked) => return Some(self),
+                (false, InterruptAction::StopIfOpen) => return Some(self),
+                _ => return None,
+            }
+        }
+
         let deciding_wall = self.0.map.wall_mut(&current_pos, checked_dir)?;
         *deciding_wall = match (*deciding_wall, condition) {
             // Interrupt will never be triggered
@@ -295,10 +306,6 @@ impl<const N: usize> Default for PartialWorldData<N> {
         Self(WorldData::default())
     }
 }
-
-
-
-
 
 pub struct CommandExecution<const N: usize> {
     pub world: WorldData<N>,
@@ -406,10 +413,11 @@ impl<const N: usize> Display for WorldData<N> {
     }
 }
 
-
-impl<const N:usize> From<PartialWorldData<N>> for WorldData<N> {
+impl<const N: usize> From<PartialWorldData<N>> for WorldData<N> {
     fn from(value: PartialWorldData<N>) -> Self {
-        Self { map: value.map, mouse: value.mouse }
+        Self {
+            map: value.map,
+            mouse: value.mouse,
+        }
     }
 }
-
