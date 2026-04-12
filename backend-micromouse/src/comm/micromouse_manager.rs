@@ -7,6 +7,7 @@ use std::{
 use console::Style;
 use tokio::sync::{watch, Mutex, MutexGuard, Notify, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, warn};
+use tungstenite::Message;
 
 use crate::{
     comm::{
@@ -54,7 +55,9 @@ impl<const N: usize> MicromouseManager<N> {
         info!(target: "comm/mng", "CREATING NEW MicromouseManager");
         let new_channel = WsChannel::new(WsChannelConfig::default(), 9001).await?;
         let (queue_length_sender, queue_length_receiver) = watch::channel(0);
-        queue_length_sender.send(0).expect("Stays const, shouldn't panic");
+        queue_length_sender
+            .send(0)
+            .expect("Stays const, shouldn't panic");
         Ok(Self {
             channel: new_channel,
             next_cmd_id: AtomicU32::new(0),
@@ -80,7 +83,9 @@ impl<const N: usize> MicromouseManager<N> {
 
         debug!(target: "comm/mng/cmd", "Got Id {cmd_id:?}");
         let msg = CommandMessage { cmd, cmd_id };
-        self.channel.send((&msg).into()).await;
+        let cmd_str = (&msg).into();
+        info!(target: "comm/msg_log", "> {cmd_str:?}");
+        self.channel.send(cmd_str).await;
         let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
         unconfirmed_cmd_queue.insert(cmd_id, msg);
         debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
@@ -94,6 +99,7 @@ impl<const N: usize> MicromouseManager<N> {
     async fn resend(&self, cmd_id: CommandId) -> bool {
         warn!(target: "comm/mng/cmd", "RESENDING {cmd_id:?}");
         if let Some(msg) = self.unconfirmed_cmd.lock().await.get(&cmd_id) {
+            info!(target: "comm/msg_log", "> {msg:?}");
             self.channel.send(msg.into()).await;
             true
         } else {
@@ -102,115 +108,132 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
+    pub async fn next_read(&self) -> Option<Message> {
+        self.channel.read().await
+    }
+
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
     /// communication to continue (even though the channel will spin up a separate thread to keep
     /// the connection alive, it won't handle desyncs and the like)
-    pub async fn next(&self) -> Result<NonEmpty<Vec<MicromouseEvent<N>>>, MicromouseManagerError> {
+    pub async fn next(
+        &self,
+        read: Option<Message>,
+    ) -> Result<Vec<MicromouseEvent<N>>, MicromouseManagerError> {
         info!(target: "comm/mng", "Read tick");
-        loop {
-            let next_response = &self.channel.read().await;
-            if next_response.is_none() {
-                error!(target: "comm/mng", "CONNECTION CLOSED DELIBERATELY & PERMANENTLY");
-                return Err(MicromouseManagerError::ConnectionClosedPermanently);
+        if read.is_none() {
+            error!(target: "comm/mng", "CONNECTION CLOSED DELIBERATELY & PERMANENTLY");
+            return Err(MicromouseManagerError::ConnectionClosedPermanently);
+        }
+        let next_response_str = read.as_ref().unwrap().to_string();
+        info!(target: "comm/msg_log", "< {next_response_str}");
+        let next_response: MicromouseResponse = next_response_str.try_into()?;
+        info!(target: "comm/mng", "NEXT RESPONSE: {next_response:?}");
+        match next_response {
+            MicromouseResponse::Debug(msg) => {
+                debug!(target: "comm/mng/dbg", "READ DEBUG {msg}");
+                return Ok(vec![MicromouseEvent::DebugMessage(msg)]);
             }
-            let next_response: MicromouseResponse =
-                next_response.as_ref().unwrap().to_string().try_into()?;
-            info!(target: "comm/mng", "NEXT RESPONSE: {next_response:?}");
-            match next_response {
-                MicromouseResponse::Debug(msg) => {
-                    debug!(target: "comm/mng/dbg", "READ DEBUG {msg}");
-                    return Ok(NonEmpty::<_>::one(MicromouseEvent::DebugMessage(msg)));
+            MicromouseResponse::Measurement(measurement_message) => {
+                info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
+                // Check whether command is new
+                let mut current_cmd = self.current_command.lock().await;
+                self.update_current_command_id(measurement_message.from_cmd, &mut current_cmd)
+                    .await?;
+                let map_update = self
+                    .update_cmd_application(
+                        measurement_message.interrupt.at_step,
+                        Some(measurement_message),
+                        &mut current_cmd,
+                    )
+                    .await?;
+                debug!(target: "comm/mng/map", "Updated Map\n{:#?}", &map_update);
+                return Ok(map_update.into());
+            }
+            MicromouseResponse::CommandFinished(command_finished_message) => {
+                debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
+                let mut just_finished_cmd = self.current_command.lock().await;
+                self.update_current_command_id(
+                    command_finished_message.cmd_id,
+                    &mut just_finished_cmd,
+                ).await?;
+                if just_finished_cmd.is_none() {
+                    error!(target: "comm/mng/cmd", "NO CURRENT COMMAND TO FINISH");
+                    return Err(MicromouseManagerError::CmdNotKnown(
+                        command_finished_message.cmd_id,
+                    ));
                 }
-                MicromouseResponse::Measurement(measurement_message) => {
-                    info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
-                    // Check whether command is new
-                    self.update_current_command_id(measurement_message.from_cmd)
-                        .await?;
-                    let map_update = self
-                        .update_cmd_application(
-                            measurement_message.interrupt.at_step,
-                            Some(measurement_message),
-                        )
-                        .await?;
-                    debug!(target: "comm/mng/map", "Updated Map\n{:#?}", &map_update);
-                    if let Some(map_update_events) = map_update.into() {
-                        return Ok(map_update_events);
+                // let (just_finished_cmd, just_finished_cmd_id) =
+                //     just_finished_cmd.as_mut().expect("Already checked");
+                let step_num = match command_finished_message.reason {
+                    Some(i) => i.occurence.at_step,
+                    None => {
+                        // The step at which it ended must have been the max step that way
+                        // available (since the max step is per definition the step at which an
+                        // interrupt or max_step is triggered)
+                        let max_step = just_finished_cmd
+                            .as_ref()
+                            .expect("checked")
+                            .0
+                            .step_with_termination() as u32;
+                        debug!(target: "comm/mng/cmd", "No step_num given: max_step = {max_step}");
+                        max_step
+                    }
+                };
+                debug!(target: "comm/mng/cmd", "FINISHED AT STEP {step_num}");
+                // do a last position-update (in case we didn't get a measurement in the last
+                // step and have to update it to its last transf that way)
+                debug!(target: "comm/mng/cmd", "Currently unconfirmed {:?}", self.unconfirmed_cmd.lock().await);
+                // if self.unconfirmed_cmd.lock().await.is_empty() {
+                //     debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
+                //     self.notify_empty_queue.notify_waiters();
+                // }
+                self.update_cmd_application(step_num, None, &mut just_finished_cmd)
+                    .await?;
+                let finished_cmd_id = just_finished_cmd.as_ref().expect("checked").1;
+                self.clear_current_command(&mut just_finished_cmd).await;
+                let require_new = self.unconfirmed_cmd.lock().await.is_empty();
+                // if require_new {
+                //     debug!(target: "comm/mng/cmd", "REQUIRE NEW");
+                // self.notify_empty_queue.notify_waiters();
+                // }
+                return Ok(vec![MicromouseEvent::FinishedCommand {
+                    cmd_id: finished_cmd_id,
+                    // If we are not aware of a command in the queue, we will have to get a new
+                    // one
+                    require_new,
+                }]);
+            }
+            MicromouseResponse::Desync(command_ids) => {
+                warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
+                for c in command_ids {
+                    if !self.resend(c).await {
+                        error!(target: "comm/mng/cmd", "RESEND FAILED");
+                        return Err(MicromouseManagerError::CmdConfirmThenReqested(c));
                     }
                 }
-                MicromouseResponse::CommandFinished(command_finished_message) => {
-                    debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
-                    let just_finished_cmd = self.current_command.lock().await;
-                    if just_finished_cmd.is_none() {
-                        error!(target: "comm/mng/cmd", "NO CURRENT COMMAND TO FINISH");
-                        return Err(MicromouseManagerError::CmdNotKnown(
-                            command_finished_message.cmd_id,
-                        ));
-                    }
-                    let (just_finished_cmd, just_finished_cmd_id) =
-                        just_finished_cmd.as_ref().expect("Already checked");
-                    let step_num = match command_finished_message.reason {
-                        Some(i) => i.occurence.at_step,
-                        None => {
-                            // The step at which it ended must have been the max step that way
-                            // available (since the max step is per definition the step at which an
-                            // interrupt or max_step is triggered)
-                            let max_step = just_finished_cmd.step_with_termination() as u32;
-                            debug!(target: "comm/mng/cmd", "No step_num given: max_step = {max_step}");
-                            max_step
-                        }
-                    };
-                    debug!(target: "comm/mng/cmd", "FINISHED AT STEP {step_num}");
-                    // do a last position-update (in case we didn't get a measurement in the last
-                    // step and have to update it to its last transf that way)
-                    debug!(target: "comm/mng/cmd", "Currently unconfirmed {:?}", self.unconfirmed_cmd.lock().await);
-                    // if self.unconfirmed_cmd.lock().await.is_empty() {
-                    //     debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
-                    //     self.notify_empty_queue.notify_waiters();
-                    // }
-                    self.update_cmd_application(step_num, None).await?;
-                    self.clear_current_command().await;
-                    let require_new = self.unconfirmed_cmd.lock().await.is_empty();
-                    // if require_new {
-                    //     debug!(target: "comm/mng/cmd", "REQUIRE NEW");
-                    // self.notify_empty_queue.notify_waiters();
-                    // }
-                    return Ok(NonEmpty::<_>::one(MicromouseEvent::FinishedCommand {
-                        cmd_id: *just_finished_cmd_id,
-                        // If we are not aware of a command in the queue, we will have to get a new
-                        // one
-                        require_new,
-                    }));
-                }
-                MicromouseResponse::Desync(command_ids) => {
-                    warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
-                    for c in command_ids {
-                        if !self.resend(c).await {
-                            error!(target: "comm/mng/cmd", "RESEND FAILED");
-                            return Err(MicromouseManagerError::CmdConfirmThenReqested(c));
-                        }
-                    }
-                }
-                MicromouseResponse::Stop => {
-                    info!(target: "comm/mng", "STOPPED");
-                    *self.mode.lock().await = MicromouseMode::Stopped;
-                    return Ok(NonEmpty::<_>::one(MicromouseEvent::Stop));
-                }
-                MicromouseResponse::Restart => {
-                    info!(target: "comm/mng", "RESTARTED");
-                    *self.mode.lock().await = MicromouseMode::Running;
-                    self.restart().await;
-                    return Ok(NonEmpty::<_>::one(MicromouseEvent::Restart));
-                }
-                MicromouseResponse::Continue => {
-                    info!(target: "comm/mng", "CONTINUED");
-                    *self.mode.lock().await = MicromouseMode::Running;
-                    return Ok(NonEmpty::<_>::one(MicromouseEvent::Continue));
-                }
-                MicromouseResponse::Battery(b_100) => {
-                    debug!(target: "comm/mng/battery", "BATTERY: {b_100}/100");
-                    let f_b = b_100 as f32 / 100.0;
-                    *self.battery.lock().await = f_b;
-                }
+                return Ok(vec![]);
+            }
+            MicromouseResponse::Stop => {
+                info!(target: "comm/mng", "STOPPED");
+                *self.mode.lock().await = MicromouseMode::Stopped;
+                return Ok(vec![MicromouseEvent::Stop]);
+            }
+            MicromouseResponse::Restart => {
+                info!(target: "comm/mng", "RESTARTED");
+                *self.mode.lock().await = MicromouseMode::Running;
+                self.restart().await;
+                return Ok(vec![MicromouseEvent::Restart]);
+            }
+            MicromouseResponse::Continue => {
+                info!(target: "comm/mng", "CONTINUED");
+                *self.mode.lock().await = MicromouseMode::Running;
+                return Ok(vec![MicromouseEvent::Continue]);
+            }
+            MicromouseResponse::Battery(b_100) => {
+                debug!(target: "comm/mng/battery", "BATTERY: {b_100}/100");
+                let f_b = b_100 as f32 / 100.0;
+                *self.battery.lock().await = f_b;
+                return Ok(vec![]);
             }
         }
     }
@@ -230,13 +253,14 @@ impl<const N: usize> MicromouseManager<N> {
 
     /// Uses a measurement or a command finished message (-> measurment = None) to update the
     /// current position (as those messages carry a step-number)
-    async fn update_cmd_application(
+    async fn update_cmd_application<'a>(
         &self,
         step_number: StepNum,
         measurement: Option<MeasurementMessage>,
+        current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<InternalMapUpdate, MicromouseManagerError> {
         debug!(target: "comm/mng/map", "UPDATE INTERNAL MAP (step = {step_number}, measurement = {measurement:?})");
-        let mut current_cmd = self.current_command.lock().await;
+        // let mut  current_cmd = self.current_command.lock().await;
 
         let (current_cmd_application, id) = current_cmd
             .as_mut()
@@ -305,14 +329,16 @@ impl<const N: usize> MicromouseManager<N> {
             debug!(target: "comm/mng", "NOTIFY QUEUE CHANGE");
             let val = queue_length_receiver.borrow_and_update();
             if *val < self.target_queue_length {
-                debug!(target: "comm/mng", ">>> BELOW TARGET");
+                debug!(target: "comm/mng", ">>> BELOW TARGET ({} < {})",*val, self.target_queue_length);
                 break;
             }
         }
     }
 
     pub async fn update_queue_count(&self) {
-        self.queue_length_sender.send(self.unconfirmed_cmd.lock().await.len()).expect("Stays const, shouldn't error");
+        self.queue_length_sender
+            .send(self.unconfirmed_cmd.lock().await.len())
+            .expect("Stays const, shouldn't error");
         // let mut queue_length_receiver = self.queue_length_receiver.lock().await;
         // let val = queue_length_receiver.borrow_and_update();
         //
@@ -323,22 +349,26 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None
-    async fn clear_current_command(&self) -> Option<FilteredCommandApplication<N>> {
+    async fn clear_current_command<'a>(
+        &self,
+        current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
+    ) -> Option<FilteredCommandApplication<N>> {
         debug!(target: "comm/mng/cmd", "CLEARING CURRENT COMMAND");
         debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
-        let mut current_cmd = self.current_command.lock().await;
+        // let mut current_cmd = self.current_command.lock().await;
         let old_cmd = current_cmd.take();
         old_cmd.map(|x| x.0)
     }
 
     /// Checks whether the cmd_id contained in the response is a new one --> Would mean, that the
     /// previous command **has** to be finished and a new cmd started
-    async fn update_current_command_id(
+    async fn update_current_command_id<'a>(
         &self,
         response_cmd_id: CommandId,
+        current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<(), MicromouseManagerError> {
         // let (transformed_cmd, mut current_cmd) = self.current_command.lock().await;
-        let mut current_cmd = self.current_command.lock().await;
+        // let mut current_cmd = self.current_command.lock().await;
         if current_cmd.is_none() {
             // Get the command we just started from the list of unconfirmed commands (commands that
             // were sent but have not yet sent any processing information) --> Should exist, error
@@ -368,7 +398,7 @@ impl<const N: usize> MicromouseManager<N> {
             for outcome in new_cmd.potential_outcome_ids().potential_outcome_ids {
                 debug!(target: "comm/mng/cmd", "POT. OUTCOME = {outcome:?}");
             }
-            *current_cmd = Some((new_cmd, response_cmd_id));
+            **current_cmd = Some((new_cmd, response_cmd_id));
             return Ok(());
         }
 
@@ -465,7 +495,7 @@ impl From<CertainStepError> for MicromouseManagerError {
     }
 }
 
-impl<const N: usize> From<InternalMapUpdate> for Option<NonEmpty<Vec<MicromouseEvent<N>>>> {
+impl<const N: usize> From<InternalMapUpdate> for Vec<MicromouseEvent<N>> {
     fn from(value: InternalMapUpdate) -> Self {
         let mut vec = Vec::with_capacity(3);
         if let Some(x) = value.new_transf {
@@ -477,6 +507,6 @@ impl<const N: usize> From<InternalMapUpdate> for Option<NonEmpty<Vec<MicromouseE
         if let Some(x) = value.rejected_outcomes {
             vec.push(MicromouseEvent::RejectedOutcomes(x))
         }
-        vec.non_empty()
+        vec
     }
 }

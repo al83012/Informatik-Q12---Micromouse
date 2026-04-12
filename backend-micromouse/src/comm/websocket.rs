@@ -532,6 +532,7 @@ impl WsChannel {
         self.read_recv.lock().await.recv().await
     }
 
+
     pub async fn next_nonresolved_error(&self) -> Option<WsChannelConnError> {
         self.e_recv.lock().await.recv().await
     }
@@ -542,6 +543,7 @@ impl WsChannel {
             .await
             .expect("Error while writing to mpsc channel");
     }
+
 }
 
 impl Drop for WsChannel {

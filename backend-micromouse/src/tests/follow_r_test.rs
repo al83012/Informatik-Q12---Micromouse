@@ -18,7 +18,8 @@ use crate::{
 #[ignore]
 #[test]
 pub fn follow_r_and_conn() {
-    init_logging();
+    let guards = init_logging();
+    info!(target: "comm/msg_log", "****************************************************************************************");
     // run_test("trace", || {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
@@ -81,7 +82,12 @@ pub fn follow_r_and_conn() {
                     micromouse_manager.send_command(next_cmd).await.expect("SENDING FAILED");
                     // Need next command
                 }
-                events = micromouse_manager.next() => {
+                msg = micromouse_manager.next_read() => {
+                    // WARN: Have to move the code for parsing etc. here: It has to be blocking (at
+                    // least relative to sending commands, as the order might get screwed up
+                    // otherwise when the command sending takes precedence and cancels next() -->
+                    // cannot be the condition for the select-clause
+                    let events = micromouse_manager.next(msg).await;
                     match events {
                         Ok(events) => {
                             for event in events.deref().iter() {

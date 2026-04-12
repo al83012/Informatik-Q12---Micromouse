@@ -4,7 +4,9 @@ use tracing::{
     field::{Field, Visit},
     Event, Subscriber,
 };
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
+    filter::FilterFn,
     fmt::{self, format::Writer, FmtContext, FormatEvent, FormatFields},
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
@@ -14,13 +16,16 @@ use tracing_subscriber::{
 
 use std::io::{self, Write};
 
+use crate::utils::file_writer;
+
 fn unbuffered_stdout() -> impl Write {
     io::stdout()
 }
 
 pub const ENABLED_LOG_TARGETS: [&str; 4] = ["comm", "strat", "main", "test"];
+pub const DISABLE_LOG_FILES: [&str; 1] = ["websocket"];
 
-struct TargetFilter;
+pub struct TargetFilter;
 
 impl<S> Layer<S> for TargetFilter
 where
@@ -30,9 +35,15 @@ where
         //sanity check
         // return true;
         let target = metadata.target();
+        let file = metadata.file().unwrap_or("");
 
         if ENABLED_LOG_TARGETS.contains(&target) {
             return true;
+        }
+        for filter in DISABLE_LOG_FILES.iter() {
+            if file.ends_with(filter) {
+                return false;
+            }
         }
         for filter in ENABLED_LOG_TARGETS.iter() {
             if target.starts_with(&format!("{filter}/")) {
@@ -67,7 +78,7 @@ const RESET_COLOR: &str = "\x1b[0m";
 const BLACK: &str = "\x1b[30m";
 const STD_BG: &str = "\x1b[0;100m";
 
-struct MyFormatter {
+pub struct MyFormatter {
     start_time: Instant,
 }
 
@@ -195,31 +206,60 @@ impl Visit for MessageVisitor {
     }
 }
 
-pub fn init_logging() {
+pub fn init_logging() -> Vec<WorkerGuard> {
     let env_filter = EnvFilter::new("debug");
     let fmt_layer = fmt::layer()
         .event_format(MyFormatter::new())
-        .with_ansi(true);
+        .with_ansi(true)
+        .with_filter(FilterFn::new(|meta| {
+            !meta.module_path().unwrap_or("").ends_with("websocket")
+        }));
+
+    let (non_blocking, guard) = file_writer::file_appender("comm/msg_log", "messages");
+
+    let msg_log_layer = tracing_subscriber::fmt::layer()
+        // .with_file(true)
+        // .with_target(true)
+        .with_ansi(true)
+        .with_writer(non_blocking)
+        .event_format(MyFormatter::new())
+        .with_filter(FilterFn::new(|meta| meta.target() == "comm/msg_log"));
 
     tracing_subscriber::registry()
         .with(env_filter)
         .with(fmt_layer)
+        .with(msg_log_layer)
         .init();
+
+    vec![guard]
 }
 
-pub fn test_logging(env_filter: &str) -> impl tracing::Subscriber {
+pub fn test_logging(env_filter: &str) -> (impl tracing::Subscriber, Vec<WorkerGuard>) {
     let fmt_layer = fmt::layer()
         .with_file(true)
         .with_target(true)
         .with_ansi(true)
         .event_format(TestFormatter::new());
 
-    tracing_subscriber::registry()
-        .with(EnvFilter::new(env_filter))
-        .with(fmt_layer)
+    let (non_blocking, guard) = file_writer::file_appender("comm/msg_log", "messages");
+
+    let msg_log_layer = tracing_subscriber::fmt::layer()
+        .with_file(true)
+        .with_target(true)
+        .with_ansi(false)
+        .with_writer(non_blocking)
+        .event_format(TestFormatter::new());
+
+    (
+        tracing_subscriber::registry()
+            .with(EnvFilter::new(env_filter))
+            .with(fmt_layer)
+            .with(msg_log_layer),
+        vec![guard],
+    )
 }
 
 pub fn run_test<T>(env_filter: &str, f: impl FnOnce() -> T) -> T {
-    let subscriber = test_logging(env_filter);
+    let (subscriber, _guards) = test_logging(env_filter);
     tracing::subscriber::with_default(subscriber, f)
 }
