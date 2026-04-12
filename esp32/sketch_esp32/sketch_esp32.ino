@@ -539,6 +539,14 @@ void handleCommand(WebsocketsMessage WSmessage) {
       lastIndex = i + 1;
     }
   }
+  
+  //DEBUG: Print arguments with id:
+  for(int i = 0; i < words; i++) {
+    String content = String(i) + " -> " + String(arguments[i]);
+    Serial.println(content);
+  } 
+
+  
   if(!desync_mode) {
   //Scanning for command type
     if(arguments[1].indexOf("#") != -1) {
