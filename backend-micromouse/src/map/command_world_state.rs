@@ -20,6 +20,8 @@ use std::{
     ops::Sub,
 };
 
+use tracing::{debug, error, field::debug, info};
+
 use crate::{
     comm::{
         micromouse_message::{Command, InterruptType, StepNum, TransformedMovement},
@@ -156,6 +158,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
     /// (The only exception to this is the case, in which interrupts are contradictory (like
     /// opposing `0_L_STOP-IF-BLOCKED` and `0_l_STOP-IF-OPEN`))
     pub fn new(with_filter: Option<WorldData<N>>, command: Command) -> Self {
+        info!(target: "map/cmd/apl", "NEW Command Application for {command:?}");
         let with_filter = with_filter.unwrap_or_default();
         let filter = with_filter.map;
 
@@ -173,8 +176,11 @@ impl<const N: usize> FilteredCommandApplication<N> {
         // have to look like to make it past a certain point
         let mut next_step_start_requirements = PartialWorldData::from(with_filter);
 
+        debug!(target: "map/cmd/apl", "  >> Could reach {max_step_count}?");
         for i in 0..=max_step_count {
+            debug!(target: "map/cmd/apl", "     >> Processing step {i}");
             let transform_at_step = transformed_move.at_step(i).expect("step in range");
+            debug!(target: "map/cmd/apl", "     >> Transform at step = {transform_at_step:?}");
 
             // Encoding the info from transformed move, where the mouse is
             // --> Finally combining the map with movement
@@ -186,6 +192,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                 if !interrupt.at_step.matches(i) {
                     continue;
                 }
+                debug!(target: "map/cmd/apl", "         >> Interrupt [{interrupt_index}] = {interrupt:?}");
                 let potential_end_reason: InterruptType = interrupt.into();
 
                 // Create a world-filter, which ensures, that the interrupt, which would trigger
@@ -212,6 +219,14 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     // There is no way of passing this step without triggering an interrupt which
                     // will stop
                     // INFO: WILL HAVE TO STOP
+
+                    debug!(target: "map/cmd/apl", "         >> NO CONTINUING WORLD");
+
+                    if let Some(terminating_world) = &terminating_world {
+                        debug!(target: "map/cmd/apl", "         >> TERMINATING_WORLD = \n{terminating_world}");
+                    } else {
+                        error!(target: "map/cmd/apl", "         >> NO TERMINATING_WORLD EITHER");
+                    }
 
                     let end_of_command =
                         CommandTerminationReason::Interrupted(CommandInterruptEnd {

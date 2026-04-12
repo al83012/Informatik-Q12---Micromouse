@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use tracing::{
     field::{Field, Visit},
-    Event, Subscriber,
+    Event, Level, Subscriber,
 };
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
@@ -223,7 +223,11 @@ pub fn init_logging() -> Vec<WorkerGuard> {
         .with_ansi(true)
         .with_writer(non_blocking)
         .event_format(MyFormatter::new())
-        .with_filter(FilterFn::new(|meta| meta.target() == "comm/msg_log"));
+        .with_filter(FilterFn::new(|meta| {
+            meta.target() == "comm/msg_log"
+                || meta.target().ends_with("event")
+                || *meta.level() == Level::ERROR
+        }));
 
     tracing_subscriber::registry()
         .with(env_filter)

@@ -90,7 +90,9 @@ impl TryFrom<String> for MicromouseResponse {
                 let parts = parts.as_slice();
 
                 match parts {
-                    ["DBG", dbg_msg@ ..] => Ok(MicromouseResponse::Debug(dbg_msg.join(" ").to_string())),
+                    ["DBG", dbg_msg @ ..] => {
+                        Ok(MicromouseResponse::Debug(dbg_msg.join(" ").to_string()))
+                    }
                     ["MEASUREMENT", cmd_id, measurement_occurence, depth] => {
                         Ok(MicromouseResponse::Measurement(MeasurementMessage {
                             from_cmd: FormatError::caused_by(CommandId::try_from(
@@ -209,6 +211,29 @@ impl From<&CommandMessage> for Message {
         let msg_str = format!("{ty_str} {cmd_id} {num}{interrupt_str}");
 
         Message::Text(Utf8Bytes::from(msg_str))
+    }
+}
+
+impl From<&CommandMessage> for String {
+    fn from(value: &CommandMessage) -> Self {
+        let cmd = &value.cmd;
+        let cmd_id = &value.cmd_id;
+        let interrupts = &cmd.interrupts;
+        let (ty_str, num) = match cmd.ty {
+            MovementType::Turn(left) => ("TURN", left as i32),
+            MovementType::Move(fwd) => ("MOVE", fwd as i32),
+        };
+
+        let mut interrupt_str = if interrupts.is_empty() {
+            " ".to_string()
+        } else {
+            " MEASURE".to_string()
+        };
+        for i in interrupts {
+            interrupt_str = format!("{interrupt_str} {i}");
+        }
+
+        format!("{ty_str} {cmd_id} {num}{interrupt_str}")
     }
 }
 

@@ -83,9 +83,11 @@ impl<const N: usize> MicromouseManager<N> {
 
         debug!(target: "comm/mng/cmd", "Got Id {cmd_id:?}");
         let msg = CommandMessage { cmd, cmd_id };
-        let cmd_str = (&msg).into();
+        let cmd_msg = (&msg).into();
+        let cmd_str: String = (&msg).into();
+
         info!(target: "comm/msg_log", "> {cmd_str:?}");
-        self.channel.send(cmd_str).await;
+        self.channel.send(cmd_msg).await;
         let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
         unconfirmed_cmd_queue.insert(cmd_id, msg);
         debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
@@ -155,7 +157,8 @@ impl<const N: usize> MicromouseManager<N> {
                 self.update_current_command_id(
                     command_finished_message.cmd_id,
                     &mut just_finished_cmd,
-                ).await?;
+                )
+                .await?;
                 if just_finished_cmd.is_none() {
                     error!(target: "comm/mng/cmd", "NO CURRENT COMMAND TO FINISH");
                     return Err(MicromouseManagerError::CmdNotKnown(
@@ -187,7 +190,8 @@ impl<const N: usize> MicromouseManager<N> {
                 //     debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
                 //     self.notify_empty_queue.notify_waiters();
                 // }
-                self.update_cmd_application(step_num, None, &mut just_finished_cmd)
+                let map_update = self
+                    .update_cmd_application(step_num, None, &mut just_finished_cmd)
                     .await?;
                 let finished_cmd_id = just_finished_cmd.as_ref().expect("checked").1;
                 self.clear_current_command(&mut just_finished_cmd).await;
@@ -196,12 +200,16 @@ impl<const N: usize> MicromouseManager<N> {
                 //     debug!(target: "comm/mng/cmd", "REQUIRE NEW");
                 // self.notify_empty_queue.notify_waiters();
                 // }
+                let map_update: Vec<MicromouseEvent<N>> = map_update.into();
                 return Ok(vec![MicromouseEvent::FinishedCommand {
                     cmd_id: finished_cmd_id,
                     // If we are not aware of a command in the queue, we will have to get a new
                     // one
                     require_new,
-                }]);
+                }]
+                .into_iter()
+                .chain(map_update)
+                .collect());
             }
             MicromouseResponse::Desync(command_ids) => {
                 warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
