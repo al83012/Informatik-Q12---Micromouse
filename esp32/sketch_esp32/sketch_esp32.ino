@@ -68,7 +68,7 @@ std::map<int, int> reactions;
 
 //IDs
 int STOP_IF_OPEN_ID = 10;
-int STOP_IF_CLOSED_ID = 11;
+int STOP_IF_BLOCKED_ID = 11;
 int CONTINUE_ID = 12;
 
 //---- Simulation methods start ----
@@ -370,7 +370,7 @@ void moveActive(int cells) {
       } else if (distance <= DISTANCE_THRESHOLD) {
 
 
-        if (reactions[sub_step] == STOP_IF_CLOSED_ID) {
+        if (reactions[sub_step] == STOP_IF_BLOCKED_ID) {
           debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
           return;
         }
@@ -439,7 +439,7 @@ void turnActive(int turns) {
 
       } else if (distance <= DISTANCE_THRESHOLD) {
 
-        if (reactions[sub_step] == STOP_IF_CLOSED_ID) {
+        if (reactions[sub_step] == STOP_IF_BLOCKED_ID) {
           debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
           return;
         }
@@ -607,7 +607,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
               if (word.indexOf("STOP-IF-OPEN") != -1) {
                 reactions[sub_step] = STOP_IF_OPEN_ID;
               } else if (word.indexOf("STOP-IF-CLOSED") != -1) {
-                reactions[sub_step] = STOP_IF_CLOSED_ID;
+                reactions[sub_step] = STOP_IF_BLOCKED_ID;
               } else if (word.indexOf("TURN-IF-BLOCKED") != -1) {
                 reactions[sub_step] = String(word[word.length() - 1]).toInt();
               } else if (word.indexOf("CONTINUE") != -1) {
