@@ -609,7 +609,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
               } else if (word.indexOf("STOP-IF-BLOCKED") != -1) {
                 reactions[sub_step] = STOP_IF_BLOCKED_ID;
               } else if (word.indexOf("TURN-IF-BLOCKED") != -1) {
-                reactions[sub_step] = String(word[word.length() - 1]).toInt();
+                //reactions[sub_step] = String(word[word.length() - 1]).toInt();
               } else if (word.indexOf("CONTINUE") != -1) {
                 reactions[sub_step] = CONTINUE_ID;
               }
