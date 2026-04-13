@@ -550,7 +550,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
 
   //DEBUG: Print arguments with id:
   for (int i = 0; i < words; i++) {
-    String content = String(i) + " -> " + String(arguments[i]);
+    String content = String(i) + " -> \"" + String(arguments[i] + "\"");
     Serial.println(content);
   }
 
@@ -567,7 +567,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
         Serial.print("# CMD_ID VALID:");
         Serial.println(currCMD_ID);
 
-        if (words == 3 || arguments[3] == " ") {
+        if (words == 3 || arguments[3] == "") {
           if (arguments[0] == "MOVE") {
             movePassive(arguments[2].toInt());
             finishedAll();
