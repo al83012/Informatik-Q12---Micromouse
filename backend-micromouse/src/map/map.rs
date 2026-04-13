@@ -474,12 +474,14 @@ impl<const N: usize> Map<N> {
 
             let sample_pos_x = from_pos.x as i32 + dx * depth_sample as i32;
             let sample_pos_y = from_pos.y as i32 + dy * depth_sample as i32;
+            debug!(target: "map", "    >> SAMPLING ({sample_pos_x}, {sample_pos_y})");
 
             if sample_pos_x < 0
                 || sample_pos_y < 0
                 || sample_pos_x as usize + 1 > N
                 || sample_pos_y as usize + 1 > N
             {
+                debug!(target: "map", "        >> Outside bounds -> Finish");
                 // Can only get to this invalid state by going out of bounds
                 break;
             }
@@ -491,6 +493,7 @@ impl<const N: usize> Map<N> {
 
             let sample_cell = self.cell_mut(&pos).expect("Already did bounds-check");
             if CellDiscoveryStatus::Discovered.could_be_upgrade_of(sample_cell) {
+                debug!(target: "map", "        >> sample_cell ~~> Discovered");
                 // We can upgrade the cell (Discovered can be seen as an upgrade of it)
                 *sample_cell = CellDiscoveryStatus::Discovered;
                 cell_discoveries.push(CellDiscovery {
@@ -504,18 +507,21 @@ impl<const N: usize> Map<N> {
                     || (pos.y == 0 && direction == Direction::NegY))
                     && measurement_determined.potentially_eq(&WallDiscoveryStatus::Exists(true))
                 {
+                    debug!(target: "map", "        >> sample_wall = MAP_BOUNDARY = Exists(true) =O= {measurement_determined:?}");
                     // Is allowed, outside way just has to stay potentially_eq(Exists(true))
+                } else {
+                    error!(target: "map", "        >> sample_wall ({pos} -> {direction} does not exist");
+                    inconsistencies.push(pos);
                     return Err(MapInconsistencyError::OutsideBounds {
                         x: pos.x as _,
                         y: pos.y as _,
                     });
-                } else {
-                    inconsistencies.push(pos);
                     // return Err(MapInconsistencyError::Conflicting(*measurement, )
                 }
                 break;
             };
             if measurement_determined.could_be_upgrade_of(sample_wall) {
+                debug!(target: "map", "        >> sample_wall {sample_wall:?} ~~> {measurement_determined:?}");
                 // We can upgrade the sample_wall to measurement_determined
                 *sample_wall = measurement_determined;
                 wall_discoveries.push(WallDiscovery {
@@ -523,6 +529,8 @@ impl<const N: usize> Map<N> {
                     from_cell: pos,
                     in_direction: direction,
                 });
+            } else if measurement_determined.potentially_eq(sample_wall) {
+                debug!(target: "map", "        >> sample_wall {sample_wall:?} =O= ~!~> {measurement_determined:?}; Not upgradeable");
             } else {
                 inconsistencies.push(pos);
             }

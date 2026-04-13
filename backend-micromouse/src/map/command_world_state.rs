@@ -223,7 +223,8 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     debug!(target: "map/cmd/apl", "         >> NO CONTINUING WORLD");
 
                     if let Some(terminating_world) = &terminating_world {
-                        debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
+                        // debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
+                        debug!(target: "map/cmd/apl", "        >> BUT FOUND TERMINATING WORLD");
                     } else {
                         error!(target: "map/cmd/apl", "             >> NO TERMINATING_WORLD EITHER");
                     }
@@ -235,6 +236,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                             terminating_world: terminating_world.expect("By definition, if `world_if_stop_NOT_triggered` does not exist, `world_if_stop_triggered` has to exist (As it is also the termination, it would be nice if it existed)"),
                         });
 
+                    debug!(target: "map/cmd/apl", "         >> Command finishes through interrupt --> FORCED");
                     // Still need to add the current step to the list (but without the final
                     // interrupt)
                     execution_steps.push(ExecutionStep {
@@ -265,22 +267,29 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
                 // Even registers `Continue`-Interrupts (Which is why terminating world is optional)
                 //
+                debug!(target: "map/cmd/apl", "        >> WITH CONTINUING WORLD");
+                if terminating_world.is_some() {
+                    let interrupt_id = PathLocalInterruptId::InterruptAtIndex(interrupt_index);
+                    potential_outcome_ids.insert(PathLocalOutcomeId {
+                        at_step: i,
+                        from_interrupt: interrupt_id,
+                    });
+                    debug!(target: "map/cmd/apl", "        >> INTERRUPT_INDEX = {interrupt_id:?}");
+                }
                 step_potential_ends.push(PotentialCommandInterruptTermination {
                     potentially_terminating_interrupt: potential_end_reason,
                     continuing_world,
                     interrupt_index,
                     terminating_world,
                 });
-                potential_outcome_ids.insert(PathLocalOutcomeId {
-                    at_step: i,
-                    from_interrupt: PathLocalInterruptId::InterruptAtIndex(interrupt_index),
-                });
             }
+            debug!(target: "map/cmd/apl", "    >> Finished Step");
             execution_steps.push(ExecutionStep {
                 interrupts: step_potential_ends,
             });
         }
 
+        debug!(target: "map/cmd/apl", "    >> MAX STEP at end of {max_step_count}");
         potential_outcome_ids.insert(PathLocalOutcomeId {
             at_step: max_step_count,
             from_interrupt: PathLocalInterruptId::MaxStep,
@@ -301,6 +310,10 @@ impl<const N: usize> FilteredCommandApplication<N> {
         }
     }
 
+    pub fn command(&self) -> &Command {
+        &self.command
+    }
+
     // pub fn max_step(&self) -> usize {
     //     self.execution_steps.len()
     // }
@@ -313,6 +326,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &mut self,
         measurement: Measurement,
     ) -> Result<FilterUpdate, FilterMeasurementUpgradeError> {
+        debug!(target: "map/cmd/apl", "APPLYING MEASUREMENT TO FILTER");
         let discoveries = self.filter.apply_measurement(&measurement)?.non_empty();
         let rejections = self.upgrade_filter(self.filter)?.non_empty();
 
@@ -326,9 +340,11 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &mut self,
         upgraded_filter: Map<N>,
     ) -> Result<RejectedOutcomes, FilterUpgradeError> {
+        debug!(target: "map/cmd/apl", "UPGRADING FILTER");
         let is_upgrade_valid = upgraded_filter.could_be_upgrade_of(&self.filter);
 
         if !is_upgrade_valid {
+            error!(target: "map/cmd/apl", "UPGRADE INVALID");
             return Err(FilterUpgradeError);
         }
 
@@ -483,6 +499,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &self,
         step_number: StepNum,
     ) -> Result<PartialWorldData<N>, CertainStepError> {
+        debug!(target: "map/cmd/apl", "DETERMINING START OF STEP {step_number}");
         self.reach_step(step_number)?;
 
         // All steps before the one we are targetting have to be non-interrupted (at this point)
@@ -495,6 +512,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
             for interrupt in step.interrupts.iter() {
                 // WARN: Found a branching step in the past
                 if interrupt.terminating_world.is_some() {
+                    error!(target: "map/cmd/apl", "    FOUND BRANCH AT STEP {i} --> Not proven");
                     return Err(CertainStepError::Uncertainty(UncertainStepError {
                         tried_to_reach_step: step_number,
                         but_could_terminate_at: i,
@@ -504,13 +522,15 @@ impl<const N: usize> FilteredCommandApplication<N> {
         }
 
         Ok(if step_number == 0 {
+            debug!(target: "map/cmd/apl", "    STEP = 0 --> start = filter");
             PartialWorldData::new(
-                self.filter.clone().into(),
+                self.filter.into(),
                 self.transformed_move
                     .at_step(0)
                     .expect("Step 0 always valid"),
             )
         } else {
+            debug!(target: "map/cmd/apl", "    STEP != 0 --> start = end_{{step-1}}");
             let max_step_before = self.max_substep_in_step(step_number - 1)?;
             // The previous step has to be continuing
             assert!(max_step_before.potential_termination == MaxSubstepTermination::Continuing);
@@ -530,6 +550,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &self,
         step_number: StepNum,
     ) -> Result<MaxSubstep<N>, CannotReachStep> {
+        debug!(target: "map/cmd/apl", "DETERMINING MAX SUBSTEP IN STEP {step_number}");
         self.reach_step(step_number)?;
         let step = self
             .execution_steps
@@ -537,9 +558,11 @@ impl<const N: usize> FilteredCommandApplication<N> {
             .expect("Already checked");
         let potential_terminations = &step.interrupts;
         if potential_terminations.is_empty() {
+            debug!(target: "map/cmd/apl", "    NO BRANCHES IN CURRENT STEP --> Need to find some form of continuing-world in previous steps");
             // Have to look at previous steps
             // This step did not contain any map-updates or measurements
             if step_number == 0 {
+                debug!(target: "map/cmd/apl", "        STEP = 0; World = filter");
                 // There is no previous step
                 return Ok(MaxSubstep {
                     potential_termination: if step_number as usize == self.step_with_termination() {
@@ -568,6 +591,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     // This interrupt has not had any measurements either
                     continue;
                 }
+                debug!(target: "map/cmd/apl", "        Last continuing world at step {step_before_idx}");
                 last_continuing = Some(
                     step_before
                         .interrupts
@@ -599,7 +623,9 @@ impl<const N: usize> FilteredCommandApplication<N> {
         } else {
             // There are worlds in this step
 
+            debug!(target: "map/cmd/apl", "    Contains substeps");
             if step_number as usize == self.step_with_termination() {
+                debug!(target: "map/cmd/apl", "        Is the step with termination --> last_possible_state = last_possible_state");
                 // This step is the last step --> The last substep is some form of interruption
                 let last_state = self.last_possible_state.clone();
                 return Ok(MaxSubstep {
@@ -614,6 +640,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     world_at_substep: last_state,
                 });
             } else {
+                debug!(target: "map/cmd/apl", "        Get last substep's continuing world");
                 let last_world = potential_terminations
                     .last()
                     .expect("vec nonempty")
@@ -630,6 +657,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
     pub fn reach_step(&self, step_number: StepNum) -> Result<(), CannotReachStep> {
         if step_number > self.step_with_termination() as u32 {
+            error!(target: "map/cmd/apl", "{step_number} > TERMINATION_STEP = {}", self.step_with_termination());
             Err(CannotReachStep(step_number))
         } else {
             Ok(())

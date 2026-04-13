@@ -280,9 +280,19 @@ impl<const N: usize> MicromouseManager<N> {
             error!(target: "comm/mng/map", "SHOULD ALREADY HAVE TERMINATED IN PREVIOUS STEP");
             return Err(MicromouseManagerError::CmdTooLong(*id));
         }
-        let world_at_step = current_cmd_application
-            .at_start_certain_step(step_number)
-            .map_err(MicromouseManagerError::from)?;
+        let world_at_step = current_cmd_application.at_start_certain_step(step_number);
+        let world_at_step = match world_at_step {
+            Ok(world_at_step) => world_at_step,
+            Err(e) => {
+                // WARN: LIFE MUST GO ON:
+                error!(target: "comm/mng/map", "CERTAIN STEP ERROR: DID NOT PROVE THAT STEP {} OF {:?} WAS REACHABLE",
+                    step_number,
+                    current_cmd_application.command()
+                );
+                return Err(MicromouseManagerError::from(e));
+            }
+        };
+        // .map_err(MicromouseManagerError::from)?;
 
         let new_transf = {
             if world_at_step.mouse != self.current_world.read().await.mouse {
@@ -303,7 +313,9 @@ impl<const N: usize> MicromouseManager<N> {
             let new_map = current_cmd_application
                 .at_start_certain_step(step_number)
                 .map_err(MicromouseManagerError::from)?;
-            *self.current_world.write().await = new_map.clone().into();
+            let mut current_world = self.current_world.write().await;
+            *current_world = new_map.clone().into();
+
             filter_update
         } else {
             // since there is no new measurement, we can just take the world_at_step as the new
@@ -378,9 +390,11 @@ impl<const N: usize> MicromouseManager<N> {
         response_cmd_id: CommandId,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<(), MicromouseManagerError> {
+        info!(target: "comm/mng/cmd", "UPDATING CURRENT CMD ID");
         // let (transformed_cmd, mut current_cmd) = self.current_command.lock().await;
         // let mut current_cmd = self.current_command.lock().await;
         if current_cmd.is_none() {
+            debug!(target: "comm/mng/cmd", "NO CURRENT CMD REGISTERED");
             // Get the command we just started from the list of unconfirmed commands (commands that
             // were sent but have not yet sent any processing information) --> Should exist, error
             // otherwise
@@ -411,20 +425,20 @@ impl<const N: usize> MicromouseManager<N> {
             }
             **current_cmd = Some((new_cmd, response_cmd_id));
 
-            let last_processed_id = self
+            let expected_next_id = self
                 .next_cmd_process_id
                 .load(std::sync::atomic::Ordering::SeqCst);
-            let expected_next_id = last_processed_id + 1;
+            // let expected_next_id = last_processed_id + 1;
             if expected_next_id == response_cmd_id.0 {
                 self.next_cmd_process_id
-                    .store(expected_next_id, std::sync::atomic::Ordering::SeqCst);
+                    .store(expected_next_id + 1, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
             } else {
-                error!(target: "comm/mng/cmd", "WRONG PROCESS ORDER: last_processed = #{last_processed_id}, tried_starting = #{}, expected = #{expected_next_id}", response_cmd_id.0);
+                error!(target: "comm/mng/cmd", "WRONG PROCESS ORDER: tried_starting = #{}, expected = #{expected_next_id}", response_cmd_id.0);
                 // WARN: LIFE MUST GO ON (but really, this essentially silences the error, so that
                 // it only triggers once, have to be aware of that)
                 self.next_cmd_process_id
-                    .store(expected_next_id, std::sync::atomic::Ordering::SeqCst);
+                    .store(response_cmd_id.0 + 1, std::sync::atomic::Ordering::SeqCst);
                 Err(MicromouseManagerError::WrongProcessOrder {
                     expected: CommandId(expected_next_id),
                     received: response_cmd_id,
@@ -432,16 +446,19 @@ impl<const N: usize> MicromouseManager<N> {
             }
         } else {
             let current_cmd_id = current_cmd.as_ref().unwrap().1;
+            debug!(target: "comm/mng/cmd", "CURRENTLY REGISTERED = {current_cmd_id}");
 
             if current_cmd_id == response_cmd_id {
                 // No change; current command = new command
                 Ok(())
             } else {
                 // Life must go on
+                // Pretend, that the next cmd we expect to see is the one after that
                 self.next_cmd_process_id
-                    .store(response_cmd_id.0, std::sync::atomic::Ordering::SeqCst);
+                    .store(response_cmd_id.0 + 1, std::sync::atomic::Ordering::SeqCst);
                 // Started a new command without exiting the previous one
                 error!(target: "comm/mng/cmd", "MISSING CMD FINISH, TRIED STARTING NEW ONE");
+
                 Err(MicromouseManagerError::CmdStartBeforeFinish {
                     new_cmd: response_cmd_id,
                     unfinished_cmd: current_cmd_id,
