@@ -1,7 +1,7 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     ops::Deref,
-    sync::atomic::{AtomicBool, AtomicU32},
+    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize},
 };
 
 use console::Style;
@@ -32,8 +32,10 @@ use crate::{
 
 pub struct MicromouseManager<const N: usize> {
     channel: WsChannel,
-    next_cmd_id: AtomicU32,
+    next_cmd_send_id: AtomicU32,
+    // unconfirmed_cmd_queue: Mutex<VecDeque<(CommandId, CommandMessage)>
     unconfirmed_cmd: Mutex<HashMap<CommandId, CommandMessage>>,
+    next_cmd_process_id: AtomicU32,
     mode: Mutex<MicromouseMode>,
     current_command: Mutex<Option<(FilteredCommandApplication<N>, CommandId)>>,
     current_world: RwLock<WorldData<N>>,
@@ -60,8 +62,9 @@ impl<const N: usize> MicromouseManager<N> {
             .expect("Stays const, shouldn't panic");
         Ok(Self {
             channel: new_channel,
-            next_cmd_id: AtomicU32::new(0),
+            next_cmd_send_id: AtomicU32::new(0),
             unconfirmed_cmd: Mutex::new(HashMap::new()),
+            next_cmd_process_id: AtomicU32::new(0),
             mode: Mutex::new(MicromouseMode::Stopped),
             current_command: Mutex::new(None),
             current_world: RwLock::new(WorldData::default()),
@@ -77,7 +80,7 @@ impl<const N: usize> MicromouseManager<N> {
     pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
         debug!(target: "comm/mng/cmd", "Adding cmd to queue {cmd:?}");
         let cmd_id = CommandId(
-            self.next_cmd_id
+            self.next_cmd_send_id
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
 
@@ -133,7 +136,7 @@ impl<const N: usize> MicromouseManager<N> {
         match next_response {
             MicromouseResponse::Debug(msg) => {
                 debug!(target: "comm/mng/dbg", "READ DEBUG {msg}");
-                return Ok(vec![MicromouseEvent::DebugMessage(msg)]);
+                Ok(vec![MicromouseEvent::DebugMessage(msg)])
             }
             MicromouseResponse::Measurement(measurement_message) => {
                 info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
@@ -149,7 +152,7 @@ impl<const N: usize> MicromouseManager<N> {
                     )
                     .await?;
                 debug!(target: "comm/mng/map", "Updated Map\n{:#?}", &map_update);
-                return Ok(map_update.into());
+                Ok(map_update.into())
             }
             MicromouseResponse::CommandFinished(command_finished_message) => {
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
@@ -201,7 +204,7 @@ impl<const N: usize> MicromouseManager<N> {
                 // self.notify_empty_queue.notify_waiters();
                 // }
                 let map_update: Vec<MicromouseEvent<N>> = map_update.into();
-                return Ok(vec![MicromouseEvent::FinishedCommand {
+                Ok(vec![MicromouseEvent::FinishedCommand {
                     cmd_id: finished_cmd_id,
                     // If we are not aware of a command in the queue, we will have to get a new
                     // one
@@ -209,7 +212,7 @@ impl<const N: usize> MicromouseManager<N> {
                 }]
                 .into_iter()
                 .chain(map_update)
-                .collect());
+                .collect())
             }
             MicromouseResponse::Desync(command_ids) => {
                 warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
@@ -219,35 +222,35 @@ impl<const N: usize> MicromouseManager<N> {
                         return Err(MicromouseManagerError::CmdConfirmThenReqested(c));
                     }
                 }
-                return Ok(vec![]);
+                Ok(vec![])
             }
             MicromouseResponse::Stop => {
                 info!(target: "comm/mng", "STOPPED");
                 *self.mode.lock().await = MicromouseMode::Stopped;
-                return Ok(vec![MicromouseEvent::Stop]);
+                Ok(vec![MicromouseEvent::Stop])
             }
             MicromouseResponse::Restart => {
                 info!(target: "comm/mng", "RESTARTED");
                 *self.mode.lock().await = MicromouseMode::Running;
                 self.restart().await;
-                return Ok(vec![MicromouseEvent::Restart]);
+                Ok(vec![MicromouseEvent::Restart])
             }
             MicromouseResponse::Continue => {
                 info!(target: "comm/mng", "CONTINUED");
                 *self.mode.lock().await = MicromouseMode::Running;
-                return Ok(vec![MicromouseEvent::Continue]);
+                Ok(vec![MicromouseEvent::Continue])
             }
             MicromouseResponse::Battery(b_100) => {
                 debug!(target: "comm/mng/battery", "BATTERY: {b_100}/100");
                 let f_b = b_100 as f32 / 100.0;
                 *self.battery.lock().await = f_b;
-                return Ok(vec![]);
+                Ok(vec![])
             }
         }
     }
     pub async fn restart(&self) {
         debug!(target: "comm/mng", "Doing Restart...");
-        self.next_cmd_id
+        self.next_cmd_send_id
             .store(0, std::sync::atomic::Ordering::SeqCst);
         *self.mode.lock().await = MicromouseMode::Running;
         *self.current_command.lock().await = None;
@@ -407,21 +410,43 @@ impl<const N: usize> MicromouseManager<N> {
                 debug!(target: "comm/mng/cmd", "POT. OUTCOME = {outcome:?}");
             }
             **current_cmd = Some((new_cmd, response_cmd_id));
-            return Ok(());
-        }
 
-        let current_cmd_id = current_cmd.as_ref().unwrap().1;
-
-        if current_cmd_id == response_cmd_id {
-            // No change; current command = new command
-            Ok(())
+            let last_processed_id = self
+                .next_cmd_process_id
+                .load(std::sync::atomic::Ordering::SeqCst);
+            let expected_next_id = last_processed_id + 1;
+            if expected_next_id == response_cmd_id.0 {
+                self.next_cmd_process_id
+                    .store(expected_next_id, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            } else {
+                error!(target: "comm/mng/cmd", "WRONG PROCESS ORDER: last_processed = #{last_processed_id}, tried_starting = #{}, expected = #{expected_next_id}", response_cmd_id.0);
+                // WARN: LIFE MUST GO ON (but really, this essentially silences the error, so that
+                // it only triggers once, have to be aware of that)
+                self.next_cmd_process_id
+                    .store(expected_next_id, std::sync::atomic::Ordering::SeqCst);
+                Err(MicromouseManagerError::WrongProcessOrder {
+                    expected: CommandId(expected_next_id),
+                    received: response_cmd_id,
+                })
+            }
         } else {
-            // Started a new command without exiting the previous one
-            error!(target: "comm/mng/cmd", "MISSING CMD FINISH, TRIED STARTING NEW ONE");
-            Err(MicromouseManagerError::CmdStartBeforeFinish {
-                new_cmd: response_cmd_id,
-                unfinished_cmd: current_cmd_id,
-            })
+            let current_cmd_id = current_cmd.as_ref().unwrap().1;
+
+            if current_cmd_id == response_cmd_id {
+                // No change; current command = new command
+                Ok(())
+            } else {
+                // Life must go on
+                self.next_cmd_process_id
+                    .store(response_cmd_id.0, std::sync::atomic::Ordering::SeqCst);
+                // Started a new command without exiting the previous one
+                error!(target: "comm/mng/cmd", "MISSING CMD FINISH, TRIED STARTING NEW ONE");
+                Err(MicromouseManagerError::CmdStartBeforeFinish {
+                    new_cmd: response_cmd_id,
+                    unfinished_cmd: current_cmd_id,
+                })
+            }
         }
     }
 
@@ -474,6 +499,10 @@ pub enum MicromouseManagerError {
     CannotReachStep(CannotReachStep),
     MapInconsistency(FilterMeasurementUpgradeError),
     PathNotProven(CertainStepError),
+    WrongProcessOrder {
+        expected: CommandId,
+        received: CommandId,
+    },
 }
 
 impl From<FormatError<MicromouseResponse>> for MicromouseManagerError {

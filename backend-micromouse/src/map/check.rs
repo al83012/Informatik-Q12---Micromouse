@@ -1,7 +1,6 @@
 use crate::{
-    map::map::{Map, PartialMap, WallDiscoveryStatus},
+    map::{map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus}, world_data::{PartialWorldData, WorldData}},
     transform::position::Position,
-    map::world_data::{PartialWorldData, WorldData},
 };
 
 pub trait PotentiallyEq {
@@ -23,6 +22,7 @@ impl PotentiallyEq for WallDiscoveryStatus {
         }
     }
 }
+
 
 impl<const N: usize> PotentiallyEq for Map<N> {
     type Other = PartialMap<N>;

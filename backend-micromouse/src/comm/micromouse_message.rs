@@ -225,7 +225,7 @@ impl From<&CommandMessage> for String {
         };
 
         let mut interrupt_str = if interrupts.is_empty() {
-            " ".to_string()
+            "".to_string()
         } else {
             " MEASURE".to_string()
         };
