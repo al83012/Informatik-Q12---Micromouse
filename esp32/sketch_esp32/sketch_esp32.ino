@@ -606,7 +606,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
 
               if (word.indexOf("STOP-IF-OPEN") != -1) {
                 reactions[sub_step] = STOP_IF_OPEN_ID;
-              } else if (word.indexOf("STOP-IF-CLOSED") != -1) {
+              } else if (word.indexOf("STOP-IF-BLOCKED") != -1) {
                 reactions[sub_step] = STOP_IF_BLOCKED_ID;
               } else if (word.indexOf("TURN-IF-BLOCKED") != -1) {
                 reactions[sub_step] = String(word[word.length() - 1]).toInt();
