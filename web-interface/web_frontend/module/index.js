@@ -211,12 +211,15 @@ function init_maze() {
     }
 
     //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
-    let animation = displayPathChange([
+    let path = [
         [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
         [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1],
         [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1],
         [9, 9, 9, 10, 10, 10, 0]
-    ]);
+    ];
+    console.log(path);
+    console.log(path[1][14])
+    let animation = displayPathChange(path);
     Index.animHandler.add(animation);
 }
 
