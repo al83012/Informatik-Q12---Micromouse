@@ -399,7 +399,11 @@ void turnPassive(int turns) {
 }
 
 void turnActive(int turns) {
-      
+    bool counterclock = false;
+    if(turns < 0) {
+      turns = turns*-1;
+      counterclock = true;
+    }
 
     for(int i = 0; i < turns; i++) {
         int sub_step = i;
@@ -440,7 +444,12 @@ void turnActive(int turns) {
         
       }
     } 
-      turnPassive(1);
+    if(!counterclock) {
+            turnPassive(1);
+    } else {
+          turnPassive(-1);
+    }
+
     
   }
 }
@@ -559,7 +568,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
             Serial.print("# CMD_ID VALID:");
             Serial.println(currCMD_ID);
 
-              if(words == 3) {
+              if(words == 3 || arguments[3] == " ") {
                   if(arguments[0] == "MOVE") {
                     movePassive(arguments[2].toInt());
                     finishedAll();
@@ -629,7 +638,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
                       debug("# INVLD MOV ARGS");
 
                     }
-              }
+            }
               
 
         } else {
