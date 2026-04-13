@@ -148,10 +148,10 @@ int sim_measure(char scan_dir) {
   int checkY = Y;
   directions lookDir = dir;
 
-  if (scan_dir == 'F') {
+  
 
 
-  } else if (scan_dir == 'L') {
+    if (scan_dir == 'L') {
     if (dir == posX) lookDir = posY;
     else if (dir == posY) lookDir = negX;
     else if (dir == negX) lookDir = negY;
@@ -165,28 +165,39 @@ int sim_measure(char scan_dir) {
     else if (dir == posY) lookDir = posX;
   }
 
+ int wall_flag = 0;
+
+ if (lookDir == posX) {
+      wall_flag = 1;
+    } else if (lookDir == posY) {
+      wall_flag = 4;
+    } else if (lookDir == negX) {
+      wall_flag = 8;
+    } else if (lookDir == negY) {
+      wall_flag = 2;
+    }
+
   while (true) {
-    int wall_flag = 0;
+   
     int nextX = checkX;
     int nextY = checkY;
 
+  
+
+    if (SIM_FIELD[checkY][checkX] & wall_flag) { break; }
+    if (distance >= SIM_SIZE) break;
+
     if (lookDir == posX) {
-      wall_flag = 1;
       nextX++;
     } else if (lookDir == posY) {
-      wall_flag = 4;
       nextY++;
     } else if (lookDir == negX) {
-      wall_flag = 8;
       nextX--;
     } else if (lookDir == negY) {
-      wall_flag = 2;
       nextY--;
     }
 
     if (nextX < 0 || nextX >= SIM_SIZE || nextY < 0 || nextY >= SIM_SIZE) { break; }
-    if (SIM_FIELD[checkY][checkX] & wall_flag) { break; }
-    if (distance >= SIM_SIZE) break;
 
     checkX = nextX;
     checkY = nextY;
