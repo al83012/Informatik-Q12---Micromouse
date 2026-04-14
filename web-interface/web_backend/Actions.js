@@ -68,10 +68,18 @@ export class Actions {
     }
 
     static update_path(path) {
-        return new Action("update_path", new Map([["path", path]]));
+        //TODO: convert path into string
+        return new Action("update_path", new Map([["path", ""]]));
     }
 
     static discover_tile(x, y, directions) {
-        return new Action("discover_tile", new Map([["x", x], ["y", y], ["directions", directions]]));
+        let dir_string = "[";
+        for (let i = 0; i < directions.length; i++) {
+            dir_string += '"' + directions[i] + '"';
+            if (i < directions.length - 1) {dir_string += ",";}
+        }
+        dir_string += "]";
+        return new Action("discover_tile", new Map([["x", x], ["y", y],
+            ["directions", dir_string]]));
     }
 }

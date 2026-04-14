@@ -5,6 +5,45 @@ const manager = new BackendManager();
 
 
 //communication with backend
+const WebsocketClient = require('websocket').client;
+const back_port = 8090;
+const host = '127.0.0.1';
+const client = new WebsocketClient();
+
+function connect_backend()
+{client.connect("ws://"+host+":"+back_port, "maze-backend");};
+
+client.on('connectFailed', (err) => {
+    console.error('Connect Error: ' + err.toString());
+});
+
+client.on('connect', (conn) => {
+    console.log('WebSocket Client Connected');
+    manager.set_backend(client);
+    manager.sync.push(Actions.update_con_status(true));
+
+    conn.on('error', (err) => {
+        console.log("Implement ERROR");
+        manager.set_backend(null);
+        manager.sync.push(Actions.update_con_status(false));
+        connect_backend();
+    });
+    conn.on('close', () => {
+        console.log('Connection Closed');
+        manager.set_backend(null);
+        manager.sync.push(Actions.update_con_status(false));
+        connect_backend();
+    });
+    conn.on('message', (message) => {
+        if (message.type === 'utf8') {
+            manager.b_handleUpdate(JSON.parse(message.utf8Data));
+        }
+    });
+});
+
+connect_backend();
+
+/*old deprecated due to protocol
 const net = require('net');
 const back_port = 8090; //which is from arne?
 const host = '127.0.0.1';
@@ -18,7 +57,7 @@ client.on('error', (err) => {console.log("Implement ERROR")})
         console.log('Reconnected successfully');
     });
 });*/ //for actual production
-
+/*
 client.connect( {port: back_port, host: host }, function () {
     console.log('Connected successfully to backend');
     manager.set_backend(client);
@@ -26,7 +65,7 @@ client.connect( {port: back_port, host: host }, function () {
 
 client.on('data', (data) => {
     manager.b_handleUpdate(data);
-});
+});*/
 
 
 //communication with frontend

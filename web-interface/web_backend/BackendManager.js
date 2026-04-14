@@ -5,7 +5,7 @@ export class BackendManager {
     in_selected_squares = []; // e.g. [[2,4],[3,1]]
     in_maze = {
         "visited": [],
-        "discovered": [],
+        "discovered": [0, 0],
         "walls": [], // e.g. [[0,0, 0,1], [1,0, 1,1]] //wall between 00 and 01 as well as 10 and 11
         "goals": [],
         "paths": []
@@ -72,7 +72,9 @@ export class BackendManager {
         }
     }
 
-    b_handleUpdate(data) {} //backend
+    b_handleUpdate(data) {
+        console.log(data);
+    } //backend
 
     get_full() {
         let actions = [];
@@ -87,6 +89,11 @@ export class BackendManager {
 
         for (let algo of this.algorithms) {
             actions.push(Actions.add_algorithm(algo));
+        }
+
+        for (let i = 0; i < this.in_maze.discovered.length; i+=2) {
+            actions.push(Actions.discover_tile(this.in_maze.discovered[i], this.in_maze.discovered[i+1]
+                , []));
         }
 
         return actions;
