@@ -94,6 +94,8 @@ pub fn follow_r_and_conn() {
                                 info!(target: "comm/mng/event", "RECEIVED EVENT:\n{event:#?}");
                                 if let MicromouseEvent::UpdatedMap(_) = event {
                                     info!(target: "comm/mng/event", "MAP UPDATE:\n{}", micromouse_manager.current_world_lock().await);
+                                } else if let MicromouseEvent::UpdatePosition(_) = event {
+                                    info!(target: "comm/mng/event", "POS UPDATE:\n{}", micromouse_manager.current_world_lock().await);
                                 }
                             }
                         }

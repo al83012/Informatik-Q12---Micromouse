@@ -1,15 +1,19 @@
-use std::marker::PhantomData;
+use std::{error::Error, marker::PhantomData, num::ParseIntError};
 
 use tracing::debug;
+use tracing_subscriber::fmt::format::Format;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     map::{
         map::{PartialMap, WallDiscoveryStatus},
-        measurement::{Measurement, MeasurementValue},
+        measurement::{self, Measurement, MeasurementValue},
         world_data::{PartialWorldData, WorldData},
     },
-    transform::{direction::RelativeDirection, position::MouseTransform},
+    transform::{
+        direction::{self, RelativeDirection},
+        position::MouseTransform,
+    },
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -234,6 +238,20 @@ impl From<&CommandMessage> for String {
         }
 
         format!("{ty_str} {cmd_id} {num}{interrupt_str}")
+    }
+}
+
+impl From<MeasurementMessage> for String {
+    fn from(value: MeasurementMessage) -> Self {
+        let cmd_id = value.from_cmd;
+        let direction = value.interrupt.direction;
+        let step = value.interrupt.at_step;
+        let is_sensorlimit = value.is_sensorlimit;
+        let depth = value.depth;
+        format!(
+            "MEASUREMENT {cmd_id} {step}_{direction} {depth} {}",
+            if is_sensorlimit { "SENSORLIMIT" } else { "" }
+        )
     }
 }
 
@@ -610,5 +628,143 @@ impl MeasurementMessage {
             direction: dir,
             position: pos,
         }
+    }
+}
+
+impl TryFrom<String> for CommandMessage {
+    type Error = FormatError<CommandMessage>;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let split_whitespace = value.split_whitespace().collect::<Vec<_>>();
+        let split_whitespace = split_whitespace.as_slice();
+        let mov_type = match split_whitespace {
+            ["TURN", _cmd_id, step_count, ..] => {
+                MovementType::Turn(step_count.parse().map_err(|e: ParseIntError| {
+                    FormatError::<CommandMessage>::new(e.to_string())
+                })?)
+            }
+            ["MOVE", _cmd_id, step_count, ..] => {
+                MovementType::Move(step_count.parse().map_err(|e: ParseIntError| {
+                    FormatError::<CommandMessage>::new(e.to_string())
+                })?)
+            }
+            _ => return Err(FormatError::new(value)),
+        };
+
+        let cmd_id: CommandId = CommandId::try_from(
+            match split_whitespace {
+                [_, cmd_id, ..] => cmd_id,
+                _ => return Err(FormatError::new(value)),
+            }
+            .to_string(),
+        )?;
+
+        let measurements = match split_whitespace {
+            [_, _, _, "MEASURE", measurements @ ..] => Some(measurements),
+            [_, _, _] => None,
+            _ => return Err(FormatError::new(value)),
+        };
+
+        if measurements.is_none() {
+            return Ok(CommandMessage {
+                cmd: Command {
+                    ty: mov_type,
+                    interrupts: vec![],
+                },
+                cmd_id,
+            });
+        }
+
+        let mut measurements_parsed = vec![];
+
+        for m_str in measurements.unwrap().iter() {
+            let split_m_str = m_str.split("_").collect::<Vec<_>>();
+            let split_m_str = split_m_str.as_slice();
+            let [at_str, dir_str, action_str] = split_m_str else {
+                return Err(FormatError::new(m_str.to_string()));
+            };
+
+            let at = InterruptStep::try_from(at_str.to_string())?;
+            let dir = RelativeDirection::try_from(dir_str.to_string())?;
+            let action = InterruptAction::try_from(action_str.to_string())?;
+
+            measurements_parsed.push(MeasurementInterrupt {
+                at_step: at,
+                direction: dir,
+                action: action,
+            });
+            // let action = InterruptAction::try_from
+
+            // measurements_parsed.push(MeasurementInterrupt {
+            //     at_step: at,
+            // });
+        }
+        Ok(CommandMessage {
+            cmd: Command {
+                ty: mov_type,
+                interrupts: measurements_parsed,
+            },
+            cmd_id,
+        })
+    }
+}
+
+impl TryFrom<String> for InterruptStep {
+    type Error = FormatError<InterruptStep>;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.eq("X") {
+            Ok(InterruptStep::Each)
+        } else {
+            let num = value.parse().map_err(|e| FormatError::new(value))?;
+            Ok(InterruptStep::At(num))
+        }
+    }
+}
+
+impl TryFrom<String> for RelativeDirection {
+    type Error = FormatError<RelativeDirection>;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "L" => Ok(RelativeDirection::Left),
+            "R" => Ok(RelativeDirection::Right),
+            "F" => Ok(RelativeDirection::Forward),
+            _ => Err(FormatError::new(value)),
+        }
+    }
+}
+
+// impl TryFrom<String> for InterruptAction {
+//     type Error = FormatError<InterruptAction>;
+//     fn try_from(value: String) -> Result<Self, Self::Error> {
+//         match value.as_str() {
+//             "STOP-IF-BLOCKED" => Ok(InterruptAction::StopIfBlocked),
+//             "STOP-IF-OPEN" => Ok(InterruptAction::StopIfOpen),
+//             "CONTINUE" => Ok(InterruptAction::Continue),
+//             _ => Err(FormatError::new(value)),
+//         }
+//     }
+// }
+
+impl From<FormatError<InterruptStep>> for FormatError<CommandMessage> {
+    fn from(value: FormatError<InterruptStep>) -> Self {
+        Self::new(value.faulty_text)
+    }
+}
+
+impl From<FormatError<RelativeDirection>> for FormatError<CommandMessage> {
+    fn from(value: FormatError<RelativeDirection>) -> Self {
+        Self::new(value.faulty_text)
+    }
+}
+
+impl From<FormatError<CommandId>> for FormatError<CommandMessage> {
+    fn from(value: FormatError<CommandId>) -> Self {
+        Self::new(value.faulty_text)
+    }
+}
+impl From<FormatError<InterruptAction>> for FormatError<CommandMessage> {
+    fn from(value: FormatError<InterruptAction>) -> Self {
+        Self::new(value.faulty_text)
     }
 }

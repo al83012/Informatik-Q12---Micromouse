@@ -23,18 +23,18 @@ pub struct Measurement {
     pub position: Position,
 }
 
-impl TryFrom<String> for RelativeDirection {
-    type Error = FormatError<Self>;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
-            "L" => Ok(Self::Left),
-            "R" => Ok(Self::Right),
-            "F" => Ok(Self::Forward),
-            _ => Err(FormatError::new(value)),
-        }
-    }
-}
+// impl TryFrom<String> for RelativeDirection {
+//     type Error = FormatError<Self>;
+//
+//     fn try_from(value: String) -> Result<Self, Self::Error> {
+//         match value.as_str() {
+//             "L" => Ok(Self::Left),
+//             "R" => Ok(Self::Right),
+//             "F" => Ok(Self::Forward),
+//             _ => Err(FormatError::new(value)),
+//         }
+//     }
+// }
 
 impl Display for MeasurementValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

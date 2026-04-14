@@ -15,6 +15,8 @@ mod test_map_discoveries;
 mod visual_tests;
 mod shortcircuit_discovery;
 pub mod follow_r_test;
+pub mod follow_r_test_short;
+pub mod micromouse_simulator;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
@@ -32,6 +34,7 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
     // [row][col] = [y][x]
     let mut groups = Vec::<Vec<usize>>::new();
     let mut possible_connections = HashMap::<Position, HashSet<Direction>>::new();
+
 
     debug!(target: "tests/map/gen", "Initializing...");
 
