@@ -4,14 +4,20 @@ use std::{
 };
 
 use console::Style;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::{
-    comm::micromouse_message::{Command, InterruptAction, MeasurementInterrupt, StepNum},
-    map::map::{self, Map, PartialMap, WallDiscoveryStatus},
-    map::measurement::{self, Measurement},
-    transform::direction::{Direction, RelativeDirection},
-    transform::position::MouseTransform,
+    comm::micromouse_message::{
+        Command, InterruptAction, MeasurementInterrupt, MovementType, StepNum, TransformedMovement,
+    },
+    map::{
+        map::{self, Map, PartialMap, WallDiscoveryStatus},
+        measurement::{self, Measurement},
+    },
+    transform::{
+        direction::{Direction, RelativeDirection},
+        position::MouseTransform,
+    },
     utils::map_display::{MapDisplay, MapDisplayWrite},
 };
 
@@ -51,97 +57,151 @@ impl<const N: usize> WorldData<N> {
             )
             .expect("")
     }
+    // pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
+    //     let start_transform = self.mouse;
+    //     let measure_dir = relative_direction.transform_by(&start_transform.dir);
+    //     let ray_transform = MouseTransform {
+    //         pos: start_transform.pos,
+    //         dir: measure_dir,
+    //     };
+    //     debug!(target: "map/measure", "Starting measure {start_transform:?} -> {relative_direction}");
+    //     for i in 0..=max_depth {
+    //         let current_pos = ray_transform.moved(i);
+    //         debug!(target: "map/measure", "Checking pos = {current_pos:?}");
+    //         if current_pos.is_none() {
+    //             debug!(target: "map/measure", "CHECK out of bounds --> Mark as collision");
+    //             return Measurement {
+    //                 value: measurement::MeasurementValue::Value { cells: i as u32 },
+    //                 direction: measure_dir,
+    //                 position: ray_transform.pos,
+    //             };
+    //         }
+    //         let current_pos = current_pos.unwrap();
+    //         let next_wall = self.map.wall(&current_pos.pos, &measure_dir);
+    //         // .expect("Already checked");
+    //         if next_wall.is_none() {
+    //             debug!(target: "map/measure", "HIT map wall");
+    //             return Measurement {
+    //                 value: measurement::MeasurementValue::Value { cells: i as u32 },
+    //                 direction: measure_dir,
+    //                 position: ray_transform.pos,
+    //             };
+    //         }
+    //         let next_wall = next_wall.unwrap();
+    //         if i != max_depth {
+    //             // Not yet the end --> could continue
+    //             match next_wall {
+    //                 //INFO: The ray only doesn't hit a wall if it is explicitly not there
+    //                 //Does not work, if it is the max-depth: int that case HAS to create a measurement
+    //                 WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => continue,
+    //                 WallDiscoveryStatus::Exists(true) => {
+    //                     return Measurement {
+    //                         value: measurement::MeasurementValue::Value { cells: i as u32 },
+    //                         direction: measure_dir,
+    //                         position: ray_transform.pos,
+    //                     };
+    //                 }
+    //                 WallDiscoveryStatus::Undiscovered => {
+    //                     return Measurement {
+    //                         value: measurement::MeasurementValue::OutsideRange {
+    //                             at_least_cells: i as u32,
+    //                         },
+    //                         direction: measure_dir,
+    //                         position: ray_transform.pos,
+    //                     };
+    //                 }
+    //             }
+    //         } else {
+    //             match next_wall {
+    //                 //
+    //                 WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => {
+    //                     return Measurement {
+    //                         value: measurement::MeasurementValue::OutsideRange {
+    //                             at_least_cells: i as u32,
+    //                         },
+    //                         direction: measure_dir,
+    //                         position: ray_transform.pos,
+    //                     };
+    //                 }
+    //                 WallDiscoveryStatus::Exists(true) => {
+    //                     return Measurement {
+    //                         value: measurement::MeasurementValue::Value { cells: i as u32 },
+    //                         direction: measure_dir,
+    //                         position: ray_transform.pos,
+    //                     };
+    //                 }
+    //                 WallDiscoveryStatus::Undiscovered => {
+    //                     return Measurement {
+    //                         value: measurement::MeasurementValue::OutsideRange {
+    //                             at_least_cells: i as u32,
+    //                         },
+    //                         direction: measure_dir,
+    //                         position: ray_transform.pos,
+    //                     };
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     Measurement {
+    //         value: measurement::MeasurementValue::OutsideRange {
+    //             at_least_cells: max_depth as u32,
+    //         },
+    //         direction: measure_dir,
+    //         position: ray_transform.pos,
+    //     }
+    // }
+
     pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
-        let start_transform = self.mouse;
-        let measure_dir = relative_direction.transform_by(&start_transform.dir);
+        debug!(target: "op/map", "!!! Measuring from {} & {} in rel dir {}", self.mouse.pos, self.mouse.dir, relative_direction);
+        let base_pos = self.mouse.pos;
+        let ray_dir = relative_direction.transform_by(&self.mouse.dir);
+        debug!(target: "op/map", "!!! Ray dir = {ray_dir}");
+
         let ray_transform = MouseTransform {
-            pos: start_transform.pos,
-            dir: measure_dir,
+            pos: base_pos,
+            dir: ray_dir,
         };
-        debug!(target: "map/measure", "Starting measure {start_transform:?} -> {relative_direction}");
+
+        let transformed_move =
+            TransformedMovement::new(MovementType::Move(max_depth), ray_transform);
+
         for i in 0..=max_depth {
-            let current_pos = ray_transform.moved(i);
-            debug!(target: "map/measure", "Checking pos = {current_pos:?}");
-            if current_pos.is_none() {
-                debug!(target: "map/measure", "CHECK out of bounds --> Mark as collision");
+            let from_cell = transformed_move
+                .at_step(i as usize)
+                .expect("Checked bounds")
+                .pos;
+            debug!(target: "op/map", "    !!! Checking {from_cell} -> {ray_dir}");
+            let Some(wall) = self.map.wall(&from_cell, &ray_dir) else {
+                // Hit map boundary
+                // Always exists
+                debug!(target: "op/map", "    !!! Hit map boundary");
+
                 return Measurement {
                     value: measurement::MeasurementValue::Value { cells: i as u32 },
-                    direction: measure_dir,
-                    position: ray_transform.pos,
+                    direction: ray_dir,
+                    position: base_pos,
                 };
-            }
-            let current_pos = current_pos.unwrap();
-            let next_wall = self.map.wall(&current_pos.pos, &measure_dir);
-            // .expect("Already checked");
-            if next_wall.is_none() {
-                debug!(target: "map/measure", "HIT map wall");
-                return Measurement {
-                    value: measurement::MeasurementValue::Value { cells: i as u32 },
-                    direction: measure_dir,
-                    position: ray_transform.pos,
-                };
-            }
-            let next_wall = next_wall.unwrap();
-            if i != max_depth {
-                // Not yet the end --> could continue
-                match next_wall {
-                    //INFO: The ray only doesn't hit a wall if it is explicitly not there
-                    //Does not work, if it is the max-depth: int that case HAS to create a measurement
-                    WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => continue,
-                    WallDiscoveryStatus::Exists(true) => {
-                        return Measurement {
-                            value: measurement::MeasurementValue::Value { cells: i as u32 },
-                            direction: measure_dir,
-                            position: ray_transform.pos,
-                        };
-                    }
-                    WallDiscoveryStatus::Undiscovered => {
-                        return Measurement {
-                            value: measurement::MeasurementValue::OutsideRange {
-                                at_least_cells: i as u32,
-                            },
-                            direction: measure_dir,
-                            position: ray_transform.pos,
-                        };
+            };
+            debug!(target: "op/map", "    !!! Found Wall {wall:?}");
+            match wall {
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => continue,
+                WallDiscoveryStatus::Exists(true) => {
+                    return Measurement {
+                        value: measurement::MeasurementValue::Value { cells: i as u32 },
+                        direction: ray_dir,
+                        position: base_pos,
                     }
                 }
-            } else {
-                match next_wall {
-                    //
-                    WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => {
-                        return Measurement {
-                            value: measurement::MeasurementValue::OutsideRange {
-                                at_least_cells: i as u32,
-                            },
-                            direction: measure_dir,
-                            position: ray_transform.pos,
-                        };
-                    }
-                    WallDiscoveryStatus::Exists(true) => {
-                        return Measurement {
-                            value: measurement::MeasurementValue::Value { cells: i as u32 },
-                            direction: measure_dir,
-                            position: ray_transform.pos,
-                        };
-                    }
-                    WallDiscoveryStatus::Undiscovered => {
-                        return Measurement {
-                            value: measurement::MeasurementValue::OutsideRange {
-                                at_least_cells: i as u32,
-                            },
-                            direction: measure_dir,
-                            position: ray_transform.pos,
-                        };
-                    }
-                }
+                _ => warn!(target: "op/map", "Measure is only meant for fully discovered maps"),
             }
         }
+        debug!(target: "op/map", "!!! Found no wall in path");
         Measurement {
             value: measurement::MeasurementValue::OutsideRange {
                 at_least_cells: max_depth as u32,
             },
-            direction: measure_dir,
-            position: ray_transform.pos,
+            direction: ray_dir,
+            position: base_pos,
         }
     }
 

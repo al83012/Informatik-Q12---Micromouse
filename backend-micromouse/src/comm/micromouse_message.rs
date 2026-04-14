@@ -617,11 +617,11 @@ impl MeasurementMessage {
         let dir = rel_dir.transform_by(&from_transform.dir);
 
         let value = if self.is_sensorlimit {
-            MeasurementValue::Value { cells: self.depth }
-        } else {
             MeasurementValue::OutsideRange {
                 at_least_cells: self.depth,
             }
+        } else {
+            MeasurementValue::Value { cells: self.depth }
         };
         Measurement {
             value,
