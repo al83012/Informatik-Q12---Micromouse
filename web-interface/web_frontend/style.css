@@ -574,14 +574,29 @@ body {
     transition: background-color 0.25s ease-in;
 }
 
-.sys-arm_arm.repl {
+.sys-arm_arm.repl {}
+.sys-arm_node.repl {}
+
+.sys-arm_arm.repl.discovered {
     transition: background-color 0.25s ease-in;
     background: #1a1e2e;
 }
 
-.sys-arm_node.repl {
+.sys-arm_node.repl.discovered {
     transition: background-color 0.25s ease-in;
     background: #1e2438;
+    border: 1.5px solid #2a3050;
+}
+
+.sys-arm_arm.repl.undiscovered {
+    transition: background-color 0.25s ease-in;
+    background: var(--maze_bg);
+}
+
+.sys-arm_node.repl.undiscovered {
+    transition: background-color 0.25s ease-in;
+    background: var(--maze_bg);
+    border: 0 solid var(--maze_bg);
 }
 
 .sys-arm_arm.highlight {

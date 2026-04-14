@@ -13,6 +13,7 @@ import {
     AnimBackgroundColor,
     AnimSlideColor,
     AnimGroup,
+    AnimCssChange,
     generatePathAnimGroup
 } from "./Animation.js"
 import { StyleAdder } from "./style_adder.js";
@@ -64,9 +65,9 @@ export class Index {
             request.send();
         }, 100);
         window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
-
-        //TODO: remove timeout in production
-        window.setTimeout(() => init_maze(), 1000); //the timeout is only for the test animation which had a bug
+        
+        //window.setTimeout(() => init_maze(), 1000); //the timeout is only for the test animation which had a bug
+        init_maze();
 
 
         //let borderAnim = new AnimBorderColor(100, Index.squares[[5, 5]], "darkblue", "cyan");
@@ -105,6 +106,12 @@ export class Index {
                     break;
                 case "reset_maze":
                     reset_maze(data["animation"] === "true");
+                    break;
+                case "update_path":
+                    Index.animHandler.addImmediate(displayPathChange(data["path"]));
+                    break;
+                case "discover_tile":
+                    discoverTile(data["x"], data["y"], data["directions"]);
                     break;
             }
         });
@@ -165,6 +172,17 @@ export class Index {
     }
 }
 
+function discoverTile(x, y, directions) {
+    let index = co_crds_i([x, y]);
+    let group = new AnimGroup(0);
+    group.add(new AnimCssChange(10, document.getElementById("sys-arm_node_" + index),
+        ["undiscovered"], "discovered"));
+    for (let i = 0; i < directions.length; i++) {
+        group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-" + directions[i] + "_" + index),
+            ["undiscovered"], "discovered"));
+    }
+    Index.animHandler.addImmediate(group);
+}
 
 //new function for initializing using the arm system
 function init_maze() {
@@ -177,50 +195,55 @@ function init_maze() {
         tile.appendChild(arm_container);
 
         let node = document.createElement("div");
-        node.className = "sys-arm_node repl";
+        node.className = "sys-arm_node repl undiscovered";
         node.id = "sys-arm_node_" + i;
         arm_container.appendChild(node);
 
         if (!(coords[1] === 0)) {
             let arm_up = document.createElement("div");
-            arm_up.className = "sys-arm_arm sys-arm_arm-n repl";
+            arm_up.className = "sys-arm_arm sys-arm_arm-n repl undiscovered";
             arm_up.id = "sys-arm_arm-n_" + i;
             arm_container.appendChild(arm_up);
         }
 
         if (!(coords[1] === 15)) {
             let arm_down = document.createElement("div");
-            arm_down.className = "sys-arm_arm sys-arm_arm-s repl";
+            arm_down.className = "sys-arm_arm sys-arm_arm-s repl undiscovered";
             arm_down.id = "sys-arm_arm-s_" + i;
             arm_container.appendChild(arm_down);
         }
 
         if (!(coords[0] === 0)) {
             let arm_left = document.createElement("div");
-            arm_left.className = "sys-arm_arm sys-arm_arm-w repl";
+            arm_left.className = "sys-arm_arm sys-arm_arm-w repl undiscovered";
             arm_left.id = "sys-arm_arm-w_" + i;
             arm_container.appendChild(arm_left);
         }
 
         if (!(coords[0] === 15)) {
             let arm_right = document.createElement("div");
-            arm_right.className = "sys-arm_arm sys-arm_arm-e repl";
+            arm_right.className = "sys-arm_arm sys-arm_arm-e repl undiscovered";
             arm_right.id = "sys-arm_arm-e_" + i;
             arm_container.appendChild(arm_right);
         }
     }
 
     //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
-    let path = [
+    /*let path = [
         [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
         [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1],
         [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1],
         [9, 9, 9, 10, 10, 10, 0]
     ];
-    console.log(path);
-    console.log(path[1][14])
     let animation = displayPathChange(path);
+    let path_second = [
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 9, 9, 9, 10, 10, 10, -1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 5, 10, 5, 11, 6, 11, 7, 11, 8, 11, 9, 11, 10, 11, 1]
+    ];
+    let animation_second = displayPathChange(path_second);
     Index.animHandler.add(animation);
+    Index.animHandler.add(animation_second);*/
 }
 
 function displayPathChange(changed_path) {

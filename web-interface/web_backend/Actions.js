@@ -66,4 +66,12 @@ export class Actions {
     static reset_maze(play_anim) {
         return new Action("reset_maze", new Map([["animation", play_anim]]));
     }
+
+    static update_path(path) {
+        return new Action("update_path", new Map([["path", path]]));
+    }
+
+    static discover_tile(x, y, directions) {
+        return new Action("discover_tile", new Map([["x", x], ["y", y], ["directions", directions]]));
+    }
 }
