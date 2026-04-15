@@ -665,8 +665,9 @@ void handleCommand(WebsocketsMessage WSmessage) {
               } else if (word.indexOf("CONTINUE") != -1) {
                 task.reaction = CONTINUE_ID;
               }
+              activeTasks.push_back(task);
             }
-            activeTasks.push_back(task);
+            
             if (arguments[0] == "MOVE") {
               moveActive(cells);
             } else if (arguments[0] == "TURN") {
