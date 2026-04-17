@@ -157,11 +157,18 @@ impl<const N: usize> MicromouseManager<N> {
             MicromouseResponse::CommandFinished(command_finished_message) => {
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
                 let mut just_finished_cmd = self.current_command.lock().await;
-                self.update_current_command_id(
-                    command_finished_message.cmd_id,
-                    &mut just_finished_cmd,
-                )
-                .await?;
+                if let Err(e) = self
+                    .update_current_command_id(
+                        command_finished_message.cmd_id,
+                        &mut just_finished_cmd,
+                    )
+                    .await
+                {
+                    error!(target: "comm/mng/cmd", "Error while updating current cmd id");
+                    self.remove_unordered(command_finished_message.cmd_id)
+                        .await?;
+                    return Err(e);
+                }
                 if just_finished_cmd.is_none() {
                     error!(target: "comm/mng/cmd", "NO CURRENT COMMAND TO FINISH");
                     return Err(MicromouseManagerError::CmdNotKnown(
@@ -260,6 +267,22 @@ impl<const N: usize> MicromouseManager<N> {
             .store(true, std::sync::atomic::Ordering::SeqCst);
         // self.notify_empty_queue.notify_waiters();
         debug!(target: "comm/mng", "RESTART COMPLETE");
+    }
+
+    async fn remove_unordered(
+        &self,
+        cmd_to_remove: CommandId,
+    ) -> Result<(), MicromouseManagerError> {
+        warn!(target: "comm/mng/cmd", "REMOVING COMMAND OUT OF ORDER {cmd_to_remove}");
+        let mut unconfirmed = self.unconfirmed_cmd.lock().await;
+        let removed = unconfirmed.remove(&cmd_to_remove);
+        if removed.is_none() {
+            error!(target: "comm/mng/cmd", "CMD already removed or never sent");
+            Err(MicromouseManagerError::CmdNotKnown(cmd_to_remove))
+        } else {
+            warn!(target: "comm/mng/cmd", "Remove successful");
+            Ok(())
+        }
     }
 
     /// Uses a measurement or a command finished message (-> measurment = None) to update the
