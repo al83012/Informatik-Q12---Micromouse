@@ -72,9 +72,10 @@ pub struct StrategyTreeNode<const N: usize, S: Strategy<N>> {
     pub on_basis_of_state: Option<S>, // Could be none if it is a step taken over from another tree
     // or if it is a substep
     pub applied_strategy: Option<NodeActionResult<N>>, // The StrategyAction may not be known (as the
-                                                       // strategy may reject working with partial actions)
-                                                       // Once the strategy is known, all the potential_outcomes have to be inserted and the nodes
-                                                       // added
+    // strategy may reject working with partial actions)
+    // Once the strategy is known, all the potential_outcomes have to be inserted and the nodes
+    // added
+    pub as_branch_from_parent: Option<AbsolutePathId>,
 }
 
 pub struct SentCommandNode<const N: usize> {
@@ -279,9 +280,14 @@ where
                     .potential_outcomes_given_filter()
                     .potential_outcomes
                 {
+                    let path_id = AbsolutePathId {
+                        from_node: parent_node,
+                        branch: child_path_id,
+                    };
                     let child_node = StrategyTreeNode::new_leaf(
                         child_world.clone(),
                         strategy_state_after.clone(),
+                        path_id,
                     );
                     let child_node_id = self.add_node(child_node, child_node_layer);
                     nodes_created += 1;
@@ -353,9 +359,7 @@ where
 
     fn lowest_expandable_layer(&self) -> AbsoluteLayerId {
         self.layers
-            .iter()
-            .filter(|l| !l.is_fully_expanded)
-            .next()
+            .iter().find(|l| !l.is_fully_expanded)
             .map(|l| l.absolute_layer_id)
             .expect("There should always be a layer that has not yet been fully expanded (as expansion creates new non-expanded layers)")
     }
@@ -410,14 +414,44 @@ Also: regow
 ");
     }
 
-    fn prune_node(&mut self, node_and_children: AbsoluteNodeId) // -> ?
-    {
-        todo!()
+    fn prune_node(&mut self, node_and_children: AbsoluteNodeId) -> Result<(), PruneError> {
+        let Some(node_to_delete) = self.node(node_and_children) else {
+            return Err(PruneError::UnknownNode(node_and_children));
+        };
+        let Some(branch) = &node_to_delete.as_branch_from_parent else {
+            return Err(PruneError::CannotDeleteRoot(node_and_children));
+        };
+
+        self.prune_branch(branch.clone())
     }
 
-    fn prune_branch(&mut self, from_node: AbsoluteNodeId, prune_branch: PathLocalOutcomeId) // -> ?
-    {
-        todo!()
+    fn prune_branch(&mut self, branch: AbsolutePathId) -> Result<(), PruneError> {
+        let branch_source_id = branch.from_node;
+        let Some(branch_source) = self.node_mut(branch_source_id) else {
+            return Err(PruneError::UnknownNode(branch_source_id));
+        };
+        let Some(Ok(children)) = &mut branch_source.applied_strategy else {
+            return Err(PruneError::SourceHasNoChildren(branch_source_id));
+        };
+
+        let Some(first_delete_node) = children.potential_outcomes.remove(&branch.branch) else {
+            return Err(PruneError::SourceDoesNotHaveThisChild(branch));
+        };
+
+        let mut to_delete = vec![first_delete_node];
+
+        while let Some(node_to_delete) = to_delete.pop() {
+            let mut new_nodes = self.delete_node(node_to_delete).unwrap_or(vec![]);
+            to_delete.append(&mut new_nodes);
+        }
+        Ok(())
+    }
+
+    fn delete_node(&mut self, node: AbsoluteNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
+        let Some(layer) = self.layer_mut(node.layer_id) else {
+            return Err(PruneError::UnknownNode(node));
+        };
+        layer.delete_node(node.node_id)
     }
 
     pub fn close(&mut self) -> SentUnfinishedCommands<N> {
@@ -425,10 +459,24 @@ Also: regow
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum PruneError {
+    UnknownNode(AbsoluteNodeId),
+    CannotDeleteRoot(AbsoluteNodeId),
+    SourceHasNoChildren(AbsoluteNodeId),
+    SourceDoesNotHaveThisChild(AbsolutePathId),
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct AbsoluteNodeId {
     layer_id: AbsoluteLayerId,
     node_id: RelativeNodeId,
+}
+
+#[derive(Clone, Debug)]
+pub struct AbsolutePathId {
+    from_node: AbsoluteNodeId,
+    branch: PathLocalOutcomeId,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -478,6 +526,20 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         self.node_count += 1;
         next_id
     }
+
+    pub fn delete_node(&mut self, node: RelativeNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
+        let Some(node) = self.nodes.remove(&node) else {
+            return Err(PruneError::UnknownNode(AbsoluteNodeId {
+                layer_id: self.absolute_layer_id,
+                node_id: node,
+            }));
+        };
+        self.node_count -= 1;
+        let Some(Ok(c)) = node.applied_strategy else {
+            return Ok(vec![]);
+        };
+        Ok(c.potential_outcomes.values().cloned().collect())
+    }
 }
 
 pub struct RelativeNodeIdCounter(pub usize);
@@ -497,11 +559,12 @@ impl Default for RelativeNodeIdCounter {
 }
 
 impl<const N: usize> SentCommandNode<N> {
-    pub fn as_nonexpandable<S: Strategy<N>>(self) -> StrategyTreeNode<N, S> {
+    pub fn as_nonexpandable<S: Strategy<N>>(self, at: AbsolutePathId) -> StrategyTreeNode<N, S> {
         StrategyTreeNode {
             on_basis_of_world: self.on_basis_of_world,
             on_basis_of_state: None,
             applied_strategy: Some(self.applied_strategy),
+            as_branch_from_parent: Some(at),
         }
     }
 }
@@ -510,11 +573,13 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
     pub fn new_leaf(
         world_at_start_of_node: PartialWorldData<N>,
         state_at_start_of_node: Option<S>,
+        at: AbsolutePathId,
     ) -> Self {
         Self {
             on_basis_of_world: world_at_start_of_node,
             on_basis_of_state: state_at_start_of_node,
             applied_strategy: None,
+            as_branch_from_parent: Some(at),
         }
     }
 }
