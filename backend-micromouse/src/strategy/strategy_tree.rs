@@ -211,9 +211,12 @@ where
     fn try_expand_node(&mut self, node_id: AbsoluteNodeId) -> NodeExpansionResult {
         let mut nodes_created = 0;
         let goal_position = self.goal_position;
+
+        // INFO: ############# Getting the node ##############################
         let node = self
             .node_mut(node_id)
             .expect("Passed inside the tree; should be valid");
+        // INFO: ############# Checking that it isn't already expanded ##############################
         if node.applied_strategy.is_some() {
             // The node already is fully expanded
             return NodeExpansionResult::AlreadyExpanded;
@@ -221,11 +224,13 @@ where
 
         let basis_world = &node.on_basis_of_world;
 
+        // INFO: ############# Checking that it has a strategy needed for expansion ##############################
         let Some(basis_strategy_state) = &node.on_basis_of_state else {
             // There is no strategy to base this expansion on
             return NodeExpansionResult::NotExpandable;
         };
 
+        // INFO: ############# If the strategy does not return a proper value, it is just not yet ready ##############################
         let StrategyComputationResult::Computed(expansion_actions) =
             basis_strategy_state.next_cmd(basis_world, &goal_position)
         else {
@@ -241,11 +246,14 @@ where
             }
         };
 
+        // INFO: ############# First, apply on the one node ##############################
         let mut apply_on_node = vec![node_id];
 
         // There could be multiple actions, that were batched:
         // In that case, we have to work through all the different actions layer by layer and
         // always expand the nodes of the previous layer
+        // INFO: ############# If there are multiple substeps, apply on all the children of
+        // expansion ##############################
         for expansion_action in expansion_actions.0.into_inner().into_iter() {
             let do_cmd = expansion_action.after_command;
             let strategy_state_after = expansion_action.next_strategy_state;
@@ -287,9 +295,9 @@ where
                     potential_outcomes: children,
                 };
 
-                self.node_mut(parent_node)
-                    .expect("Checked")
-                    .applied_strategy = Some(Ok(action));
+                //Lastly, add the actual children-information to the parent
+                let parent_node = self.node_mut(parent_node).expect("Checked");
+                parent_node.applied_strategy = Some(Ok(action));
             }
             apply_on_node = new_apply_on_node;
         }
@@ -402,18 +410,14 @@ Also: regow
 ");
     }
 
-    pub fn prune_root_outcome(&mut self, outcome_id: PathLocalOutcomeId) // -->
+    fn prune_node(&mut self, node_and_children: AbsoluteNodeId) // -> ?
     {
-        todo!(
-            "Remove the child of the root that matches the PathLocalOutcomeId;
-Also: return all the sub-options that were pruned (and their relationship) for the frontend"
-        );
-        todo!("Also: regrow")
+        todo!()
     }
 
-    pub fn grow(&mut self) // -> ?
+    fn prune_branch(&mut self, from_node: AbsoluteNodeId, prune_branch: PathLocalOutcomeId) // -> ?
     {
-        todo!("Check whether growth is within the limits of StrategyTree (desired_depth & max_nodes) & then expand those worlds that are closest to the root")
+        todo!()
     }
 
     pub fn close(&mut self) -> SentUnfinishedCommands<N> {
