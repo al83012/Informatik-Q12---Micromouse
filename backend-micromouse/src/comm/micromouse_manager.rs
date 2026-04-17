@@ -157,18 +157,11 @@ impl<const N: usize> MicromouseManager<N> {
             MicromouseResponse::CommandFinished(command_finished_message) => {
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
                 let mut just_finished_cmd = self.current_command.lock().await;
-                if let Err(e) = self
-                    .update_current_command_id(
-                        command_finished_message.cmd_id,
-                        &mut just_finished_cmd,
-                    )
-                    .await
-                {
-                    error!(target: "comm/mng/cmd", "Error while updating current cmd id");
-                    self.remove_unordered(command_finished_message.cmd_id)
-                        .await?;
-                    return Err(e);
-                }
+                self.update_current_command_id(
+                    command_finished_message.cmd_id,
+                    &mut just_finished_cmd,
+                )
+                .await?;
                 if just_finished_cmd.is_none() {
                     error!(target: "comm/mng/cmd", "NO CURRENT COMMAND TO FINISH");
                     return Err(MicromouseManagerError::CmdNotKnown(
@@ -202,14 +195,16 @@ impl<const N: usize> MicromouseManager<N> {
                 // }
                 let map_update = self
                     .update_cmd_application(step_num, None, &mut just_finished_cmd)
-                    .await?;
+                    .await;
+                if let Err(e) = map_update {
+                    warn!(target: "comm/mng/cmd", "Err {e:?} while updating map; Still need to clear it");
+                    self.clear_current_command(&mut just_finished_cmd).await;
+                    return Err(e);
+                }
+                let map_update = map_update.expect("Checked");
                 let finished_cmd_id = just_finished_cmd.as_ref().expect("checked").1;
                 self.clear_current_command(&mut just_finished_cmd).await;
                 let require_new = self.unconfirmed_cmd.lock().await.is_empty();
-                // if require_new {
-                //     debug!(target: "comm/mng/cmd", "REQUIRE NEW");
-                // self.notify_empty_queue.notify_waiters();
-                // }
                 let map_update: Vec<MicromouseEvent<N>> = map_update.into();
                 Ok(vec![MicromouseEvent::FinishedCommand {
                     cmd_id: finished_cmd_id,
