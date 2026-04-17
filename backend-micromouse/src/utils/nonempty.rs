@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::Deref};
+use std::{fmt::Display, ops::{Deref, DerefMut}};
 
 
 pub struct NonEmpty<T: Sized>(T);
@@ -90,6 +90,12 @@ impl<T> std::fmt::Debug for NonEmpty<T>
     }
 }
 
+
+impl<T> NonEmpty<T> {
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
 
 impl<T> Deref for NonEmpty<T> {
     type Target = T;

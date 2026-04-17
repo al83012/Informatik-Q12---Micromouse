@@ -1,9 +1,9 @@
 use crate::{
-    comm::micromouse_message::Command, map::world_data::{PartialWorldData, WorldData},
-    transform::position::Position, utils::nonempty::NonEmpty,
+    comm::micromouse_message::Command,
+    map::world_data::{PartialWorldData, WorldData},
+    transform::position::Position,
+    utils::nonempty::NonEmpty,
 };
-
-
 
 #[derive(Clone, Debug)]
 pub enum StrategyError {
@@ -15,8 +15,8 @@ pub enum StrategyComputationResult<const N: usize, S: Strategy<N>> {
     Computed(Result<ComputedActions<N, S>, StrategyError>),
 }
 
-pub type ComputedActions<const N: usize, S: Strategy<N>> = NonEmpty<Vec<ComputedAction<N, S>>>;
-
+// pub type ComputedActions<const N: usize, S: Strategy<N>> = NonEmpty<Vec<ComputedAction<N, S>>>;
+pub struct ComputedActions<const N: usize, S: Strategy<N>>(pub NonEmpty<Vec<ComputedAction<N, S>>>);
 
 // The action that was computed from certain starting world state; Contains the next_strategy_state
 // after completing that action
@@ -35,7 +35,11 @@ pub trait FromConfig {
 }
 
 pub trait Strategy<const N: usize>: FromConfig + Sized {
-    fn next_cmd(&self, world: &PartialWorldData<N>, goal: &GoalPosition) -> StrategyComputationResult<N, Self>;
+    fn next_cmd(
+        &self,
+        world: &PartialWorldData<N>,
+        goal: &GoalPosition,
+    ) -> StrategyComputationResult<N, Self>;
 }
 
 pub trait SerializeInformationView<const N: usize>: Strategy<N> {

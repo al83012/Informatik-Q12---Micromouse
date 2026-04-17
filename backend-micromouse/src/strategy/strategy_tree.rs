@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map, HashMap},
     hash::{DefaultHasher, Hash, Hasher},
     ops::{Add, Sub},
 };
@@ -34,8 +34,9 @@ pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     nodes: HashMap<RelativeNodeId, StrategyTreeNode<N, S>>,
     absolute_layer_id: AbsoluteLayerId,
     is_fully_expanded: bool,
-    merged: Option<Command>,
+    eq: Option<Command>,
     node_count: usize,
+    node_id_counter: RelativeNodeIdCounter,
 }
 
 pub struct SentTreeLayer<const N: usize> {
@@ -119,7 +120,9 @@ where
         // the last layer of the sent tree layers need to be pre-expanded by taking the outcomes of
         // the filtered application and already adding the nodes for that to the next layer
         // Then, the sent layers will have to be transformed to a non-expandable node of this
-        // strategy (Maybe add a trait for that)
+        // strategy (Maybe add a trait for that).
+        // The newly pre-expanded ones will also have to be prepared with a "fresh" clone of the
+        // Strategy (as they are basically its starting point)
         //
         // let continue_with_node_count = continue_after_doing.iter().map(|l| l.node_count).sum();
 
@@ -206,7 +209,8 @@ where
 
     // Returns the number of children this operation created
     fn try_expand_node(&mut self, node_id: AbsoluteNodeId) -> NodeExpansionResult {
-        let goal_position = self.goal_position.clone();
+        let mut nodes_created = 0;
+        let goal_position = self.goal_position;
         let node = self
             .node_mut(node_id)
             .expect("Passed inside the tree; should be valid");
@@ -237,9 +241,99 @@ where
             }
         };
 
-        for expansion_action in (*expansion_actions).iter() {}
+        let mut apply_on_node = vec![node_id];
 
-        todo!()
+        // There could be multiple actions, that were batched:
+        // In that case, we have to work through all the different actions layer by layer and
+        // always expand the nodes of the previous layer
+        for expansion_action in expansion_actions.0.into_inner().into_iter() {
+            let do_cmd = expansion_action.after_command;
+            let strategy_state_after = expansion_action.next_strategy_state;
+
+            // At the first step there should only be one node to expand, but further down the line
+            // there could be an entire collection of them
+            let mut new_apply_on_node = vec![];
+            for parent_node in apply_on_node {
+                let child_node_layer = parent_node.layer_id + RelativeLayerId(1);
+                let basis_world = {
+                    let parent_node = self.node(parent_node).expect("Checked");
+                    parent_node.on_basis_of_world.clone()
+                };
+
+                let cmd_application = FilteredCommandApplication::new(
+                    Some(basis_world.clone().into()),
+                    do_cmd.clone(),
+                );
+
+                // There will be 1 child per potential outcome of the given command
+                let mut children = HashMap::new();
+                for (child_path_id, child_world) in cmd_application
+                    .potential_outcomes_given_filter()
+                    .potential_outcomes
+                {
+                    let child_node = StrategyTreeNode::new_leaf(
+                        child_world.clone(),
+                        strategy_state_after.clone(),
+                    );
+                    let child_node_id = self.add_node(child_node, child_node_layer);
+                    nodes_created += 1;
+                    new_apply_on_node.push(child_node_id);
+
+                    children.insert(child_path_id, child_node_id);
+                }
+
+                let action = NodeAction {
+                    command: cmd_application,
+                    potential_outcomes: children,
+                };
+
+                self.node_mut(parent_node)
+                    .expect("Checked")
+                    .applied_strategy = Some(Ok(action));
+            }
+            apply_on_node = new_apply_on_node;
+        }
+
+        NodeExpansionResult::Expanded(nodes_created)
+    }
+
+    fn add_node(
+        &mut self,
+        node: StrategyTreeNode<N, S>,
+        to_layer: AbsoluteLayerId,
+    ) -> AbsoluteNodeId {
+        let layer = if let Some(mut layer) = self.layer_mut(to_layer) {
+            layer
+        } else {
+            self.fill_layers_to_id(to_layer);
+            self.layer_mut(to_layer).expect("Tried to create it")
+        };
+
+        let rel_id = layer.add_node(node);
+
+        AbsoluteNodeId {
+            layer_id: to_layer,
+            node_id: rel_id,
+        }
+    }
+
+    fn fill_layers_to_id(&mut self, to_layer: AbsoluteLayerId) -> usize {
+        let highest_layer_id = self
+            .layers
+            .last()
+            .expect("There should always be at least one layer")
+            .absolute_layer_id;
+
+        if highest_layer_id < to_layer {
+            let diff = to_layer.0 - highest_layer_id.0;
+            for i in highest_layer_id.0 + 1..=to_layer.0 {
+                let id = AbsoluteLayerId(i);
+                self.layers.push(StrategyTreeLayer::new(id));
+            }
+            diff
+        } else {
+            0
+        }
     }
 
     fn fully_expanded_layer_count(&self) -> usize {
@@ -327,6 +421,7 @@ Also: return all the sub-options that were pruned (and their relationship) for t
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct AbsoluteNodeId {
     layer_id: AbsoluteLayerId,
     node_id: RelativeNodeId,
@@ -361,5 +456,61 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
     }
     pub fn node_mut(&mut self, node_id: RelativeNodeId) -> Option<&mut StrategyTreeNode<N, S>> {
         self.nodes.get_mut(&node_id)
+    }
+    pub fn new(absolute_layer_id: AbsoluteLayerId) -> Self {
+        Self {
+            node_id_counter: RelativeNodeIdCounter::default(),
+            nodes: HashMap::new(),
+            absolute_layer_id,
+            is_fully_expanded: false,
+            eq: None,
+            node_count: 0,
+        }
+    }
+
+    pub fn add_node(&mut self, node: StrategyTreeNode<N, S>) -> RelativeNodeId {
+        let next_id = self.node_id_counter.next();
+        self.nodes.insert(next_id, node);
+        self.node_count += 1;
+        next_id
+    }
+}
+
+pub struct RelativeNodeIdCounter(pub usize);
+
+impl RelativeNodeIdCounter {
+    pub fn next(&mut self) -> RelativeNodeId {
+        let id = RelativeNodeId(self.0);
+        self.0 += 1;
+        id
+    }
+}
+
+impl Default for RelativeNodeIdCounter {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
+impl<const N: usize> SentCommandNode<N> {
+    pub fn as_nonexpandable<S: Strategy<N>>(self) -> StrategyTreeNode<N, S> {
+        StrategyTreeNode {
+            on_basis_of_world: self.on_basis_of_world,
+            on_basis_of_state: None,
+            applied_strategy: Some(self.applied_strategy),
+        }
+    }
+}
+
+impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
+    pub fn new_leaf(
+        world_at_start_of_node: PartialWorldData<N>,
+        state_at_start_of_node: Option<S>,
+    ) -> Self {
+        Self {
+            on_basis_of_world: world_at_start_of_node,
+            on_basis_of_state: state_at_start_of_node,
+            applied_strategy: None,
+        }
     }
 }
