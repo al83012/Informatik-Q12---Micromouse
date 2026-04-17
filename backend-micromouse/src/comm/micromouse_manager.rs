@@ -23,7 +23,6 @@ use crate::{
             CannotReachStep, CertainStepError, FilterMeasurementUpgradeError, FilterUpdate,
             FilteredCommandApplication, RejectedOutcomes,
         },
-        map::MapInconsistencyError,
         world_data::WorldData,
     },
     transform::position::MouseTransform,
@@ -33,7 +32,6 @@ use crate::{
 pub struct MicromouseManager<const N: usize> {
     channel: WsChannel,
     next_cmd_send_id: AtomicU32,
-    // unconfirmed_cmd_queue: Mutex<VecDeque<(CommandId, CommandMessage)>
     unconfirmed_cmd: Mutex<HashMap<CommandId, CommandMessage>>,
     next_cmd_process_id: AtomicU32,
     mode: Mutex<MicromouseMode>,
@@ -168,8 +166,6 @@ impl<const N: usize> MicromouseManager<N> {
                         command_finished_message.cmd_id,
                     ));
                 }
-                // let (just_finished_cmd, just_finished_cmd_id) =
-                //     just_finished_cmd.as_mut().expect("Already checked");
                 let step_num = match command_finished_message.reason {
                     Some(i) => i.occurence.at_step,
                     None => {
@@ -189,10 +185,6 @@ impl<const N: usize> MicromouseManager<N> {
                 // do a last position-update (in case we didn't get a measurement in the last
                 // step and have to update it to its last transf that way)
                 debug!(target: "comm/mng/cmd", "Currently unconfirmed {:?}", self.unconfirmed_cmd.lock().await);
-                // if self.unconfirmed_cmd.lock().await.is_empty() {
-                //     debug!(target: "comm/mng/cmd", "NOTIFIED CMD WAITER");
-                //     self.notify_empty_queue.notify_waiters();
-                // }
                 let map_update = self
                     .update_cmd_application(step_num, None, &mut just_finished_cmd)
                     .await;
@@ -448,6 +440,7 @@ impl<const N: usize> MicromouseManager<N> {
                 .load(std::sync::atomic::Ordering::SeqCst);
             // let expected_next_id = last_processed_id + 1;
             if expected_next_id == response_cmd_id.0 {
+                info!(target: "comm/mng/cmd", "Cmd Id matches next expected --> Next cmd; now = {expected_next_id}, next = {}", expected_next_id + 1);
                 self.next_cmd_process_id
                     .store(expected_next_id + 1, std::sync::atomic::Ordering::SeqCst);
                 Ok(())
