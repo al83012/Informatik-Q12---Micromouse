@@ -350,14 +350,26 @@ export class AnimationHandler {
             }
         }
 
-        let shift = 0;
+        //let shift = 0;
+        let remove = [];
         for (let i = 0; i < this.imm_animations.length; i++) {
-            this.imm_animations[i-shift].execute();
-            if (this.imm_animations[i-shift].finished) {
-                shift++;
-                this.imm_animations.splice(i-shift, 1);
+            //this.imm_animations[i-shift].execute();
+            this.imm_animations[i].execute();
+            //if (this.imm_animations[i-shift].finished) {
+            if (this.imm_animations[i].finished) {
+                //shift++;
+                //this.imm_animations.splice(i-shift, 1);
+                remove.push(i);
             }
         }
+        let new_imm_animations = [];
+        for (let i = 0; i < this.imm_animations.length; i++) {
+            if (!(remove.includes(i))) {
+                new_imm_animations.push(this.imm_animations[i]);
+            }
+        }
+        this.imm_animations = new_imm_animations;
+
 
         if (this.animations.length === 0) return;
         this.animations[0].execute();

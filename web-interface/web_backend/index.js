@@ -13,7 +13,7 @@ console.log("[B] Creating Client");
 const client = new WebsocketClient();
 
 function connect_backend()
-{client.connect("ws://"+host+":"+back_port, "maze-backend");};
+{client.connect("ws://"+host+":"+back_port, "echo-protocol");};
 
 client.on('connectFailed', (err) => {
     console.error('[B] Connect Error: ' + err.toString());
