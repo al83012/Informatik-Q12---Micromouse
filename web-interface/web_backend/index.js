@@ -3,7 +3,16 @@ const { Action, Actions} = require('./Actions.js');
 const { BackendManager } = require('./BackendManager.js');
 const manager = new BackendManager();
 
-
+/**
+ * Communication build with Backend
+ * Sending:
+ * type: type of command
+ * values are concatenated after type
+ * Example: {"type": "NewStrategy", "strategy_type": "<strategy type>"}
+ *
+ * Receiving:
+ * type: type of command
+ */
 //communication with backend
 console.log("[B] Requiring Websocket");
 const WebsocketClient = require('websocket').client;
