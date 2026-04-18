@@ -249,15 +249,15 @@ where
                     break 'expansion;
                 }
             }
-            self.layer_mut(layer_to_expand)
-                .expect("ID should be in bounds")
-                .is_fully_expanded = true;
             if skipped_layer {
                 // We skipped some node expansion in this layer as it was not yet available to us
                 // INFO: it will still try to expand the already existing layers up to that depth,
                 // but it will not incr the expanden-layer-counter
             } else {
                 self.highest_full_layer += 1;
+                self.layer_mut(layer_to_expand)
+                    .expect("ID should be in bounds")
+                    .is_fully_expanded = true;
             }
         }
         TreeExpansionResult::Expanded {
@@ -382,6 +382,8 @@ where
         };
 
         let rel_id = layer.add_node(node);
+
+        self.node_count += 1;
 
         AbsoluteNodeId {
             layer_id: to_layer,
@@ -527,6 +529,7 @@ where
         }
 
         self.layers.remove(0);
+        self.node_count -= 1;
 
         let new_first_layer = self.layers.first().expect("Has Successor");
         self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
@@ -629,7 +632,11 @@ where
         let Some(layer) = self.layer_mut(node.layer_id) else {
             return Err(PruneError::UnknownNode(node));
         };
-        layer.delete_node(node.node_id)
+        let l = layer.delete_node(node.node_id);
+        if l.is_ok() {
+            self.node_count -= 1;
+        }
+        l
     }
 
     pub fn close(&mut self) -> SentUnfinishedCommands<N> {
@@ -717,6 +724,32 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
             return Ok(vec![]);
         };
         Ok(c.potential_outcomes.values().cloned().collect())
+    }
+
+    pub fn equal_command(&self) -> Option<Command> {
+        if !self.is_fully_expanded {
+            return None;
+        }
+        if self.node_count == 0 {
+            return None;
+        }
+        let mut nodes = self.nodes.iter();
+        let (_, first) = nodes.next().expect("Checked");
+        let Some(Ok(a)) = &first.applied_strategy else {
+            return None;
+        };
+        let cmd = a.command.command().clone();
+
+        for (_, other) in nodes {
+            let Some(Ok(a)) = &other.applied_strategy else {
+                return None;
+            };
+            if cmd != *a.command.command() {
+                return None;
+            }
+        }
+
+        Some(cmd)
     }
 }
 

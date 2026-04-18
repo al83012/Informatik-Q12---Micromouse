@@ -314,20 +314,20 @@ impl TryFrom<String> for CommandId {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Command {
     pub ty: MovementType,
     pub interrupts: Vec<MeasurementInterrupt>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum MovementType {
     Turn(i8),
     Move(u8),
 }
 
 /// The task for an interrupt (be it terminating or continuing) --> Sent to micromouse
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeasurementInterrupt {
     pub direction: RelativeDirection,
     pub at_step: InterruptStep,
@@ -403,7 +403,7 @@ impl TryFrom<String> for InterruptAction {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum InterruptStep {
     Each,
     At(StepNum),
