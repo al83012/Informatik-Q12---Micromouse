@@ -1,17 +1,16 @@
-use std::{error::Error, marker::PhantomData, num::ParseIntError};
+use std::{marker::PhantomData, num::ParseIntError};
 
 use tracing::debug;
-use tracing_subscriber::fmt::format::Format;
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     map::{
         map::{PartialMap, WallDiscoveryStatus},
-        measurement::{self, Measurement, MeasurementValue},
+        measurement::{Measurement, MeasurementValue},
         world_data::{PartialWorldData, WorldData},
     },
     transform::{
-        direction::{self, RelativeDirection},
+        direction::RelativeDirection,
         position::MouseTransform,
     },
 };
@@ -691,7 +690,7 @@ impl TryFrom<String> for CommandMessage {
             measurements_parsed.push(MeasurementInterrupt {
                 at_step: at,
                 direction: dir,
-                action: action,
+                action,
             });
             // let action = InterruptAction::try_from
 
@@ -716,7 +715,7 @@ impl TryFrom<String> for InterruptStep {
         if value.eq("X") {
             Ok(InterruptStep::Each)
         } else {
-            let num = value.parse().map_err(|e| FormatError::new(value))?;
+            let num = value.parse().map_err(|_e| FormatError::new(value))?;
             Ok(InterruptStep::At(num))
         }
     }

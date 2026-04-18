@@ -1,6 +1,6 @@
 use crate::{
     comm::micromouse_message::Command,
-    map::world_data::{PartialWorldData, WorldData},
+    map::world_data::PartialWorldData,
     transform::position::Position,
     utils::nonempty::NonEmpty,
 };

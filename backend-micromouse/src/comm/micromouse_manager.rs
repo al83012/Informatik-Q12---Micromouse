@@ -1,11 +1,11 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::HashMap,
     ops::Deref,
-    sync::atomic::{AtomicBool, AtomicU32, AtomicUsize},
+    sync::atomic::{AtomicBool, AtomicU32},
 };
 
 use console::Style;
-use tokio::sync::{watch, Mutex, MutexGuard, Notify, RwLock, RwLockReadGuard};
+use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, warn};
 use tungstenite::Message;
 

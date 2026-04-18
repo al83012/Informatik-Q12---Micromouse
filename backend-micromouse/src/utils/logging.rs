@@ -82,6 +82,12 @@ pub struct MyFormatter {
     start_time: Instant,
 }
 
+impl Default for MyFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MyFormatter {
     pub fn new() -> Self {
         Self {
@@ -97,7 +103,7 @@ where
 {
     fn format_event(
         &self,
-        ctx: &FmtContext<'_, S, N>,
+        _ctx: &FmtContext<'_, S, N>,
         mut writer: Writer<'_>,
         event: &Event<'_>,
     ) -> std::fmt::Result {

@@ -1,4 +1,4 @@
-use std::{fmt::Display, ops::{Deref, DerefMut}};
+use std::{fmt::Display, ops::Deref};
 
 
 pub struct NonEmpty<T: Sized>(T);

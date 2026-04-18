@@ -6,7 +6,6 @@ use tracing::{debug, trace};
 use crate::{
     map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
     transform::{direction::Direction, position::Position},
-    utils::map_display,
 };
 
 pub struct MapDisplay {

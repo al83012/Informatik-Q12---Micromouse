@@ -10,7 +10,7 @@ use crate::{
     comm::website::DiscoveryMessage,
     map::{
         check::PotentiallyEq,
-        measurement::{Measurement, MeasurementValue},
+        measurement::Measurement,
         upgrade::IsUpgradeable,
     },
     transform::{

@@ -1,5 +1,5 @@
 use crate::{
-    map::{map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus}, world_data::{PartialWorldData, WorldData}},
+    map::{map::{Map, PartialMap, WallDiscoveryStatus}, world_data::{PartialWorldData, WorldData}},
     transform::position::Position,
 };
 

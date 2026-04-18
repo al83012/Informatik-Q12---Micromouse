@@ -105,12 +105,11 @@ impl FrontendConnectionManager {
 impl FrontendConnectionManagerInternal {
     pub async fn handle_connection_loop(&self) {
         loop {
-            if self.first_element_send_time.is_some() {
-                if self.first_element_send_time.unwrap().elapsed() > self.batching_duration {
+            if self.first_element_send_time.is_some()
+                && self.first_element_send_time.unwrap().elapsed() > self.batching_duration {
                     // TODO: SEND ALL
                     continue;
                 }
-            }
             tokio::select! {
                 batch = self.batch() => {
                     self.send_batch(batch).await;
@@ -118,7 +117,7 @@ impl FrontendConnectionManagerInternal {
                 msg = self.next_read() => {
                     self.handle_read(msg).await;
                 }
-                msg = self.next_send() => {
+                _msg = self.next_send() => {
                     self.register_send();
                 }
             }
@@ -134,10 +133,10 @@ impl FrontendConnectionManagerInternal {
     pub async fn batch(&self) -> BatchedFrontendMessage {
         todo!("Returns only once the time elapsed since first_element_send_time exceeds batching_duration")
     }
-    pub async fn handle_read(&self, msg: Message) {
+    pub async fn handle_read(&self, _msg: Message) {
         todo!("Actually handles all the parsing; The read_next fn is only allowed to contain one substep")
     }
-    pub async fn send_batch(&self, batch: BatchedFrontendMessage) {
+    pub async fn send_batch(&self, _batch: BatchedFrontendMessage) {
         todo!("Send the batch of frontend messages as the actual .batch()-method may only contain one substep")
     }
     pub async fn register_send(&self) {

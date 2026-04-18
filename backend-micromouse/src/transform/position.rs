@@ -1,6 +1,6 @@
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, trace, warn};
+use tracing::{trace, warn};
 
 use crate::{comm::micromouse_message::MovementType, transform::direction::{Direction, DirectionNormalizedVector}};
 

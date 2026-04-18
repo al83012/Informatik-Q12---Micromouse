@@ -1,19 +1,18 @@
 use std::{
-    collections::{hash_map, HashMap},
-    hash::{DefaultHasher, Hash, Hasher},
+    collections::HashMap,
+    hash::Hash,
     ops::{Add, Sub},
 };
 
 use crate::{
-    comm::micromouse_message::{Command, CommandMessage},
+    comm::micromouse_message::Command,
     map::{
         check::PotentiallyEq,
         command_world_state::{
-            CommandOutcomes, CommandTerminationReason, FilteredCommandApplication,
-            PathLocalInterruptId, PathLocalOutcomeId, RejectedOutcomes,
+            FilteredCommandApplication, PathLocalOutcomeId, RejectedOutcomes,
         },
-        map::{Map, PartialMap},
-        world_data::{PartialWorldData, WorldData},
+        map::PartialMap,
+        world_data::PartialWorldData,
     },
     strategy::strategy::{
         ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
@@ -123,15 +122,14 @@ where
 {
     pub fn new_continuing_after(
         continue_after_doing: SentUnfinishedCommands<N>,
-        tree_config: StrategyTreeConfig<N, S>,
-        goal_position: GoalPosition,
+        _tree_config: StrategyTreeConfig<N, S>,
+        _goal_position: GoalPosition,
     ) -> Self {
-        let mut continue_after_doing = continue_after_doing.layers;
+        let continue_after_doing = continue_after_doing.layers;
         let queue_len = continue_after_doing.len();
 
         // Either the first layer id is the first one of the unfinished cmds, or it is 0
-        let first_layer_absolute_id = continue_after_doing
-            .get(0)
+        let _first_layer_absolute_id = continue_after_doing.first()
             .map(|l| l.absolute_layer_id)
             .unwrap_or(AbsoluteLayerId(0));
 
@@ -146,8 +144,8 @@ where
         // let continue_with_node_count = continue_after_doing.iter().map(|l| l.node_count).sum();
 
         // Those are currently the only layers which are both sent and finished
-        let highest_sent_layer = queue_len;
-        let highest_eq_layer = queue_len;
+        let _highest_sent_layer = queue_len;
+        let _highest_eq_layer = queue_len;
 
         // The last layer has to be expandable
         // if let Some(last) = continue_after_doing.last_mut() {
@@ -184,7 +182,7 @@ where
             .saturating_sub(self.fully_expanded_layer_count());
 
         let mut nodes_created = 0;
-        let mut layers_fully_expanded = 0;
+        let layers_fully_expanded = 0;
 
         let highest_full_layer = self.highest_full_layer();
 
@@ -241,7 +239,7 @@ where
                             expansion: node_expansion_result,
                         });
                     }
-                    NodeExpansionResult::EndState(s) => {
+                    NodeExpansionResult::EndState(_s) => {
                         // That is alright, we will throw the error once this part of the tree is
                         // visited
                     }
@@ -379,7 +377,7 @@ where
         node: StrategyTreeNode<N, S>,
         to_layer: AbsoluteLayerId,
     ) -> AbsoluteNodeId {
-        let layer = if let Some(mut layer) = self.layer_mut(to_layer) {
+        let layer = if let Some(layer) = self.layer_mut(to_layer) {
             layer
         } else {
             self.fill_layers_to_id(to_layer);
@@ -470,8 +468,8 @@ where
     // removes the root, making its successor the new root; if the successor was not yet expanded
     // into a command, it will do so at this point, returning its NodeAction
     pub fn finish_root(&mut self) -> Result<Option<NodeAction<N>>, FinishRootError> {
-        let (outcome_id, successor) = {
-            let root = self.root_node();
+        let (_outcome_id, successor) = {
+            let _root = self.root_node();
             let root = self.node_mut(self.root_node()).expect("Checked");
 
             let Some(strategy_res) = &root.applied_strategy else {
@@ -551,7 +549,7 @@ where
             .iter()
             .flat_map(|l| {
                 l.nodes.iter().filter_map(|(k, v)| {
-                    if v.on_basis_of_world.map.potentially_eq(&filter) {
+                    if v.on_basis_of_world.map.potentially_eq(filter) {
                         Some(AbsoluteNodeId {
                             layer_id: l.absolute_layer_id,
                             node_id: *k,
@@ -663,7 +661,7 @@ where
 
     fn new_sends(&mut self) -> Vec<Command> {
         if self.highest_sent_layer < self.highest_eq_layer {
-            return (&self.layers[self.highest_sent_layer + 1..=self.highest_eq_layer])
+            return self.layers[self.highest_sent_layer + 1..=self.highest_eq_layer]
                 .iter()
                 .map(|l| l.eq.as_ref().expect("Explicitly should exist").clone())
                 .collect();
@@ -677,7 +675,7 @@ where
         todo!()
     }
 
-    fn transform_path(&mut self, from_node: AbsoluteNodeId, split_commands: (Command, Option<Command>)) // ->?
+    fn transform_path(&mut self, _from_node: AbsoluteNodeId, _split_commands: (Command, Option<Command>)) // ->?
     {
         // takes in a node which has a command (otherwise, what are we even merging / merges on
         // incomplete layers are not allowed)
@@ -694,7 +692,7 @@ where
         todo!()
     }
 
-    fn move_node_back(&mut self, node: AbsoluteNodeId) // --> The new node_id; the id of its
+    fn move_node_back(&mut self, _node: AbsoluteNodeId) // --> The new node_id; the id of its
     // parent; 
     {
         todo!()
@@ -857,10 +855,11 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
                 return true;
             }
         }
-        return false;
+        false
     }
 }
 
+#[derive(Default)]
 pub struct RelativeNodeIdCounter(pub usize);
 
 pub enum FinishRootError {
@@ -882,11 +881,6 @@ impl RelativeNodeIdCounter {
     }
 }
 
-impl Default for RelativeNodeIdCounter {
-    fn default() -> Self {
-        Self(0)
-    }
-}
 
 impl<const N: usize> SentCommandNode<N> {
     pub fn as_nonexpandable<S: Strategy<N>>(self, at: AbsolutePathId) -> StrategyTreeNode<N, S> {

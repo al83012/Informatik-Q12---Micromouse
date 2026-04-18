@@ -2,7 +2,7 @@ use console::Style;
 
 use crate::{
     transform::position::MouseTransform,
-    utils::map_display::{self, MapDisplay, MapDisplayWrite},
+    utils::map_display::{MapDisplay, MapDisplayWrite},
 };
 
 pub struct Path {

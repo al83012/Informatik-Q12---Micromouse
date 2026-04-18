@@ -1,8 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-    comm::micromouse_message::FormatError,
-    transform::direction::{Direction, RelativeDirection},
+    transform::direction::Direction,
     transform::position::Position,
 };
 

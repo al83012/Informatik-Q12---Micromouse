@@ -20,7 +20,7 @@ use std::{
     ops::Sub,
 };
 
-use tracing::{debug, error, field::debug, info};
+use tracing::{debug, error, info};
 
 use crate::{
     comm::{
@@ -192,8 +192,8 @@ impl<const N: usize> FilteredCommandApplication<N> {
             {
                 *cell = CellDiscoveryStatus::Visited;
             }
-            if i >= 1 {
-                if let MovementType::Move(_) = command.ty {
+            if i >= 1
+                && let MovementType::Move(_) = command.ty {
                     let current = transform_at_step.pos;
                     let move_dir = transform_at_step.dir;
                     let mark_dir = move_dir.rotated(2);
@@ -205,7 +205,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
                         *wall = WallDiscoveryStatus::Visited;
                     }
                 }
-            }
             //
             // {
             // if i > 0 {
@@ -657,7 +656,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
             // The last known map during command execution --> Is all the information we have about
             // this step's map
             let last_continuing = last_continuing.unwrap_or(self.filter.into());
-            return Ok(MaxSubstep {
+            Ok(MaxSubstep {
                 potential_termination: if step_number as usize == self.step_with_termination() {
                     MaxSubstepTermination::Terminated(PathLocalInterruptId::MaxStep)
                 } else {
@@ -671,7 +670,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                         .expect("Already checked"),
                 }
                 .into(),
-            });
+            })
         } else {
             // There are worlds in this step
 
@@ -680,17 +679,17 @@ impl<const N: usize> FilteredCommandApplication<N> {
                 debug!(target: "map/cmd/apl", "        Is the step with termination --> last_possible_state = last_possible_state");
                 // This step is the last step --> The last substep is some form of interruption
                 let last_state = self.last_possible_state.clone();
-                return Ok(MaxSubstep {
+                Ok(MaxSubstep {
                     potential_termination: MaxSubstepTermination::Terminated(
                         match &self.execution_termination {
                             CommandTerminationReason::Interrupted(i) => {
                                 PathLocalInterruptId::InterruptAtIndex(i.interrupt_index)
                             }
-                            CommandTerminationReason::MaxStep(i) => PathLocalInterruptId::MaxStep,
+                            CommandTerminationReason::MaxStep(_i) => PathLocalInterruptId::MaxStep,
                         },
                     ),
                     world_at_substep: last_state,
-                });
+                })
             } else {
                 debug!(target: "map/cmd/apl", "        Get last substep's continuing world");
                 let last_world = potential_terminations
@@ -699,10 +698,10 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     .continuing_world
                     .clone();
 
-                return Ok(MaxSubstep {
+                Ok(MaxSubstep {
                     potential_termination: MaxSubstepTermination::Continuing,
                     world_at_substep: last_world,
-                });
+                })
             }
         }
     }
