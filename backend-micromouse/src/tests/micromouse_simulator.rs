@@ -63,7 +63,7 @@ impl<const N: usize> MicromouseSimulator<N> {
             info!(target: "test/sim", "AT CMD SIM {}", msg.cmd_id);
 
             for i in 0..=current_cmd.max_step_count() {
-                // tokio::time::sleep(Duration::from_millis(500)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
                 info!(target: "test/sim", "Sim at step {i}");
                 let current_transf = transformed_move.at_step(i).expect("In valid range");
                 self.full_map.mouse = current_transf;

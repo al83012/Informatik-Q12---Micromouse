@@ -24,11 +24,11 @@ use tracing::{debug, error, field::debug, info};
 
 use crate::{
     comm::{
-        micromouse_message::{Command, InterruptType, StepNum, TransformedMovement},
+        micromouse_message::{Command, InterruptType, MovementType, StepNum, TransformedMovement},
         website::DiscoveryMessage,
     },
     map::{
-        map::{Map, MapInconsistencyError},
+        map::{CellDiscoveryStatus, Map, MapInconsistencyError, WallDiscoveryStatus},
         measurement::Measurement,
         upgrade::IsUpgradeable,
         world_data::{PartialWorldData, WorldData},
@@ -182,6 +182,27 @@ impl<const N: usize> FilteredCommandApplication<N> {
             let transform_at_step = transformed_move.at_step(i).expect("step in range");
             debug!(target: "map/cmd/apl", "     >> Transform at step = {transform_at_step:?}");
 
+            // Mark current cell as visited
+            // if let Some(cell) = next_step_start_requirements
+            //     .map
+            //     .cell_mut(&transform_at_step.pos)
+            // {
+            //     *cell = CellDiscoveryStatus::Visited;
+            // }
+            //
+            // {
+            //     if let MovementType::Move(_) = command.ty {
+            //         let prev_pos = next_step_start_requirements.mouse.pos;
+            //         let move_dir = next_step_start_requirements.mouse.dir;
+            //         if let Some(wall) = next_step_start_requirements
+            //             .map
+            //             .wall_mut(&prev_pos, &move_dir)
+            //         {
+            //             *wall = WallDiscoveryStatus::Visited;
+            //         }
+            //     }
+            // }
+
             // Encoding the info from transformed move, where the mouse is
             // --> Finally combining the map with movement
             next_step_start_requirements.mouse = transform_at_step;
@@ -223,7 +244,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     debug!(target: "map/cmd/apl", "         >> NO CONTINUING WORLD");
 
                     if let Some(terminating_world) = &terminating_world {
-                        // debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
+                        debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
                         debug!(target: "map/cmd/apl", "        >> BUT FOUND TERMINATING WORLD");
                     } else {
                         error!(target: "map/cmd/apl", "             >> NO TERMINATING_WORLD EITHER");
@@ -263,6 +284,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                 // or not
                 let continuing_world = continuing_world
                     .expect("Already handled forced end; This path **has** to continue");
+                debug!(target: "map/cmd/apl", "CONTINUING WORLD {interrupt} at step {i}\n{continuing_world}");
                 next_step_start_requirements = continuing_world.clone();
 
                 // Even registers `Continue`-Interrupts (Which is why terminating world is optional)
