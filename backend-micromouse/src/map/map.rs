@@ -597,3 +597,12 @@ impl<const N: usize> From<PartialMap<N>> for Map<N> {
         value.0
     }
 }
+
+impl CellDiscoveryStatus {
+    pub fn is_discovered(&self) -> bool {
+        match self {
+            CellDiscoveryStatus::Visited | CellDiscoveryStatus::Discovered => true,
+            _ => false
+        }
+    }
+}

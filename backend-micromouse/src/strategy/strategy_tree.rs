@@ -9,7 +9,7 @@ use crate::{
     map::{
         command_world_state::{
             CommandOutcomes, CommandTerminationReason, FilteredCommandApplication,
-            PathLocalInterruptId, PathLocalOutcomeId,
+            PathLocalInterruptId, PathLocalOutcomeId, RejectedOutcomes,
         },
         map::{Map, PartialMap},
         world_data::{PartialWorldData, WorldData},
@@ -25,6 +25,7 @@ pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone> {
     layers: Vec<StrategyTreeLayer<N, S>>,
     highest_sent_layer: usize,
     highest_eq_layer: usize,
+    highest_full_layer: usize,
     first_layer_absolute_id: AbsoluteLayerId,
     node_count: usize,
     goal_position: GoalPosition,
@@ -98,6 +99,17 @@ pub enum NodeExpansionResult {
     Expanded(usize),
 }
 
+pub enum TreeExpansionResult {
+    NodeExpansionFailed {
+        node: AbsoluteNodeId,
+        expansion: NodeExpansionResult,
+    },
+    Expanded {
+        nodes: usize,
+        layers: usize,
+    },
+}
+
 impl<const N: usize, S> StrategyTree<N, S>
 where
     // For use in the Strategy-Tree, we need to be able to duplicate the StrategyState to branch
@@ -158,7 +170,7 @@ where
     }
 
     // returns the number of nodes this action creates
-    fn expand_fully(&mut self) -> usize {
+    fn expand_fully(&mut self) -> TreeExpansionResult {
         let node_budget = self.config.max_nodes.saturating_sub(self.node_count);
         let layer_budget = self
             .config
@@ -168,12 +180,21 @@ where
         let mut nodes_created = 0;
         let mut layers_fully_expanded = 0;
 
-        'expansion: loop {
+        let highest_full_layer = self.highest_full_layer();
+
+        // Once a layer in-between was not fully expanded, that layer and all layers after that
+        // will not incr the fully_expanded_layer-counter
+        let mut skipped_layer = false;
+        // Iterating through all the layers that are still to be expanded
+        'expansion: for i in 0..layer_budget {
             if node_budget <= nodes_created || layer_budget <= layers_fully_expanded {
                 // Out of budget
                 break;
             }
-            let layer_to_expand = self.lowest_expandable_layer();
+
+            // in step 0, it will be the lowest non-expanded layer
+            let layer_to_expand = highest_full_layer + RelativeLayerId(i + 1);
+            // let layer_to_expand = self.lowest_expandable_layer();
             let non_expanded_node_ids = {
                 let layer = self
                     .layer_mut(layer_to_expand)
@@ -186,15 +207,42 @@ where
                     .map(|(k, _v)| *k)
                     .collect::<Vec<_>>()
             };
-            let mut skipped = false;
             'layer_expansion: for non_expanded_node_id in non_expanded_node_ids {
                 let abs_node_id = AbsoluteNodeId {
                     layer_id: layer_to_expand,
                     node_id: non_expanded_node_id,
                 };
 
-                todo!("Handle different outputs; only count up if necc, prop errors");
-                // nodes_created += self.try_expand_node(abs_node_id);
+                // todo!("Handle different outputs; only count up if necc, prop errors");
+
+                let node_expansion_result = self.try_expand_node(abs_node_id);
+                match node_expansion_result {
+                    NodeExpansionResult::NotExpandable => {
+                        return TreeExpansionResult::NodeExpansionFailed {
+                            node: abs_node_id,
+                            expansion: node_expansion_result,
+                        };
+                    }
+                    NodeExpansionResult::NotYetExpandable => {
+                        skipped_layer = true;
+                        // INFO: This should be alright, as long as the root node isn't being
+                        // completed and is the only one left
+                    }
+                    NodeExpansionResult::AlreadyExpanded => {
+                        // This shouldn't happen, we already filtered them
+                        return TreeExpansionResult::NodeExpansionFailed {
+                            node: abs_node_id,
+                            expansion: node_expansion_result,
+                        };
+                    }
+                    NodeExpansionResult::StrategyError(s) => {
+                        // That is alright, we will throw the error once this part of the tree is
+                        // visited
+                    }
+                    NodeExpansionResult::Expanded(num_of_nodes) => {
+                        nodes_created += num_of_nodes;
+                    }
+                }
 
                 if node_budget <= nodes_created {
                     break 'expansion;
@@ -203,9 +251,18 @@ where
             self.layer_mut(layer_to_expand)
                 .expect("ID should be in bounds")
                 .is_fully_expanded = true;
-            layers_fully_expanded += 1;
+            if skipped_layer {
+                // We skipped some node expansion in this layer as it was not yet available to us
+                // INFO: it will still try to expand the already existing layers up to that depth,
+                // but it will not incr the expanden-layer-counter
+            } else {
+                self.highest_full_layer += 1;
+            }
         }
-        nodes_created
+        TreeExpansionResult::Expanded {
+            nodes: nodes_created,
+            layers: layers_fully_expanded,
+        }
     }
 
     // Returns the number of children this operation created
@@ -351,17 +408,19 @@ where
     }
 
     fn fully_expanded_layer_count(&self) -> usize {
-        self.layers
-            .iter()
-            .map(|l| if l.is_fully_expanded { 1 } else { 0 })
-            .sum()
+        // self.layers
+        //     .iter()
+        //     .map(|l| if l.is_fully_expanded { 1 } else { 0 })
+        //     .sum()
+        self.highest_full_layer + 1
     }
 
-    fn lowest_expandable_layer(&self) -> AbsoluteLayerId {
-        self.layers
-            .iter().find(|l| !l.is_fully_expanded)
-            .map(|l| l.absolute_layer_id)
-            .expect("There should always be a layer that has not yet been fully expanded (as expansion creates new non-expanded layers)")
+    fn highest_full_layer(&self) -> AbsoluteLayerId {
+        self.first_layer_absolute_id + RelativeLayerId(self.highest_full_layer)
+        // self.layers
+        //     .iter().find(|l| !l.is_fully_expanded)
+        //     .map(|l| l.absolute_layer_id)
+        //     .expect("There should always be a layer that has not yet been fully expanded (as expansion creates new non-expanded layers)")
     }
 
     fn node(&self, node_id: AbsoluteNodeId) -> Option<&StrategyTreeNode<N, S>> {
@@ -412,6 +471,32 @@ where
 Also: return all the sub-options that were pruned (and their relationship) for the frontend;
 Also: regow
 ");
+    }
+
+    pub fn prune_current_command_by_rejection(
+        &mut self,
+        rejections: &RejectedOutcomes,
+    ) -> Result<(), PruneError> {
+        for rejected in rejections.rejected_outcome_ids.iter() {
+            let path_id = AbsolutePathId {
+                from_node: self.root_node(),
+                branch: *rejected,
+            };
+            self.prune_branch(path_id)?
+        }
+        Ok(())
+    }
+
+    fn root_node(&self) -> AbsoluteNodeId {
+        let root_layer = self
+            .layer(self.first_layer_absolute_id)
+            .expect("Should always be kept valid");
+        assert_eq!(root_layer.node_count, 1);
+        let rel_id = root_layer.nodes.keys().next().expect("Checked");
+        AbsoluteNodeId {
+            layer_id: self.first_layer_absolute_id,
+            node_id: *rel_id,
+        }
     }
 
     fn prune_node(&mut self, node_and_children: AbsoluteNodeId) -> Result<(), PruneError> {
