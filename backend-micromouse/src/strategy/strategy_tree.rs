@@ -20,6 +20,12 @@ use crate::{
     },
 };
 
+pub enum StrategyTreeError {
+    WhilePruning(PruneError),
+    WhileExpanding(TreeExpansionError),
+    MeasureDoesNotMatchInner,
+}
+
 pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone> {
     config: StrategyTreeConfig<N, S>,
     /// layers[0] = layer the micromouse is currently processing
@@ -100,15 +106,14 @@ pub enum NodeExpansionResult {
     Expanded(usize),
 }
 
-pub enum TreeExpansionResult {
-    NodeExpansionFailed {
-        node: AbsoluteNodeId,
-        expansion: NodeExpansionResult,
-    },
-    Expanded {
-        nodes: usize,
-        layers: usize,
-    },
+pub struct TreeExpansionError {
+    node: AbsoluteNodeId,
+    expansion: NodeExpansionResult,
+}
+
+pub struct TreeExpansionSuccess {
+    nodes: usize,
+    layers: usize,
 }
 
 impl<const N: usize, S> StrategyTree<N, S>
@@ -171,7 +176,7 @@ where
     }
 
     // returns the number of nodes this action creates
-    fn expand_fully(&mut self) -> TreeExpansionResult {
+    fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
         let node_budget = self.config.max_nodes.saturating_sub(self.node_count);
         let layer_budget = self
             .config
@@ -219,10 +224,10 @@ where
                 let node_expansion_result = self.try_expand_node(abs_node_id);
                 match node_expansion_result {
                     NodeExpansionResult::NotExpandable => {
-                        return TreeExpansionResult::NodeExpansionFailed {
+                        return Err(TreeExpansionError {
                             node: abs_node_id,
                             expansion: node_expansion_result,
-                        };
+                        });
                     }
                     NodeExpansionResult::NotYetExpandable => {
                         skipped_layer = true;
@@ -231,10 +236,10 @@ where
                     }
                     NodeExpansionResult::AlreadyExpanded => {
                         // This shouldn't happen, we already filtered them
-                        return TreeExpansionResult::NodeExpansionFailed {
+                        return Err(TreeExpansionError {
                             node: abs_node_id,
                             expansion: node_expansion_result,
-                        };
+                        });
                     }
                     NodeExpansionResult::EndState(s) => {
                         // That is alright, we will throw the error once this part of the tree is
@@ -260,10 +265,10 @@ where
                     .is_fully_expanded = true;
             }
         }
-        TreeExpansionResult::Expanded {
+        Ok(TreeExpansionSuccess {
             nodes: nodes_created,
             layers: layers_fully_expanded,
-        }
+        })
     }
 
     // Returns the number of children this operation created
@@ -540,7 +545,7 @@ where
         Ok(None)
     }
 
-    pub fn prune_not_potentially_eq(&mut self, filter: PartialMap<N>) -> Result<(), PruneError> {
+    pub fn prune_not_potentially_eq(&mut self, filter: &PartialMap<N>) -> Result<(), PruneError> {
         let node_indices = self
             .layers
             .iter()
@@ -639,6 +644,84 @@ where
         l
     }
 
+    fn update_equal_layers(&mut self) {
+        let highest_full_layer = self.highest_full_layer;
+        let highest_eq_layer = self.highest_eq_layer;
+
+        for layer_offset in highest_eq_layer + 1..=highest_full_layer {
+            let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset);
+            if !self
+                .layer_mut(layer_id)
+                .expect("Should always be in bounds")
+                .update_eq_command()
+            {
+                break;
+            }
+            self.highest_eq_layer += 1;
+        }
+    }
+
+    fn new_sends(&mut self) -> Vec<Command> {
+        if self.highest_sent_layer < self.highest_eq_layer {
+            return (&self.layers[self.highest_sent_layer + 1..=self.highest_eq_layer])
+                .iter()
+                .map(|l| l.eq.as_ref().expect("Explicitly should exist").clone())
+                .collect();
+        }
+        vec![]
+    }
+
+    fn merge(&mut self) // -> ?
+    {
+        // Try merging non-eq-layers
+        todo!()
+    }
+
+    fn transform_path(&mut self, from_node: AbsoluteNodeId, split_commands: (Command, Option<Command>)) // ->?
+    {
+        // takes in a node which has a command (otherwise, what are we even merging / merges on
+        // incomplete layers are not allowed)
+        //
+        // instead of that 1 node leading to a child node, insert a command (if needed), which
+        // would also mean pushing all the children back a layer
+        //
+        // The given node should not be in a layer that has already achieved eq, since that is
+        // nonsensical
+        // It should not however change 'fully expanded' of any layer 
+        //
+        // If there was a strategy-state associated with the from_node, this state will either stay
+        // there (if the 2nd command is none) or move back 1
+        todo!()
+    }
+
+    fn move_node_back(&mut self, node: AbsoluteNodeId) // --> The new node_id; the id of its
+    // parent; 
+    {
+        todo!()
+    }
+
+    pub fn handle_map_update(
+        &mut self,
+        map: &PartialMap<N>,
+    ) -> Result<Vec<Command>, StrategyTreeError> {
+        if self
+            .node(self.root_node())
+            .expect("Index should be valid")
+            .on_basis_of_world
+            .map
+            .potentially_eq(map)
+        {
+            self.prune_not_potentially_eq(map)?;
+            let _ = self.expand_fully()?;
+            // TODO: self.merge()?;
+
+            self.update_equal_layers();
+            Ok(self.new_sends())
+        } else {
+            Err(StrategyTreeError::MeasureDoesNotMatchInner)
+        }
+    }
+
     pub fn close(&mut self) -> SentUnfinishedCommands<N> {
         todo!("The strategy tree will be closed, meaning that it will generate no new commands")
     }
@@ -662,6 +745,17 @@ pub struct AbsoluteNodeId {
 pub struct AbsolutePathId {
     from_node: AbsoluteNodeId,
     branch: PathLocalOutcomeId,
+}
+
+impl From<PruneError> for StrategyTreeError {
+    fn from(value: PruneError) -> Self {
+        Self::WhilePruning(value)
+    }
+}
+impl From<TreeExpansionError> for StrategyTreeError {
+    fn from(value: TreeExpansionError) -> Self {
+        Self::WhileExpanding(value)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -750,6 +844,20 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         }
 
         Some(cmd)
+    }
+
+    // Returns true, if the layer has a common command
+    pub fn update_eq_command(&mut self) -> bool {
+        if self.eq.is_some() {
+            return true;
+        }
+        if self.is_fully_expanded {
+            self.eq = self.equal_command();
+            if self.eq.is_some() {
+                return true;
+            }
+        }
+        return false;
     }
 }
 
