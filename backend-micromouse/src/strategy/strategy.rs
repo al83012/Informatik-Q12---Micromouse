@@ -6,13 +6,14 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub enum StrategyError {
+pub enum StrategyEndState {
     NoPossibleAction(String),
+    ReachedGoal
 }
 
 pub enum StrategyComputationResult<const N: usize, S: Strategy<N>> {
     NotEnoughInformation,
-    Computed(Result<ComputedActions<N, S>, StrategyError>),
+    Computed(Result<ComputedActions<N, S>, StrategyEndState>),
 }
 
 // pub type ComputedActions<const N: usize, S: Strategy<N>> = NonEmpty<Vec<ComputedAction<N, S>>>;

@@ -7,6 +7,7 @@ use std::{
 use crate::{
     comm::micromouse_message::{Command, CommandMessage},
     map::{
+        check::PotentiallyEq,
         command_world_state::{
             CommandOutcomes, CommandTerminationReason, FilteredCommandApplication,
             PathLocalInterruptId, PathLocalOutcomeId, RejectedOutcomes,
@@ -15,7 +16,7 @@ use crate::{
         world_data::{PartialWorldData, WorldData},
     },
     strategy::strategy::{
-        ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyError,
+        ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
     },
 };
 
@@ -55,11 +56,11 @@ pub struct AbsoluteLayerId(pub usize);
 // The lowest layer of a tree has id 0
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct RelativeLayerId(pub usize);
-
-pub enum StrategyTreeError {
-    MultipleSuccessors,
-    NoSuccessor,
-}
+//
+// pub enum StrategyTreeError {
+//     MultipleSuccessors,
+//     NoSuccessor,
+// }
 
 pub struct StrategyTreeConfig<const N: usize, S: Strategy<N> + Clone> {
     pub strategy_config: S::Config,
@@ -84,7 +85,7 @@ pub struct SentCommandNode<const N: usize> {
     pub applied_strategy: NodeActionResult<N>,
 }
 
-type NodeActionResult<const N: usize> = Result<NodeAction<N>, StrategyError>;
+type NodeActionResult<const N: usize> = Result<NodeAction<N>, StrategyEndState>;
 
 pub struct NodeAction<const N: usize> {
     pub command: FilteredCommandApplication<N>,
@@ -95,7 +96,7 @@ pub enum NodeExpansionResult {
     NotExpandable,
     NotYetExpandable,
     AlreadyExpanded,
-    StrategyError(StrategyError),
+    EndState(StrategyEndState),
     Expanded(usize),
 }
 
@@ -235,7 +236,7 @@ where
                             expansion: node_expansion_result,
                         };
                     }
-                    NodeExpansionResult::StrategyError(s) => {
+                    NodeExpansionResult::EndState(s) => {
                         // That is alright, we will throw the error once this part of the tree is
                         // visited
                     }
@@ -300,7 +301,7 @@ where
             Err(e) => {
                 // Only trigger this error if this node is reached
                 node.applied_strategy = Some(Err(e.clone()));
-                return NodeExpansionResult::StrategyError(e);
+                return NodeExpansionResult::EndState(e);
             }
         };
 
@@ -459,18 +460,110 @@ where
         todo!("Delete all those nodes which are still deletable as the micromouse doesn't have them in the buffer yet")
     }
 
-    // fn expand(&mut self, node_id: )
+    // removes the root, making its successor the new root; if the successor was not yet expanded
+    // into a command, it will do so at this point, returning its NodeAction
+    pub fn finish_root(&mut self) -> Result<Option<NodeAction<N>>, FinishRootError> {
+        let (outcome_id, successor) = {
+            let root = self.root_node();
+            let root = self.node_mut(self.root_node()).expect("Checked");
 
-    pub fn current_finished() -> Result<(), StrategyTreeError> {
-        todo!("Remove the root (as it is done processing) and make its 1 successor the new root; Return an error if there are more or 0");
+            let Some(strategy_res) = &root.applied_strategy else {
+                // The root will be expanded, at least when it is placed into the root-slot (since the
+                // execution starts there and the potential outcomes have to be known)
+                return Err(FinishRootError::RootNotExpanded);
+            };
+
+            let node_action = match strategy_res {
+                Ok(n) => n,
+                Err(e) => {
+                    // Per definition, the command that just finished cannot be a command which was
+                    // not executable
+                    return Err(FinishRootError::ImpossibleRootAction(e.clone()));
+                }
+            };
+
+            let potential_outcomes = &node_action.potential_outcomes;
+            let next_action_len = potential_outcomes.len();
+
+            match next_action_len {
+                0 => return Err(FinishRootError::NoSuccessor),
+                1 => {
+                    let (o, c) = potential_outcomes.iter().next().unwrap();
+                    (*o, *c)
+                }
+                2.. => {
+                    return Err(FinishRootError::MultipleSuccessors(
+                        potential_outcomes.clone(),
+                    ))
+                }
+            }
+        };
+
+        let next_root_expansion_res = self.try_expand_node(successor);
+        match next_root_expansion_res {
+            NodeExpansionResult::AlreadyExpanded => {
+                // Best case
+            }
+            NodeExpansionResult::NotExpandable => {
+                return Err(FinishRootError::SuccessorNotExpandable);
+            }
+            NodeExpansionResult::NotYetExpandable => {
+                return Err(FinishRootError::SuccessorNotYetExpandable);
+            }
+            NodeExpansionResult::EndState(s) => {
+                // We know that this is expanding a full layer, since the new root layer only
+                // contains the successor
+                self.highest_full_layer += 1;
+                self.highest_eq_layer += 1; // Returning from this function counts as sending
+                self.highest_sent_layer += 1; // Returning from this function counts as sending
+                return Err(FinishRootError::SuccessorIsEnd(Some(s)));
+            }
+            NodeExpansionResult::Expanded(_) => {
+                // We know that this is expanding a full layer, since the new root layer only
+                // contains the successor
+                // layer is now fully expanded
+                self.highest_full_layer += 1;
+            }
+        }
+
+        self.layers.remove(0);
+
+        let new_first_layer = self.layers.first().expect("Has Successor");
+        self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
+        self.highest_full_layer -= 1;
+        self.highest_eq_layer -= 1;
+        self.highest_sent_layer -= 1;
+
+        Ok(None)
     }
 
-    pub fn prune_with_filter(&mut self, filter: Map<N>) // -> ?
-    {
-        todo!("Go through all the nodes and remove those whose basis is not potentially_eq to the given filter;
-Also: return all the sub-options that were pruned (and their relationship) for the frontend;
-Also: regow
-");
+    pub fn prune_not_potentially_eq(&mut self, filter: PartialMap<N>) -> Result<(), PruneError> {
+        let node_indices = self
+            .layers
+            .iter()
+            .flat_map(|l| {
+                l.nodes.iter().filter_map(|(k, v)| {
+                    if v.on_basis_of_world.map.potentially_eq(&filter) {
+                        Some(AbsoluteNodeId {
+                            layer_id: l.absolute_layer_id,
+                            node_id: *k,
+                        })
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for node in node_indices.into_iter() {
+            match self.prune_node(node) {
+                Ok(_) => {}
+                Err(PruneError::UnknownNode(_)) => {}
+                Err(e) => return Err(e),
+            }
+        }
+
+        Ok(())
     }
 
     pub fn prune_current_command_by_rejection(
@@ -628,6 +721,17 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
 }
 
 pub struct RelativeNodeIdCounter(pub usize);
+
+pub enum FinishRootError {
+    NoSuccessor,
+    MultipleSuccessors(HashMap<PathLocalOutcomeId, AbsoluteNodeId>),
+    RootNotExpanded,
+    ImpossibleRootAction(StrategyEndState),
+    SuccessorNotExpandable,
+    SuccessorNotYetExpandable,
+    // Either a valid end or a strategy error
+    SuccessorIsEnd(Option<StrategyEndState>),
+}
 
 impl RelativeNodeIdCounter {
     pub fn next(&mut self) -> RelativeNodeId {
