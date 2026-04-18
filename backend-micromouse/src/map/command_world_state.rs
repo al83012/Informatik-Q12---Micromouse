@@ -159,6 +159,9 @@ impl<const N: usize> FilteredCommandApplication<N> {
     /// opposing `0_L_STOP-IF-BLOCKED` and `0_l_STOP-IF-OPEN`))
     pub fn new(with_filter: Option<WorldData<N>>, command: Command) -> Self {
         info!(target: "map/cmd/apl", "NEW Command Application for {command:?}");
+        if let Some(f) = &with_filter {
+            info!(target: "map/cmd/apl", "WITH FILTER\n{}", f);
+        }
         let with_filter = with_filter.unwrap_or_default();
         let filter = with_filter.map;
 
@@ -183,20 +186,36 @@ impl<const N: usize> FilteredCommandApplication<N> {
             debug!(target: "map/cmd/apl", "     >> Transform at step = {transform_at_step:?}");
 
             // Mark current cell as visited
-            // if let Some(cell) = next_step_start_requirements
-            //     .map
-            //     .cell_mut(&transform_at_step.pos)
-            // {
-            //     *cell = CellDiscoveryStatus::Visited;
-            // }
+            if let Some(cell) = next_step_start_requirements
+                .map
+                .cell_mut(&transform_at_step.pos)
+            {
+                *cell = CellDiscoveryStatus::Visited;
+            }
+            if i >= 1 {
+                if let MovementType::Move(_) = command.ty {
+                    let current = transform_at_step.pos;
+                    let move_dir = transform_at_step.dir;
+                    let mark_dir = move_dir.rotated(2);
+                    if let Some(wall) = next_step_start_requirements
+                        .map
+                        .wall_mut(&current, &mark_dir)
+                    {
+                        debug!(target: "map/cmd/apl", "Marking {current} & {mark_dir} as visited");
+                        *wall = WallDiscoveryStatus::Visited;
+                    }
+                }
+            }
             //
             // {
+            // if i > 0 {
             //     if let MovementType::Move(_) = command.ty {
-            //         let prev_pos = next_step_start_requirements.mouse.pos;
+            //         let current = next_step_start_requirements.mouse.pos;
             //         let move_dir = next_step_start_requirements.mouse.dir;
+            //         let mark_dir = move_dir.rotated(2);
             //         if let Some(wall) = next_step_start_requirements
             //             .map
-            //             .wall_mut(&prev_pos, &move_dir)
+            //             .wall_mut(&current, &mark_dir)
             //         {
             //             *wall = WallDiscoveryStatus::Visited;
             //         }
@@ -556,13 +575,24 @@ impl<const N: usize> FilteredCommandApplication<N> {
             let max_step_before = self.max_substep_in_step(step_number - 1)?;
             // The previous step has to be continuing
             assert!(max_step_before.potential_termination == MaxSubstepTermination::Continuing);
-            let map_continued = max_step_before.world_at_substep;
+            let mut map_continued = max_step_before.world_at_substep.map;
 
             let mouse_transf_at_step = self
                 .transformed_move
                 .at_step(step_number as usize)
                 .expect("Already checked");
-            PartialWorldData::new(map_continued.map(), mouse_transf_at_step)
+
+            if let Some(cell) = map_continued.cell_mut(&mouse_transf_at_step.pos) {
+                *cell = CellDiscoveryStatus::Visited;
+            }
+            if let MovementType::Move(_) = self.transformed_move.movement {
+                let backward = mouse_transf_at_step.dir.rotated(2);
+                if let Some(wall) = map_continued.wall_mut(&mouse_transf_at_step.pos, &backward) {
+                    // Is ok, as step > 0
+                    *wall = WallDiscoveryStatus::Visited;
+                }
+            }
+            PartialWorldData::new(map_continued.into(), mouse_transf_at_step)
         })
 
         // todo!()

@@ -426,7 +426,7 @@ pub struct MeasurementMessage {
 /// out interrupts; believes the movement will succeed
 pub struct TransformedMovement {
     start_transform: MouseTransform,
-    movement: MovementType,
+    pub movement: MovementType,
 }
 
 /// Represents a command in the context of its starting conditions: Once the first measurement is

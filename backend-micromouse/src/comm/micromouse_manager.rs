@@ -292,7 +292,10 @@ impl<const N: usize> MicromouseManager<N> {
         }
         let world_at_step = current_cmd_application.at_start_certain_step(step_number);
         let world_at_step = match world_at_step {
-            Ok(world_at_step) => world_at_step,
+            Ok(world_at_step) => {
+                info!(target: "comm/mng/map", "AT START OF MEASUREMENT: \n{world_at_step}");
+                world_at_step
+            }
             Err(e) => {
                 // WARN: LIFE MUST GO ON:
                 error!(target: "comm/mng/map", "CERTAIN STEP ERROR: DID NOT PROVE THAT STEP {} OF {:?} WAS REACHABLE",
@@ -323,6 +326,8 @@ impl<const N: usize> MicromouseManager<N> {
             let new_map = current_cmd_application
                 .at_start_certain_step(step_number)
                 .map_err(MicromouseManagerError::from)?;
+
+            info!(target: "comm/mng/map", "WORLD AFTER MEASUREMENT: \n{new_map}");
             let mut current_world = self.current_world.write().await;
             *current_world = new_map.clone().into();
 
