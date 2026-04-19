@@ -76,7 +76,7 @@ pub struct FrontendConnectionManagerInternal {
     send_batch: Vec<FrontendMessage>,
 }
 
-pub struct FrontendConnectionManager {
+pub struct FrontendManager {
     cancellation_token: CancellationToken,
     send_queue: Sender<FrontendMessage>,
     read_queue: broadcast::Receiver<Message>,
@@ -89,7 +89,7 @@ pub struct FrontendConnectionConfig {
 
 // pub struct
 
-impl FrontendConnectionManager {
+impl FrontendManager {
     pub async fn new(
         port: u16,
         config: FrontendConnectionConfig,
@@ -115,7 +115,7 @@ impl FrontendConnectionManager {
             internal.handle_connection_loop().await;
         });
 
-        let thread_connection = FrontendConnectionManager {
+        let thread_connection = FrontendManager {
             cancellation_token,
             send_queue: send_queue_sender,
             read_queue: read_receiver,
@@ -187,7 +187,7 @@ impl FrontendConnectionManagerInternal {
     }
 }
 
-impl Drop for FrontendConnectionManager {
+impl Drop for FrontendManager {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
     }

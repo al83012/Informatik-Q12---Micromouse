@@ -624,13 +624,18 @@ where
         let mut to_delete = vec![first_delete_node];
 
         while let Some(node_to_delete) = to_delete.pop() {
-            let mut new_nodes = self.delete_node(node_to_delete).unwrap_or(vec![]);
+            let mut new_nodes =
+                unsafe { self.delete_node_no_clean(node_to_delete).unwrap_or(vec![]) };
             to_delete.append(&mut new_nodes);
         }
         Ok(())
     }
 
-    fn delete_node(&mut self, node: AbsoluteNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
+    // Returns the nodes children
+    unsafe fn delete_node_no_clean(
+        &mut self,
+        node: AbsoluteNodeId,
+    ) -> Result<Vec<AbsoluteNodeId>, PruneError> {
         let Some(layer) = self.layer_mut(node.layer_id) else {
             return Err(PruneError::UnknownNode(node));
         };
@@ -676,10 +681,11 @@ where
 
     fn transform_path(
         &mut self,
-        _from_node: AbsoluteNodeId,
-        _split_commands: (Command, Option<Command>),
+        from_node: AbsoluteNodeId,
+        split_commands: (Command, Option<Command>),
     ) // ->?
     {
+
         // takes in a node which has a command (otherwise, what are we even merging / merges on
         // incomplete layers are not allowed)
         //
@@ -695,11 +701,52 @@ where
         todo!()
     }
 
-    fn move_node_back(&mut self, _node: AbsoluteNodeId)
+    unsafe fn move_node_back(&mut self, node_id: AbsoluteNodeId)
     // --> The new node_id; the id of its
     // parent;
     {
-        todo!()
+        let node = self.take_node_unclean(node_id);
+        let node = node.expect("Node should exist; node_id comes from Internal");
+
+        let parent = node.as_branch_from_parent.clone();
+        let children = &node
+            .applied_strategy
+            .as_ref()
+            .and_then(|a| a.as_ref().map(|a| a.potential_outcomes.clone()).ok());
+
+        let new_node_id = self.add_node(node, node_id.layer_id + RelativeLayerId(1));
+
+        if let Some(path_from_parent) = parent {
+            let parent_node = self
+                .node_mut(path_from_parent.from_node)
+                .expect("Parent should exist");
+
+            let children = parent_node
+                .applied_strategy
+                .as_mut()
+                .and_then(|a| a.as_mut().map(|a| &mut a.potential_outcomes).ok())
+                .expect("Just handled its child, parent should have children");
+
+            // WARN: The real "unsafe" bit: The connection now spans 2 layers
+            children.insert(path_from_parent.branch, new_node_id);
+        }
+
+        if let Some(children) = children {
+            for (child_path, child_node_id) in children.iter() {
+                let child_node = self
+                    .node_mut(*child_node_id)
+                    .expect("If it does not exist, why was its link still there");
+                child_node.as_branch_from_parent = Some(AbsolutePathId {
+                    from_node: new_node_id,
+                    branch: *child_path,
+                })
+            }
+        }
+    }
+
+    // Remove the node from the tree and return it (without cleaning up the connections)
+    unsafe fn take_node_unclean(&mut self, node: AbsoluteNodeId) -> Option<StrategyTreeNode<N, S>> {
+        self.layer_mut(node.layer_id)?.nodes.remove(&node.node_id)
     }
 
     pub fn handle_map_update(
