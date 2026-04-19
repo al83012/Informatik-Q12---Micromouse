@@ -58,6 +58,7 @@ bool desync_mode = false;
 int lastCMD_ID = -1;
 int currCMD_ID = -1;
 bool interrupt = false;
+bool reset = true;
 struct MeasurementTask {
   int subStep;
   char direction;
@@ -249,8 +250,13 @@ void connectWS() {
 
   if (connected) {
     Serial.println("# CN SUCC!");
-    client.send("DBG From the moment i understood the weakness of my flesh, it disgusted me...");
+    debug("From the moment i understood the weakness of my flesh, it disgusted me...");
+    if(reset) {
+    debug("RESET");
+    reset = false;
+    }
     client.ping();
+
   } else {
     Serial.println("# CN FAIL!");
   }
@@ -738,6 +744,17 @@ void loop() {
 
   if (client.available()) {
     client.poll();
+  } else {
+    Serial.println("# CN LOST!");
+    Serial.println("# RE-CN...");
+    connectWS();
+    if(client.available()) {
+    Serial.println("# RE-CN SUCC!");
+
+    debug("CONTINUE");
+    }
+
+
   }
 
   // delay(1000/stepFreq);
