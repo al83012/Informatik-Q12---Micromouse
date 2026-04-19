@@ -8,9 +8,7 @@ use crate::{
     comm::micromouse_message::Command,
     map::{
         check::PotentiallyEq,
-        command_world_state::{
-            FilteredCommandApplication, PathLocalOutcomeId, RejectedOutcomes,
-        },
+        command_world_state::{FilteredCommandApplication, PathLocalOutcomeId, RejectedOutcomes},
         map::PartialMap,
         world_data::PartialWorldData,
     },
@@ -129,7 +127,8 @@ where
         let queue_len = continue_after_doing.len();
 
         // Either the first layer id is the first one of the unfinished cmds, or it is 0
-        let _first_layer_absolute_id = continue_after_doing.first()
+        let _first_layer_absolute_id = continue_after_doing
+            .first()
             .map(|l| l.absolute_layer_id)
             .unwrap_or(AbsoluteLayerId(0));
 
@@ -675,7 +674,11 @@ where
         todo!()
     }
 
-    fn transform_path(&mut self, _from_node: AbsoluteNodeId, _split_commands: (Command, Option<Command>)) // ->?
+    fn transform_path(
+        &mut self,
+        _from_node: AbsoluteNodeId,
+        _split_commands: (Command, Option<Command>),
+    ) // ->?
     {
         // takes in a node which has a command (otherwise, what are we even merging / merges on
         // incomplete layers are not allowed)
@@ -685,15 +688,16 @@ where
         //
         // The given node should not be in a layer that has already achieved eq, since that is
         // nonsensical
-        // It should not however change 'fully expanded' of any layer 
+        // It should not however change 'fully expanded' of any layer
         //
         // If there was a strategy-state associated with the from_node, this state will either stay
         // there (if the 2nd command is none) or move back 1
         todo!()
     }
 
-    fn move_node_back(&mut self, _node: AbsoluteNodeId) // --> The new node_id; the id of its
-    // parent; 
+    fn move_node_back(&mut self, _node: AbsoluteNodeId)
+    // --> The new node_id; the id of its
+    // parent;
     {
         todo!()
     }
@@ -880,7 +884,6 @@ impl RelativeNodeIdCounter {
         id
     }
 }
-
 
 impl<const N: usize> SentCommandNode<N> {
     pub fn as_nonexpandable<S: Strategy<N>>(self, at: AbsolutePathId) -> StrategyTreeNode<N, S> {

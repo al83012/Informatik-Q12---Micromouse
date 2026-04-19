@@ -63,7 +63,7 @@ pub struct CellDiscovery {
     pub at_cell: Position,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MapInconsistencyError {
     OutsideBounds { x: i64, y: i64 },
     // New Measurement conflicts with prev. measurement. --> Walls in the direction of

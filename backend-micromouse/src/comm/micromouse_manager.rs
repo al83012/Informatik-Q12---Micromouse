@@ -5,6 +5,7 @@ use std::{
 };
 
 use console::Style;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, warn};
 use tungstenite::Message;
@@ -516,7 +517,7 @@ pub enum CommandSendError {
     StoppedExecution,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum MicromouseManagerError {
     ConnectionClosedPermanently,
     UnknownResponse(FormatError<MicromouseResponse>),

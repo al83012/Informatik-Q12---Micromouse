@@ -1,5 +1,6 @@
 use std::{marker::PhantomData, num::ParseIntError};
 
+use serde::{Deserialize, Serialize};
 use tracing::debug;
 use tungstenite::{Message, Utf8Bytes};
 
@@ -9,13 +10,10 @@ use crate::{
         measurement::{Measurement, MeasurementValue},
         world_data::{PartialWorldData, WorldData},
     },
-    transform::{
-        direction::RelativeDirection,
-        position::MouseTransform,
-    },
+    transform::{direction::RelativeDirection, position::MouseTransform},
 };
 
-#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
 pub struct CommandId(pub u32);
 // Percentage 0-100
 type Battery = u8;
@@ -29,7 +27,7 @@ pub enum MicromouseMessage {
     MicromouseResponse(MicromouseResponse),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum MicromouseResponse {
     Debug(String),
     Measurement(MeasurementMessage),
@@ -41,6 +39,7 @@ pub enum MicromouseResponse {
     Battery(Battery),
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct FormatError<T> {
     pub faulty_text: String,
     _ty: PhantomData<T>, //Storing the type which was expected
@@ -362,7 +361,7 @@ impl From<&MeasurementInterrupt> for InterruptType {
 // Only contains a specific Step number, no action
 /// Direction and Step number at which a measurement took place (not what to do with it, no
 /// "Each"-option)
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct MeasurementOccurence {
     pub direction: RelativeDirection,
     pub at_step: StepNum,
@@ -370,19 +369,19 @@ pub struct MeasurementOccurence {
 
 /// MeasurementOccurence, but with the action which will be performed as a result of the interrupt
 /// --> Like MeasurementInterrupt, but like the other "Occurence"-type: cannot use step-num "Each"
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct InterruptOccurence {
     pub occurence: MeasurementOccurence,
     pub action: InterruptAction,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct CommandFinishedMessage {
     pub cmd_id: CommandId,
     pub reason: Option<InterruptOccurence>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum InterruptAction {
     Continue,
     StopIfBlocked,
@@ -413,7 +412,7 @@ pub struct CommandMessage {
     pub cmd_id: CommandId,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MeasurementMessage {
     pub from_cmd: CommandId,
     pub interrupt: MeasurementOccurence,

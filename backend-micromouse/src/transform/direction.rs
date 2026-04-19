@@ -19,7 +19,7 @@ pub struct DirectionNormalizedVector {
     pub y: i8,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RelativeDirection {
     Forward,
     Left,

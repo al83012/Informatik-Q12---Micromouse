@@ -20,6 +20,7 @@ tracing-log = "0.2" # optional= "*"
 tracing-appender = "0.2"
 console = "*"
 rand = "*"
+serde_json = "*"
 
 [features]
 comm_stats = []

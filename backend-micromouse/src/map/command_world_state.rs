@@ -20,6 +20,7 @@ use std::{
     ops::Sub,
 };
 
+use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 
 use crate::{
@@ -192,8 +193,8 @@ impl<const N: usize> FilteredCommandApplication<N> {
             {
                 *cell = CellDiscoveryStatus::Visited;
             }
-            if i >= 1
-                && let MovementType::Move(_) = command.ty {
+            if i >= 1 {
+                if let MovementType::Move(_) = command.ty {
                     let current = transform_at_step.pos;
                     let move_dir = transform_at_step.dir;
                     let mark_dir = move_dir.rotated(2);
@@ -205,6 +206,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                         *wall = WallDiscoveryStatus::Visited;
                     }
                 }
+            }
             //
             // {
             // if i > 0 {
@@ -762,7 +764,7 @@ pub enum MaxSubstepTermination {
     Terminated(PathLocalInterruptId),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum CertainStepError {
     CannotReachStep(CannotReachStep),
     Uncertainty(UncertainStepError),
@@ -779,16 +781,16 @@ impl From<UncertainStepError> for CertainStepError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct UncertainStepError {
     pub tried_to_reach_step: StepNum,
     pub but_could_terminate_at: StepNum,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FilterUpgradeError;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum FilterMeasurementUpgradeError {
     NotValidUpgrade(FilterUpgradeError),
     NotValidMeasurement(MapInconsistencyError),
@@ -805,7 +807,7 @@ impl From<FilterUpgradeError> for FilterMeasurementUpgradeError {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct CannotReachStep(pub StepNum);
 
 pub struct CommandOutcomes<'a, const N: usize> {
