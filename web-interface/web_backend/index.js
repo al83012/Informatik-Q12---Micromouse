@@ -3,12 +3,82 @@ const { Action, Actions} = require('./Actions.js');
 const { BackendManager } = require('./BackendManager.js');
 const manager = new BackendManager();
 
+const { Worker } = require('node:worker_threads');
+const { join, dirname } = require('node:path');
+const worker_path = join(__dirname, 'worker.js');
+
+function runWorker(workerData) {
+    return new Promise((resolve, reject) => {
+        let settled = false;
+
+        const worker = new Worker(worker_path, {
+            workerData,
+            /*resourceLimits: {
+                maxOldGenerationSizeMb: 64,
+                maxYoungGenerationSizeMb: 16,
+                stackSizeMb: 4
+            }*/
+        });
+
+        /*const timeout = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            worker.terminate();
+            reject(new Error('Worker timeout'));
+        }, 10_000);*/
+
+        function safeResolve(value) {
+            if (settled) return;
+            settled = true;
+            //clearTimeout(timeout);
+            worker.terminate();
+            resolve(value);
+        }
+
+        function safeReject(error) {
+            if (settled) return;
+            settled = true;
+            //clearTimeout(timeout);
+            worker.terminate();
+            reject(error);
+        }
+
+        worker.once('message', (message) => {
+            if (message.status === 'ok') {
+                safeResolve(message.result);
+            } else {
+                safeReject(new Error(message.message));
+            }
+        });
+
+        worker.once('error', (error) => {
+            safeReject(error);
+        });
+
+        worker.once('exit', (code) => {
+            if (code !== 0) {
+                safeReject(new Error(`Worker exited with code ${code}`));
+            }
+        });
+    });
+}
+
+async function loop_worker(manager) {
+//    await runWorker(manager);
+    new Worker(worker_path, {manager,});
+}
+
 /**
  * Communication build with Backend
  * Sending:
  * type: type of command
  * values are concatenated after type
  * Example: {"type": "NewStrategy", "strategy_type": "<strategy type>"}
+ *
+ * Sending types: NewStrategy<strategy_type> ; Error<location, error[]>
+ *     Error location: recv, send, backend
+ *     Error error[]: [incorrect_data, (type || data)], [missing_data, <location>], [unknown_destination]
+ *     Error is sent on next possible occasion;
  *
  * Receiving:
  * type: type of command
@@ -28,21 +98,24 @@ client.on('connectFailed', (err) => {
     console.error('[B] Connect Error: ' + err.toString());
 });
 
+//loop_worker(manager); //cant run because of infinite loop in worker
+
 client.on('connect', (conn) => {
+
     console.log('[B] WebSocket Client Connected');
     manager.set_backend(client);
-    manager.sync.push(Actions.update_con_status(true));
+    manager.f_sync.push(Actions.update_con_status(true));
 
     conn.on('error', (err) => {
         console.log("[B] Implement ERROR");
         manager.set_backend(null);
-        manager.sync.push(Actions.update_con_status(false));
+        manager.f_sync.push(Actions.update_con_status(false));
         connect_backend();
     });
     conn.on('close', () => {
         console.log('[B] Connection Closed');
         manager.set_backend(null);
-        manager.sync.push(Actions.update_con_status(false));
+        manager.f_sync.push(Actions.update_con_status(false));
         connect_backend();
     });
     conn.on('message', (message) => {

@@ -658,6 +658,27 @@ body {
     box-shadow: 0 0 10px var(--arm-glow), 0 0 20px rgba(0,207,255,0.25);
 }
 
+/**
+ * Mouse system in each direction
+ */
+
+.sys-mouse_wrapper {
+    position: absolute;
+    z-index: 29; /*higher then the arm system*/
+    pointer-events: none;
+}
+
+.sys-mouse_svg {
+    filter: drop-shadow(0 0 6px rgba(0,255,224,0.7));
+}
+
+.sys-mouse_card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
 
 
 

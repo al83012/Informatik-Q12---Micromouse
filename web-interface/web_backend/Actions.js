@@ -82,4 +82,17 @@ export class Actions {
         return new Action("discover_tile", new Map([["x", x], ["y", y],
             ["directions", dir_string]]));
     }
+
+    //Learned more JS, so I now use Objects for server
+    // communication instead of whatever the Action System I coded was
+    static b_error(location, error, error_data) {
+        let obj = new Object(null);
+        obj.location = location;
+        obj.error = [];
+        obj.error[0] = error;
+        for (let key in error_data) {
+            obj.error.push(key);
+        }
+        return obj;
+    }
 }

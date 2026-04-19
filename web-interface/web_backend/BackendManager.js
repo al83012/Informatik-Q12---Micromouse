@@ -29,7 +29,9 @@ export class BackendManager {
     in_algorithm = "A*";
     backend = null;
 
-    sync = [];
+    f_sync = [];
+    b_sync = [];
+
 
     constructor() {}
 
@@ -38,8 +40,8 @@ export class BackendManager {
     }
 
     f_handleUpdate(res) {
-        res.send(Actions.toString(this.sync));
-        this.sync = [];
+        res.send(Actions.toString(this.f_sync));
+        this.f_sync = [];
     } //frontend
 
     f_handlePost(data) {
@@ -49,31 +51,39 @@ export class BackendManager {
                     this.in_button_active[0] = false;
                     this.in_button_active[1] = true;
                     this.in_button_active[2] = true;
-                    this.sync.push(Actions.update_button(0, false));
-                    this.sync.push(Actions.update_button(1, true));
-                    this.sync.push(Actions.update_button(2, true));
+                    this.f_sync.push(Actions.update_button(0, false));
+                    this.f_sync.push(Actions.update_button(1, true));
+                    this.f_sync.push(Actions.update_button(2, true));
                 }
                 break;
             case "maze_clicked":
                 if (this.in_selected_squares === [[data.x, data.y]]) {
                     this.in_button_active[0] = false;
-                    this.sync.push(Actions.update_button(0, false));
+                    this.f_sync.push(Actions.update_button(0, false));
                     //TODO: implement the selection and deselection
                 } else {
                     this.in_button_active[0] = true;
-                    this.sync.push(Actions.update_button(0, true));
+                    this.f_sync.push(Actions.update_button(0, true));
                 }
                 break;
             case "algorithm_selected":
                 //TODO: send the algorithm to the backend
                 this.in_algorithm = data.algorithm;
-                this.sync.push(Actions.update_algorithm(data.algorithm));
+                this.f_sync.push(Actions.update_algorithm(data.algorithm));
                 break;
         }
     }
 
     b_handleUpdate(data) {
         console.log(data);
+        switch (data.type) {
+            case "":
+                break;
+
+            default:
+                this.b_sync.push(Actions.b_error("recv", "incorrect_data", ["type"]));
+                break;
+        }
     } //backend
 
     get_full() {
