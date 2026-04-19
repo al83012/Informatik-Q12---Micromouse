@@ -122,7 +122,7 @@ impl<const N: usize> MicromouseManager<N> {
     pub async fn next(
         &self,
         read: Option<Message>,
-    ) -> Result<Vec<MicromouseEvent<N>>, MicromouseManagerError> {
+    ) -> Result<Vec<MicromouseEvent>, MicromouseManagerError> {
         info!(target: "comm/mng", "Read tick");
         if read.is_none() {
             error!(target: "comm/mng", "CONNECTION CLOSED DELIBERATELY & PERMANENTLY");
@@ -198,7 +198,7 @@ impl<const N: usize> MicromouseManager<N> {
                 let finished_cmd_id = just_finished_cmd.as_ref().expect("checked").1;
                 self.clear_current_command(&mut just_finished_cmd).await;
                 let require_new = self.unconfirmed_cmd.lock().await.is_empty();
-                let map_update: Vec<MicromouseEvent<N>> = map_update.into();
+                let map_update: Vec<MicromouseEvent> = map_update.into();
                 Ok(vec![MicromouseEvent::FinishedCommand {
                     cmd_id: finished_cmd_id,
                     // If we are not aware of a command in the queue, we will have to get a new
@@ -495,8 +495,8 @@ pub enum MicromouseMode {
     Running,
 }
 
-#[derive(Debug)]
-pub enum MicromouseEvent<const N: usize> {
+#[derive(Debug, Serialize)]
+pub enum MicromouseEvent {
     UpdatePosition(MouseTransform),
     UpdatedMap(NonEmpty<DiscoveryMessage>),
     FinishedCommand {
@@ -566,7 +566,7 @@ impl From<CertainStepError> for MicromouseManagerError {
     }
 }
 
-impl<const N: usize> From<InternalMapUpdate> for Vec<MicromouseEvent<N>> {
+impl From<InternalMapUpdate> for Vec<MicromouseEvent> {
     fn from(value: InternalMapUpdate) -> Self {
         let mut vec = Vec::with_capacity(3);
         if let Some(x) = value.new_transf {

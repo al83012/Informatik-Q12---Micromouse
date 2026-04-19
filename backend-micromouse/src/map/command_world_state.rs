@@ -819,13 +819,13 @@ pub struct CommandOutcomeIds {
     pub potential_outcome_ids: HashSet<PathLocalOutcomeId>,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub struct PathLocalOutcomeId {
     pub at_step: usize,
     pub from_interrupt: PathLocalInterruptId,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Serialize, Deserialize)]
 pub enum PathLocalInterruptId {
     MaxStep,
     InterruptAtIndex(usize),
@@ -837,7 +837,7 @@ pub struct CommandApplicationIterator<const N: usize> {
     application: FilteredCommandApplication<N>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RejectedOutcomes {
     pub rejected_outcome_ids: HashSet<PathLocalOutcomeId>,
 }

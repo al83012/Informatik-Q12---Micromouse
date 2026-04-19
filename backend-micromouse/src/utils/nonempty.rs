@@ -1,5 +1,7 @@
 use std::{fmt::Display, ops::Deref};
 
+use serde::Serialize;
+
 
 pub struct NonEmpty<T: Sized>(T);
 
@@ -101,5 +103,16 @@ impl<T> Deref for NonEmpty<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+
+impl<T> Serialize for NonEmpty<T> 
+where T: Serialize
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        self.0.serialize(serializer)
     }
 }

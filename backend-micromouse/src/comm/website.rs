@@ -14,7 +14,7 @@ use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     comm::{
-        micromouse_manager::MicromouseManagerError,
+        micromouse_manager::{MicromouseEvent, MicromouseManagerError},
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
     },
     map::map::{CellDiscovery, WallDiscovery},
@@ -28,12 +28,14 @@ pub struct DiscoveryMessage {
     pub wall_discoveries: Vec<WallDiscovery>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub enum FrontendMessage {
+    MicromouseEvent(MicromouseEvent),
     MicromouseManagerError(MicromouseManagerError),
     Debug(String),
 }
 
+#[derive(Clone, Debug)]
 pub enum FrontendResponse {
     NewStrategy { strategy_type: StrategyType },
     // New Strategy will set the next strategy to be used after the execution finishes
@@ -50,7 +52,7 @@ pub enum FrontendResponse {
     Continue, // Continue the current strategy
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct BatchedFrontendMessage(pub Vec<FrontendMessage>);
 
 impl Into<Message> for BatchedFrontendMessage {
@@ -68,7 +70,7 @@ impl PotentiallyNonEmpty for DiscoveryMessage {
 
 pub struct FrontendConnectionManagerInternal {
     send_queue: Receiver<FrontendMessage>,
-    read_queue: broadcast::Sender<Message>,
+    read_queue: Sender<FrontendResponse>,
     first_element_send_time: Option<Instant>,
     batching_duration: Duration,
     cancellation_token: CancellationToken,
@@ -79,7 +81,7 @@ pub struct FrontendConnectionManagerInternal {
 pub struct FrontendManager {
     cancellation_token: CancellationToken,
     send_queue: Sender<FrontendMessage>,
-    read_queue: broadcast::Receiver<Message>,
+    read_queue: Receiver<FrontendResponse>,
 }
 
 pub struct FrontendConnectionConfig {
@@ -97,7 +99,7 @@ impl FrontendManager {
         let new_ws = WsChannel::new(config.ws_channel_config, port).await?;
 
         let (send_queue_sender, send_queue_receiver) = channel(16);
-        let (read_sender, read_receiver) = broadcast::channel(16);
+        let (read_sender, read_receiver) = channel(16);
 
         let cancellation_token = CancellationToken::new();
 
@@ -190,5 +192,21 @@ impl FrontendConnectionManagerInternal {
 impl Drop for FrontendManager {
     fn drop(&mut self) {
         self.cancellation_token.cancel();
+    }
+}
+
+impl FrontendManager {
+    pub async fn next_read(&mut self) -> FrontendResponse {
+        self.read_queue
+            .recv()
+            .await
+            .expect("Channel should not be dropped during execution")
+    }
+
+    pub async fn send(&mut self, msg: FrontendMessage) {
+        self.send_queue
+            .send(msg)
+            .await
+            .expect("Channel should not be dropped during execution");
     }
 }
