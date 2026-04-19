@@ -676,15 +676,20 @@ where
     fn merge(&mut self) // -> ?
     {
         // Try merging non-eq-layers
-        todo!()
+        todo!("Nice-to-have, but really complex")
     }
 
-    fn transform_path(
+    fn transform_command(
         &mut self,
         from_node: AbsoluteNodeId,
         split_commands: (Command, Option<Command>),
     ) // ->?
     {
+        let children = self
+            .node(from_node)
+            .expect("Internal should exist")
+            .children()
+            .expect("A command that we transform has to have been expanded");
 
         // takes in a node which has a command (otherwise, what are we even merging / merges on
         // incomplete layers are not allowed)
@@ -698,9 +703,8 @@ where
         //
         // If there was a strategy-state associated with the from_node, this state will either stay
         // there (if the 2nd command is none) or move back 1
-        todo!()
+        todo!("WE NEED TO DETERMINE, WHICH OUTCOMES MATCH THE ORIGINAL OUTCOMES; WHICH IS QUITE HARD -> NEED TO MATCH UP THE PARTIAL WORLDS");
     }
-
     unsafe fn move_node_back(&mut self, node_id: AbsoluteNodeId)
     // --> The new node_id; the id of its
     // parent;
@@ -749,6 +753,8 @@ where
         self.layer_mut(node.layer_id)?.nodes.remove(&node.node_id)
     }
 
+    // Filters the tree using the best current knowledge about the map
+    // Returns any commands that have become certain by doing that
     pub fn handle_map_update(
         &mut self,
         map: &PartialMap<N>,
@@ -769,6 +775,17 @@ where
         } else {
             Err(StrategyTreeError::MeasureDoesNotMatchInner)
         }
+    }
+
+    // Filters the tree using the rejection-events from the currently processed command
+    pub fn handle_cmd_rejection(
+        &mut self,
+        rejections: &RejectedOutcomes,
+    ) -> Result<Vec<Command>, StrategyTreeError> {
+        self.prune_current_command_by_rejection(rejections)?;
+        let _ = self.expand_fully()?;
+        self.update_equal_layers();
+        Ok(self.new_sends())
     }
 
     pub fn close(&mut self) -> SentUnfinishedCommands<N> {
@@ -955,5 +972,18 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
             applied_strategy: None,
             as_branch_from_parent: Some(at),
         }
+    }
+
+    pub fn children(&self) -> Option<&HashMap<PathLocalOutcomeId, AbsoluteNodeId>> {
+        self.applied_strategy
+            .as_ref()
+            .and_then(|a| a.as_ref().ok())
+            .map(|a| &a.potential_outcomes)
+    }
+    pub fn children_mut(&mut self) -> Option<&mut HashMap<PathLocalOutcomeId, AbsoluteNodeId>> {
+        self.applied_strategy
+            .as_mut()
+            .and_then(|a| a.as_mut().ok())
+            .map(|a| &mut a.potential_outcomes)
     }
 }
