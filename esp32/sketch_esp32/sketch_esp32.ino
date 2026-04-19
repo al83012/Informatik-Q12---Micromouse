@@ -16,16 +16,21 @@ const unsigned long reconnectInterval = 2000;
 //Network information
 const char* ssid = "HOTSPOT-TEST";
 const char* password = "012345678";
-uint16_t port = 9001;
-char serverName[] = "172.13.1.1";
+const uint16_t port = 9001;
+const char serverName[] = "172.13.1.1";
 
 
 //Simulation params
-int SIM_SIZE = 8;
+const int SIM_SIZE = 8;
 int cellSize = 18;
 int stepFreq = 1;
-int X = 1;
-int Y = 1;
+int X = 0;
+int Y = 0;
+const int poX = 1;
+const int poY = 4;
+const int neX = 8;
+const int neY = 2;
+const int emp = 0;
 enum directions {
   posX,
   posY,
@@ -38,41 +43,39 @@ enum directions dir = posX;
 
 
 int SIM_FIELD[8][8] = {
-  { 9, 1, 1, 1, 1, 1, 1, 1 },
-  { 8, 0, 2, 8, 10, 0, 0, 2 },
-  { 8, 0, 2, 8, 0, 0, 0, 2 },
-  { 8, 0, 0, 0, 11, 5, 5, 2 },
-  { 8, 0, 10, 8, 0, 0, 0, 2 },
-  { 8, 0, 10, 8, 10, 8, 10, 10 },
-  { 8, 0, 10, 8, 10, 8, 0, 2 },
-  { 12, 4, 4, 4, 4, 4, 4, 6 }
+  { neY+neX, neY, neY, neY, neY, neY, neY, neY+poX },
+  { neX, emp, poX, neX, emp, emp, emp, poX },
+  { neX, emp, emp, emp, emp, emp, emp, poX },
+  { neX, emp, poX, neX, emp, emp, emp, poX },
+  { neX, emp, poX, neX, emp, emp, emp, poX },
+  { neX, emp, poX, neX, emp, emp, emp, poX },
+  { neX, emp, poX, neX, emp, emp, emp, poX },
+  { neX+poY, poY, poY, poY, poY, poY, poY, poX+poY }
 };
 
 //Live vars
 bool desync_mode = false;
 int lastCMD_ID = -1;
 int currCMD_ID = -1;
-
+bool interrupt = false;
 struct MeasurementTask {
   int subStep;
   char direction;
   int reaction;
 };
-
-vector<MeasurementTask> activeTasks;
+ 
 
 //Command config
-int MAX_CMD_ARGS = 15;
-
-int MAX_SUB_STEPS = 256;
-int DISTANCE_THRESHOLD = 0;
-int SENSORLIMIT = 5;
+const int MAX_CMD_ARGS = 15;
+const int MAX_SUB_STEPS = 256;
+const int DISTANCE_THRESHOLD = 0;
+const int SENSORLIMIT = 5;
 
 
 //IDs
-int STOP_IF_OPEN_ID = 10;
-int STOP_IF_BLOCKED_ID = 11;
-int CONTINUE_ID = 12;
+const int STOP_IF_OPEN_ID = 10;
+const int STOP_IF_BLOCKED_ID = 11;
+const int CONTINUE_ID = 12;
 
 //---- Simulation methods start ----
 
@@ -154,17 +157,17 @@ int sim_measure(char scan_dir) {
 
 
     if (scan_dir == 'L') {
-    if (dir == posX) lookDir = posY;
+    if (dir == posX) lookDir = negY;
     else if (dir == posY) lookDir = negX;
-    else if (dir == negX) lookDir = negY;
+    else if (dir == negX) lookDir = posY;
     else if (dir == negY) lookDir = posX;
   }
 
   else if (scan_dir == 'R') {
-    if (dir == posX) lookDir = negY;
-    else if (dir == negY) lookDir = negX;
-    else if (dir == negX) lookDir = posY;
-    else if (dir == posY) lookDir = posX;
+    if (dir == posX) lookDir = posY;
+    else if (dir == negY) lookDir = posX;
+    else if (dir == negX) lookDir = negY;
+    else if (dir == posY) lookDir = negX;
   }
 
  int wall_flag = 0;
@@ -342,7 +345,7 @@ int measure(char dir) {
   }
 
 
-  return sim_measure(dir);
+  return sim_measure(dir); //REMOVE AFTER SIM
 }
 
 
@@ -352,31 +355,34 @@ void movePassive(int cells) {
 }
 
 
-//TODO: Do not overwrite multiple measurements and allow multiple measurements per substep
 
-void moveActive(int cells) {
+void moveActive(int cells, vector<MeasurementTask> activeTasks) {
 
 
   for (int i = 0; i < cells; i++) {
     int sub_step = i;
-    bool anyStep = false;
-
     for(auto task : activeTasks) {
+      Serial.println("#RSLV NEW TASK");
+      Serial.println(task.subStep);
+      Serial.println(task.direction);
+      Serial.println(task.reaction);
+
       if(task.subStep == sub_step || MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         String content;
-        if(task.subStep == MAX_SUB_STEPS) {
-          content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
-        } else {
-          content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
-        }
+        content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
+        
         if (distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
         Serial.println("#MSR > SRV");
         client.send(content);
 
          if (distance > DISTANCE_THRESHOLD) {
         if (task.reaction == STOP_IF_OPEN_ID) {
+          String content = String(sub_step) + "_" + task.direction + "STOP_IF_OPEN";
+          Serial.println("#STOPPED: STOP_IF_OPEN");
           debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+          interrupt = true;
+          finishedAllInterrupt(content);
           return;
         }
 
@@ -389,7 +395,11 @@ void moveActive(int cells) {
 
 
         if (task.direction == STOP_IF_BLOCKED_ID) {
+          String content = String(sub_step) + "_" + task.direction + "STOP_IF_BLOCKED";
+          Serial.println("#STOPPED: STOP_IF_BLOCKED");
           debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+          interrupt = true;
+          finishedAllInterrupt(content);
           return;
         }
 
@@ -397,6 +407,8 @@ void moveActive(int cells) {
           turnPassive(1);
           return;
         }
+
+
       }
         
       }
@@ -426,7 +438,7 @@ void turnPassive(int turns) {
   sim_turn(turns);  //REMOVE AFTER SIM
 }
 
-void turnActive(int turns) {
+void turnActive(int turns, vector<MeasurementTask> activeTasks) {
   bool counterclock = false;
   if (turns < 0) {
     turns = turns * -1;
@@ -439,18 +451,18 @@ void turnActive(int turns) {
       if(task.subStep == sub_step || MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         String content;
-        if(task.subStep == MAX_SUB_STEPS) {
-          content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
-        } else {
-          content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
-        }
+        content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
+        
         if (distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
         Serial.println("#MSR > SRV");
         client.send(content);
 
          if (distance > DISTANCE_THRESHOLD) {
         if (task.reaction == STOP_IF_OPEN_ID) {
+          String content = String(sub_step) + "_" + task.direction + "STOP_IF_OPEN";
           debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+          interrupt = true;
+          finishedAllInterrupt(content);
           return;
         }
 
@@ -463,7 +475,10 @@ void turnActive(int turns) {
 
 
         if (task.direction == STOP_IF_BLOCKED_ID) {
+          String content = String(sub_step) + "_" + task.direction + "STOP_IF_BLOCKED";
           debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+          interrupt = true;
+          finishedAllInterrupt(content);
           return;
         }
 
@@ -532,6 +547,14 @@ void finishedAll() {
   client.send(message);
 }
 
+void finishedAllInterrupt(String message) {
+  String content = "CMD-FINISHED #";
+  Serial.println("# CMD DONE INTRPT > SRV");
+  content = content + currCMD_ID;
+  content = content + " " + message;
+  client.send(message);
+}
+
 
 void desync() {
   Serial.println("# DSYNC > SRV");
@@ -571,6 +594,7 @@ void handleCommand(WebsocketsMessage WSmessage) {
   Serial.println(">> " + message);
   String arguments[MAX_CMD_ARGS];
   int words = 0;
+  vector<MeasurementTask> activeTasks;
   //Collect words
   int lastIndex = 0;
   for (int i = 0; i <= message.length(); i++) {
@@ -666,19 +690,23 @@ void handleCommand(WebsocketsMessage WSmessage) {
                 task.reaction = CONTINUE_ID;
               }
               activeTasks.push_back(task);
+              Serial.println(activeTasks.size());
+              Serial.println("# ADD NEW TASK:");
+              Serial.println(task.subStep);
+              Serial.println(task.direction);
+              Serial.println(task.reaction);
             }
             
             if (arguments[0] == "MOVE") {
-              moveActive(cells);
+              moveActive(cells, activeTasks);
             } else if (arguments[0] == "TURN") {
-              turnActive(cells);
+              turnActive(cells, activeTasks);
             }
             activeTasks.clear();
-            //reactions.clear();
-            //measurements.clear();
+            
 
 
-            finishedAll();  //TODO: Attach interrupt to finished message
+           if(!interrupt) {finishedAll(); interrupt = false;}  
 
           } else {
             Serial.println("# INVLD MOV ARGS > SRV");
