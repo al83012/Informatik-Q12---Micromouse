@@ -9,8 +9,8 @@ use crate::{
     map::{
         check::PotentiallyEq,
         command_world_state::{FilteredCommandApplication, PathLocalOutcomeId, RejectedOutcomes},
-        map::PartialMap,
-        world_data::PartialWorldData,
+        map::{Map, PartialMap},
+        world_data::{PartialWorldData, WorldData},
     },
     strategy::strategy::{
         ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
@@ -42,6 +42,7 @@ pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     eq: Option<Command>,
     node_count: usize,
     node_id_counter: RelativeNodeIdCounter,
+    is_sent: bool,
 }
 
 pub struct SentTreeLayer<const N: usize> {
@@ -113,63 +114,23 @@ pub struct TreeExpansionSuccess {
     layers: usize,
 }
 
+pub enum StrategyStart<const N: usize> {
+    ContinueAfterDoing(SentUnfinishedCommands<N>),
+    // Will create a root node from this world and the strategy-initializer
+    DirectlyAtState(WorldData<N>)
+}
+
 impl<const N: usize, S> StrategyTree<N, S>
 where
     // For use in the Strategy-Tree, we need to be able to duplicate the StrategyState to branch
     S: Strategy<N> + Clone,
 {
-    pub fn new_continuing_after(
-        continue_after_doing: SentUnfinishedCommands<N>,
-        _tree_config: StrategyTreeConfig<N, S>,
-        _goal_position: GoalPosition,
+    pub fn new(
+        starting_condition: StrategyStart<N>,
+        tree_config: StrategyTreeConfig<N, S>,
+        goal_position: GoalPosition,
     ) -> Self {
-        let continue_after_doing = continue_after_doing.layers;
-        let queue_len = continue_after_doing.len();
-
-        // Either the first layer id is the first one of the unfinished cmds, or it is 0
-        let _first_layer_absolute_id = continue_after_doing
-            .first()
-            .map(|l| l.absolute_layer_id)
-            .unwrap_or(AbsoluteLayerId(0));
-
-        // TODO:
-        // the last layer of the sent tree layers need to be pre-expanded by taking the outcomes of
-        // the filtered application and already adding the nodes for that to the next layer
-        // Then, the sent layers will have to be transformed to a non-expandable node of this
-        // strategy (Maybe add a trait for that).
-        // The newly pre-expanded ones will also have to be prepared with a "fresh" clone of the
-        // Strategy (as they are basically its starting point)
-        //
-        // let continue_with_node_count = continue_after_doing.iter().map(|l| l.node_count).sum();
-
-        // Those are currently the only layers which are both sent and finished
-        let _highest_sent_layer = queue_len;
-        let _highest_eq_layer = queue_len;
-
-        // The last layer has to be expandable
-        // if let Some(last) = continue_after_doing.last_mut() {
-        //     last.
-        // }
-
         todo!("aksdhföakshd");
-        // let mut this = Self {
-        //     config: tree_config,
-        //     highest_sent_layer,
-        //     highest_eq_layer,
-        //     layers: continue_after_doing,
-        //     first_layer_absolute_id,
-        //     node_count: continue_with_node_count,
-        //     goal_position,
-        // };
-
-        // this.expand_fully();
-
-        //         todo!(
-        //         "This constructor creates a new StrategyTree, whose first layers are filled up from ConfirmedUnprocessedCommands, such that they will not be changed (as they are already confirmed/sent)
-        //         This means, that we can have a constructor, which can represent the option, that there are some commands that will finish and only then the chosen strategy can take place
-        // "
-        //     )
-        // this
     }
 
     // returns the number of nodes this action creates
@@ -788,8 +749,20 @@ where
         Ok(self.new_sends())
     }
 
-    pub fn close(&mut self) -> SentUnfinishedCommands<N> {
-        todo!("The strategy tree will be closed, meaning that it will generate no new commands")
+    pub fn close(self) -> SentUnfinishedCommands<N> {
+        let highest_sent_layer = self.highest_sent_layer;
+        let mut layers = vec![];
+        let mut inner_layers = self.layers;
+        for _i in 0..=highest_sent_layer {
+            // Remove the lowest layer
+            let layer = inner_layers.remove(0);
+
+            layers.push(layer.try_into().expect(
+                "Within highest sent layer, should fulfil all the properties of the sent layer",
+            ))
+        }
+
+        SentUnfinishedCommands { layers }
     }
 }
 
@@ -862,6 +835,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
             is_fully_expanded: false,
             eq: None,
             node_count: 0,
+            is_sent: false,
         }
     }
 
@@ -985,5 +959,59 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
             .as_mut()
             .and_then(|a| a.as_mut().ok())
             .map(|a| &mut a.potential_outcomes)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum LayerReductionError {
+    NodesNotExpanded,
+    LayerNotExpanded,
+    LayerNotEq,
+    LayerNotSent,
+}
+
+impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTreeLayer<N> {
+    type Error = LayerReductionError;
+    fn try_from(value: StrategyTreeLayer<N, S>) -> Result<Self, Self::Error> {
+        if !value.is_fully_expanded {
+            return Err(LayerReductionError::LayerNotExpanded);
+        }
+        if value.eq.is_none() {
+            return Err(LayerReductionError::LayerNotEq);
+        }
+        if value.is_sent {
+            return Err(LayerReductionError::LayerNotSent);
+        }
+
+        let node_len = value.node_count;
+
+        let nodes = value
+            .nodes
+            .into_iter()
+            .filter_map(|(k, v)| match SentCommandNode::try_from(v) {
+                Ok(n) => Some((k, n)),
+                Err(e) => None,
+            })
+            .collect::<HashMap<_, _>>();
+
+        if node_len != nodes.len() {
+            return Err(LayerReductionError::NodesNotExpanded);
+        }
+
+        Ok(SentTreeLayer {
+            nodes,
+            absolute_layer_id: value.absolute_layer_id,
+            node_count: node_len,
+        })
+    }
+}
+
+impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeNode<N, S>> for SentCommandNode<N> {
+    type Error = ();
+    fn try_from(value: StrategyTreeNode<N, S>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            on_basis_of_world: value.on_basis_of_world,
+            applied_strategy: value.applied_strategy.ok_or(())?,
+        })
     }
 }
