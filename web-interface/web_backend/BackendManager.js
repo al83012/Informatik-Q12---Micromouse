@@ -112,6 +112,8 @@ export class BackendManager {
             actions.push(Actions.discover_tile(x, y, directions));
         }
 
+        actions.push(Actions.move_mouse(0, 0, this.in_mouse.pos[0], this.in_mouse.pos[1]));
+
         return actions;
     }
 }

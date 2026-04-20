@@ -14,6 +14,7 @@ import {
     AnimSlideColor,
     AnimGroup,
     AnimCssChange,
+    AnimMoveMultiples,
     generatePathAnimGroup
 } from "./Animation.js"
 import { StyleAdder } from "./style_adder.js";
@@ -112,6 +113,10 @@ export class Index {
                     break;
                 case "discover_tile":
                     discoverTile(data["x"], data["y"], data["directions"]);
+                    break;
+                case "move_mouse":
+                    let card = document.getElementById("sys-mouse_card");
+                    Index.animHandler.addImmediate(new AnimMoveMultiples(20, card, 34, data["x"], data["x_new"], data["y"], data["y_new"]));
                     break;
             }
         });

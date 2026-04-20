@@ -321,6 +321,50 @@ export class AnimCssChange extends Animation {
     }
 }
 
+export class AnimMoveMultiples extends Animation {
+    constructor(duration, object, multiples, x_factor_start, x_factor_end, y_factor_start, y_factor_end) {
+        super(duration, object);
+        this.multiples = multiples
+        this.x_factor_start = x_factor_start;
+        this.x_factor_end = x_factor_end;
+        this.y_factor_start = y_factor_start;
+        this.y_factor_end = y_factor_end;
+        this.cur_factor_x = x_factor_start;
+        this.cur_factor_y = y_factor_start;
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+        if (this.remaining_duration === this.duration) {
+            /*this.object.style = this.object.style.replace(new RegExp("\\/\\*AnimMoveMultiples_start\\*\\/.*\\/\\*AnimMoveMultiples_end\\*\\/"), "")
+                + "/*AnimMoveMultiples_start*//*AnimMoveMultiples_end*/           /*";*/
+        }
+
+        this.cur_factor_x = this.x_factor_start + (this.x_factor_end - this.x_factor_start) * (1-(this.remaining_duration / this.duration));
+        this.cur_factor_y = this.y_factor_start + (this.y_factor_end - this.y_factor_start) * (1-(this.remaining_duration / this.duration));
+
+        this.object.style.left = "calc(" + this.multiples + "px*" + this.cur_factor_x + ")";
+        this.object.style.top = "calc(" + this.multiples + "px*" + this.cur_factor_y + ")";
+
+       // this.object.style = this.object.style.replace(new RegExp("\\/\\*AnimMoveMultiples_start\\*\\/.*\\/\\*AnimMoveMultiples_end\\*\\/"),
+       //     "/*AnimMoveMultiples_start*/left: calc(" + this.multiples + "px*" + this.cur_factor_x + "); " +
+       //     "right: calc(" + this.multiples + "px*" + this.cur_factor_y + ");/*AnimMoveMultiples_end*/")
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration < 0) {
+            this.finished = true;
+            this.object.style.left = "calc(" + this.multiples + "px*" + this.x_factor_end + ")";
+            this.object.style.top = "calc(" + this.multiples + "px*" + this.y_factor_end + ")";
+            //this.object.style = this.object.style.replace(new RegExp("\\/\\*AnimMoveMultiples_start\\*\\/.*\\/\\*AnimMoveMultiples_end\\*\\/"),
+            //    "/*AnimMoveMultiples_start*/left: calc(" + this.multiples + "px*" + this.x_factor_end + "); " +
+            //    "right: calc(" + this.multiples + "px*" + this.y_factor_end + ");/*AnimMoveMultiples_end*/");
+        }
+    }
+}
+
 export class AnimationHandler {
     animations = [];
     rep_animations = [];

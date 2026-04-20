@@ -72,6 +72,10 @@ export class Actions {
         return new Action("update_path", new Map([["path", ""]]));
     }
 
+    static move_mouse(x, y, x_new, y_new) {
+        return new Action("move_mouse", new Map([["x", x], ["y", y], ["x_new", x_new], ["y_new", y_new]]));
+    }
+
     static discover_tile(x, y, directions) {
         let dir_string = "[";
         for (let i = 0; i < directions.length; i++) {

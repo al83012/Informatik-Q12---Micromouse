@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="6" height="16">
+    <symbol id="sys-mouse_card-north">
+    <rect x="4" y="3.5" width="8" height="9" rx="2" fill="#00ffe0" opacity="0.9"/>
+
+    <polygon points="8,1.5 5.5,5 10.5,5" fill="#00ffe0"/>
+
+    <rect x="5.5" y="5" width="5" height="3.5" rx="1" fill="#0b0d14" opacity="0.6"/>
+
+    <circle cx="6.65" cy="6.75" r="0.75" fill="#00cfff"/>
+    <circle cx="9.35" cy="6.75" r="0.75" fill="#00cfff"/>
+    <circle cx="6.65" cy="6.75" r="0.3" fill="white"/>
+    <circle cx="9.35" cy="6.75" r="0.3" fill="white"/>
+
+    <rect x="2.5" y="6" width="1.5" height="3.5" rx="0.75" fill="#1e2438"/>
+    <rect x="12" y="6" width="1.5" height="3.5" rx="0.75" fill="#1e2438"/>
+    <rect x="3.5" y="10.5" width="2.5" height="1.5" rx="0.25" fill="#1e2438"/>
+    <rect x="10" y="10.5" width="2.5" height="1.5" rx="0.25" fill="#1e2438"/>
+
+    <line x1="5" y1="12.5" x2="11" y2="12.5" stroke="#00ffe0" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+    </symbol>
+</svg>
