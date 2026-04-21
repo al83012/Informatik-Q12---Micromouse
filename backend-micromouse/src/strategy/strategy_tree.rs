@@ -524,7 +524,7 @@ where
             .iter()
             .flat_map(|l| {
                 l.nodes.iter().filter_map(|(k, v)| {
-                    if v.on_basis_of_world.map.potentially_eq(filter) {
+                    if !v.on_basis_of_world.map.potentially_eq(filter) {
                         Some(AbsoluteNodeId {
                             layer_id: l.absolute_layer_id,
                             node_id: *k,
