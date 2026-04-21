@@ -186,6 +186,7 @@ let actions = [];
 console.log("[F] Creating Website host at: " + JSON.stringify(results));
 app.use(express.static("./../web_frontend"));
 app.use("/module", express.static("./../web_frontend/module"));
+app.use("/favicon.ico", express.static("./../web_frontend/favicon.ico"));
 app.use(express.json());
 
 app.get('/update', (req, res) => {
