@@ -117,7 +117,7 @@ pub struct TreeExpansionSuccess {
 pub enum StrategyStart<const N: usize> {
     ContinueAfterDoing(SentUnfinishedCommands<N>),
     // Will create a root node from this world and the strategy-initializer
-    DirectlyAtState(WorldData<N>)
+    DirectlyAtState(WorldData<N>),
 }
 
 impl<const N: usize, S> StrategyTree<N, S>
@@ -130,14 +130,16 @@ where
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
     ) -> Self {
-
         match starting_condition {
             StrategyStart::ContinueAfterDoing(sent_unfinished_commands) => {
-
-            },
-            StrategyStart::DirectlyAtState(starting_state) => {
-
+                let num_of_unfinished_cmds = sent_unfinished_commands.layers.len();
+                let first_layer_absolute_id = sent_unfinished_commands
+                    .layers
+                    .get(0)
+                    .map(|l| l.absolute_layer_id)
+                    .unwrap_or(AbsoluteLayerId(0));
             }
+            StrategyStart::DirectlyAtState(starting_state) => {}
         }
 
         // Self {

@@ -314,24 +314,32 @@ impl<const N: usize> PartialWorldData<N> {
                     return None;
                 }
             }
-            (
-                WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
-                InterruptAction::StopIfOpen,
-            ) => {
+            (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfOpen) => {
                 if should_trigger {
                     *deciding_wall
                 } else {
                     return None;
                 }
             }
+            (WallDiscoveryStatus::Visited, InterruptAction::StopIfOpen) => {
+                if should_trigger {
+                    WallDiscoveryStatus::Visited
+                } else {
+                    return None;
+                }
+            }
 
             // Interrupt will never be triggered
-            (
-                WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited,
-                InterruptAction::StopIfBlocked,
-            ) => {
+            (WallDiscoveryStatus::Exists(false), InterruptAction::StopIfBlocked) => {
                 if !should_trigger {
                     *deciding_wall
+                } else {
+                    return None;
+                }
+            }
+            (WallDiscoveryStatus::Visited, InterruptAction::StopIfBlocked) => {
+                if !should_trigger {
+                    WallDiscoveryStatus::Visited
                 } else {
                     return None;
                 }

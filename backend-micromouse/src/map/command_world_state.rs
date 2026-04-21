@@ -383,7 +383,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &mut self,
         upgraded_filter: Map<N>,
     ) -> Result<RejectedOutcomes, FilterUpgradeError> {
-        debug!(target: "map/cmd/apl", "UPGRADING FILTER");
+        debug!(target: "map/cmd/apl", "UPGRADING FILTER \n{} \nwith \n{}", self.filter, upgraded_filter);
         let is_upgrade_valid = upgraded_filter.could_be_upgrade_of(&self.filter);
 
         if !is_upgrade_valid {

@@ -8,7 +8,7 @@ use tungstenite::{Message, Utf8Bytes};
 use crate::{
     comm::micromouse_message::{
         CommandMessage, InterruptAction, InterruptOccurence, MeasurementMessage,
-        MeasurementOccurence, TransformedMovement,
+        MeasurementOccurrence, TransformedMovement,
     },
     map::{
         map::Map,
@@ -80,7 +80,7 @@ impl<const N: usize> MicromouseSimulator<N> {
                     };
                     let measurement_msg = MeasurementMessage {
                         from_cmd: msg.cmd_id,
-                        interrupt: MeasurementOccurence {
+                        interrupt: MeasurementOccurrence {
                             direction: interrupt.direction,
                             at_step: i as u32,
                         },
