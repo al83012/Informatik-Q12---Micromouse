@@ -1,4 +1,5 @@
 import { Actions, Action } from "./Actions.js";
+//import { Utils } from "./Utils.ts";
 
 export class BackendManager {
     in_button_active = [true, false, false];
@@ -106,10 +107,10 @@ export class BackendManager {
             let directions = [];
             let x = this.in_maze.discovered[i][0];
             let y = this.in_maze.discovered[i][1];
-            if (this.in_maze.discovered.includes([x+1, y])) {directions.push("e");}
-            if (this.in_maze.discovered.includes([x-1, y])) {directions.push("w");}
-            if (this.in_maze.discovered.includes([x, y-1])) {directions.push("n");}
-            if (this.in_maze.discovered.includes([x, y+1])) {directions.push("s");}
+            if (this.in_maze.discovered.some(([a, b]) => x+1===a&&y===b)) {directions.push("e");}
+            if (this.in_maze.discovered.some(([a, b]) => x-1===a&&y===b)) {directions.push("w");}
+            if (this.in_maze.discovered.some(([a, b]) => x===a&&y-1===b)) {directions.push("n");}
+            if (this.in_maze.discovered.some(([a, b]) => x===a&&y+1===b)) {directions.push("s");}
             actions.push(Actions.discover_tile(x, y, directions));
         }
 
