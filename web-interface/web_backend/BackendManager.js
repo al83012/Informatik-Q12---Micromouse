@@ -11,8 +11,9 @@ export class BackendManager {
         "paths": []
     };
     in_mouse = {
-        "pos": [0, 0],
-        "rotation": 0, // 0 up clockwise
+        "pos": [4, 0],
+        "rotation": 1, // 0 up clockwise
+        "direction": "e", // rotation in nswe
         "sensors": {
             "left_1": 0,
             "left_2": 0,
@@ -113,6 +114,7 @@ export class BackendManager {
         }
 
         actions.push(Actions.move_mouse(0, 0, this.in_mouse.pos[0], this.in_mouse.pos[1]));
+        actions.push(Actions.rotate_mouse(0, this.in_mouse.direction));
 
         return actions;
     }

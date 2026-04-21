@@ -76,6 +76,44 @@ export class Actions {
         return new Action("move_mouse", new Map([["x", x], ["y", y], ["x_new", x_new], ["y_new", y_new]]));
     }
 
+    static rotate_mouse(dir, dir_new) {
+        let direction = dir;
+        let direction_new = dir_new;
+        if (typeof dir === "number") {
+            switch (dir) {
+                case 0:
+                    direction = "n";
+                    break;
+                case 1:
+                    direction = "e";
+                    break;
+                case 2:
+                    direction = "s";
+                    break;
+                case 3:
+                    direction = "w";
+                    break;
+            }
+        }
+        if (typeof dir_new === "number") {
+            switch (dir_new) {
+                case 0:
+                    direction_new = "n";
+                    break;
+                case 1:
+                    direction_new = "e";
+                    break;
+                case 2:
+                    direction_new = "s";
+                    break;
+                case 3:
+                    direction_new = "w";
+                    break;
+            }
+        }
+        return new Action("rotate_mouse", new Map([["dir", '"' + direction + '"'], ["dir_new", '"' + direction_new + '"']]));
+    }
+
     static discover_tile(x, y, directions) {
         let dir_string = "[";
         for (let i = 0; i < directions.length; i++) {

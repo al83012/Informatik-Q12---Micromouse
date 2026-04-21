@@ -365,6 +365,64 @@ export class AnimMoveMultiples extends Animation {
     }
 }
 
+export class AnimRotate extends Animation {
+    constructor(duration, object, angle_start, angle_end) {
+        super(duration, object);
+
+        this.angle_start = angle_start;
+        this.angle_end = angle_end;
+
+        if (typeof angle_start === "string") {
+            switch (angle_start) {
+                case "n":
+                    this.angle_start = 0;
+                    break;
+                case "s":
+                    this.angle_start = 180;
+                    break;
+                case "w":
+                    this.angle_start = 270;
+                    break;
+                case "e":
+                    this.angle_start = 90;
+                    break;
+            }
+        }
+
+        if (typeof angle_end === "string") {
+            switch (angle_end) {
+                case "n":
+                    this.angle_end = 0;
+                    break;
+                case "s":
+                    this.angle_end = 180;
+                    break;
+                case "w":
+                    this.angle_end = 270;
+                    break;
+                case "e":
+                    this.angle_end = 90;
+                    break;
+            }
+        }
+
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+
+        this.object.style.transform = "rotate(" + ((this.angle_end-this.angle_start)*(1-(this.remaining_duration / this.duration))) + "deg)";
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration < 0) {
+            this.object.style.transform = "rotate(" + this.angle_end + "deg)";
+        }
+    }
+}
+
 export class AnimationHandler {
     animations = [];
     rep_animations = [];
