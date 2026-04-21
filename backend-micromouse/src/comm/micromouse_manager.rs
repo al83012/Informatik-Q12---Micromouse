@@ -5,6 +5,7 @@ use std::{
 };
 
 use console::Style;
+use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, warn};
@@ -226,8 +227,8 @@ impl<const N: usize> MicromouseManager<N> {
             }
             MicromouseResponse::Restart => {
                 info!(target: "comm/mng", "RESTARTED");
-                *self.mode.lock().await = MicromouseMode::Running;
                 self.restart().await;
+                *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Restart])
             }
             MicromouseResponse::Continue => {
@@ -360,8 +361,12 @@ impl<const N: usize> MicromouseManager<N> {
         Ok(internal_map_update)
     }
 
-    // WARN: LOCKS THE QUEUE RECEIVER
+    // WARN: LOCKS THE QUEUE RECEIVER; Also returns pending as long as the micromouse is stopped
     pub async fn notified_empty_queue(&self) {
+        if *self.mode.lock().await == MicromouseMode::Stopped {
+            info!(target: "comm/mng/cmd", "COMMAND PENDING; Micromouse Stopped");
+            return pending().await;
+        }
         loop {
             let mut queue_length_receiver = self.queue_length_receiver.lock().await;
             queue_length_receiver.changed().await.expect("Please no");

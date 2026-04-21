@@ -100,7 +100,7 @@ pub fn follow_r_and_conn() {
                             }
                         }
                         Err(e) => {
-                            error!(target: "comm/mng/event", "ERROR: {e:?}")
+                            panic!("ERROR: {e:?}");
                         }
                     }
                 }

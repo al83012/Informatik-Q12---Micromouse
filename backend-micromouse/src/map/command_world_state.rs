@@ -264,7 +264,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     debug!(target: "map/cmd/apl", "         >> NO CONTINUING WORLD");
 
                     if let Some(terminating_world) = &terminating_world {
-                        debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
+                        //debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
                         debug!(target: "map/cmd/apl", "        >> BUT FOUND TERMINATING WORLD");
                     } else {
                         error!(target: "map/cmd/apl", "             >> NO TERMINATING_WORLD EITHER");
@@ -304,7 +304,8 @@ impl<const N: usize> FilteredCommandApplication<N> {
                 // or not
                 let continuing_world = continuing_world
                     .expect("Already handled forced end; This path **has** to continue");
-                debug!(target: "map/cmd/apl", "CONTINUING WORLD {interrupt} at step {i}\n{continuing_world}");
+                // debug!(target: "map/cmd/apl", "CONTINUING WORLD {interrupt} at step {i}\n{continuing_world}");
+                debug!(target: "map/cmd/apl", "CONTINUING WORLD at step {i}\n{continuing_world}");
                 next_step_start_requirements = continuing_world.clone();
 
                 // Even registers `Continue`-Interrupts (Which is why terminating world is optional)

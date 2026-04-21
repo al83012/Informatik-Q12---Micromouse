@@ -130,7 +130,22 @@ where
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
     ) -> Self {
-        todo!("aksdhföakshd");
+
+        match starting_condition {
+            StrategyStart::ContinueAfterDoing(sent_unfinished_commands) => {
+
+            },
+            StrategyStart::DirectlyAtState(starting_state) => {
+
+            }
+        }
+
+        // Self {
+        //     goal_position,
+        //     config: tree_config,
+        //
+        // }
+        todo!()
     }
 
     // returns the number of nodes this action creates

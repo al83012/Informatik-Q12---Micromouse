@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, num::ParseIntError};
 
 use serde::{Deserialize, Serialize};
-use tracing::debug;
+use tracing::{debug, info};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -100,7 +100,7 @@ impl TryFrom<String> for MicromouseResponse {
                             from_cmd: FormatError::caused_by(CommandId::try_from(
                                 cmd_id.to_string(),
                             ))?,
-                            interrupt: FormatError::caused_by(MeasurementOccurence::try_from(
+                            interrupt: FormatError::caused_by(MeasurementOccurrence::try_from(
                                 measurement_occurence.to_string(),
                             ))?,
                             depth: depth
@@ -114,7 +114,7 @@ impl TryFrom<String> for MicromouseResponse {
                             from_cmd: FormatError::caused_by(CommandId::try_from(
                                 cmd_id.to_string(),
                             ))?,
-                            interrupt: FormatError::caused_by(MeasurementOccurence::try_from(
+                            interrupt: FormatError::caused_by(MeasurementOccurrence::try_from(
                                 measurement_occurence.to_string(),
                             ))?,
                             depth: depth
@@ -161,10 +161,11 @@ impl TryFrom<String> for MicromouseResponse {
     }
 }
 
-impl TryFrom<String> for MeasurementOccurence {
+impl TryFrom<String> for MeasurementOccurrence {
     type Error = FormatError<Self>;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        // info!(target: "cmd/op", "TRY FROM STR (MeasurementOccurence) = {value}");
         match value.split("_").collect::<Vec<_>>().as_slice() {
             [num, dir @ ("L" | "R" | "F")] => Ok(Self {
                 direction: FormatError::caused_by(RelativeDirection::try_from(dir.to_string()))?,
@@ -180,10 +181,11 @@ impl TryFrom<String> for MeasurementOccurence {
 impl TryFrom<String> for InterruptOccurence {
     type Error = FormatError<Self>;
     fn try_from(value: String) -> Result<Self, Self::Error> {
+        // info!(target: "cmd/op", "TRY FROM STR (InterruptOccurence) = {value}");
         match value.rsplitn(2, "_").collect::<Vec<_>>().as_slice() {
-            [action, occurence @ ("STOP-IF-OPEN" | "STOP-IF-BLOCKED" | "CONTINUE")] => Ok(Self {
-                occurence: FormatError::caused_by(MeasurementOccurence::try_from(
-                    occurence.to_string(),
+            [action @ ("STOP-IF-OPEN" | "STOP-IF-BLOCKED" | "CONTINUE"), occurrence] => Ok(Self {
+                occurence: FormatError::caused_by(MeasurementOccurrence::try_from(
+                    occurrence.to_string(),
                 ))?,
                 action: FormatError::caused_by(InterruptAction::try_from(action.to_string()))?,
             }),
@@ -362,7 +364,7 @@ impl From<&MeasurementInterrupt> for InterruptType {
 /// Direction and Step number at which a measurement took place (not what to do with it, no
 /// "Each"-option)
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub struct MeasurementOccurence {
+pub struct MeasurementOccurrence {
     pub direction: RelativeDirection,
     pub at_step: StepNum,
 }
@@ -371,7 +373,7 @@ pub struct MeasurementOccurence {
 /// --> Like MeasurementInterrupt, but like the other "Occurence"-type: cannot use step-num "Each"
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct InterruptOccurence {
-    pub occurence: MeasurementOccurence,
+    pub occurence: MeasurementOccurrence,
     pub action: InterruptAction,
 }
 
@@ -415,7 +417,7 @@ pub struct CommandMessage {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MeasurementMessage {
     pub from_cmd: CommandId,
-    pub interrupt: MeasurementOccurence,
+    pub interrupt: MeasurementOccurrence,
     pub depth: Depth,
     pub is_sensorlimit: bool,
 }
