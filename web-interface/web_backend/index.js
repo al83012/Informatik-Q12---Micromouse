@@ -204,6 +204,11 @@ app.post('/action', (req, res) => {
 
 app.get('/', (req, res) => {
     res.redirect("/home.html");
-})
+});
+
+app.get('/error', (req, res) => {
+    manager.f_handleError(req.body);
+    res.send("handled");
+});
 
 app.listen(front_port, () => console.log(`[F] WebInterface listening on port ${front_port}!`));

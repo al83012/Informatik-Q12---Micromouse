@@ -27,6 +27,18 @@ export class Index {
     static algorithms = [];
 
     static eventLoad() {
+        //creating error feedback to backend
+        window.onerror = function (e) {
+            let request = new XMLHttpRequest();
+            request.open("POST", document.location.origin + "/error");
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify({
+                error: e,
+                stack: e.stack,
+            }));
+        }
+
+
         let squares = document.getElementsByClassName("maze_tile");
 
         for (let i = 0; i < squares.length; i++) {

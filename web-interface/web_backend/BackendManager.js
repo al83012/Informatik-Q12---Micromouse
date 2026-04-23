@@ -76,6 +76,13 @@ export class BackendManager {
         }
     }
 
+    f_handleError(body) {
+        console.log("--------------------------------------------------------");
+        console.log("[F] An Error occurred on the Frontend:");
+        console.log("[F->Error]: " + body);
+        console.log("--------------------------------------------------------");
+    }
+
     b_handleUpdate(data) {
         console.log(data);
         switch (data.type) {
