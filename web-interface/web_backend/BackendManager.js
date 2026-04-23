@@ -6,7 +6,7 @@ export class BackendManager {
     in_selected_squares = []; // e.g. [[2,4],[3,1]]
     in_maze = {
         "visited": [],
-        "discovered": [[0, 0], [1, 0]],
+        "discovered": [[0, 0]],
         "walls": [], // e.g. [[0,0, 0,1], [1,0, 1,1]] //wall between 00 and 01 as well as 10 and 11
         "goals": [],
         "paths": []
