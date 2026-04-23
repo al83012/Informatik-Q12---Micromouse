@@ -114,15 +114,45 @@ export class Actions {
         return new Action("rotate_mouse", new Map([["dir", '"' + direction + '"'], ["dir_new", '"' + direction_new + '"']]));
     }
 
-    static discover_tile(x, y, directions) {
+    static discover_tile(x, y, discovered_tiles, no_others) {
+        let directions = [];
+        let other_tiles = [];
+        if (discovered_tiles.some(([a, b]) => x+1===a&&y===b)) {directions.push("e"); other_tiles.push([x+1, y]);}
+        if (discovered_tiles.some(([a, b]) => x-1===a&&y===b)) {directions.push("w"); other_tiles.push([x-1, y]);}
+        if (discovered_tiles.some(([a, b]) => x===a&&y-1===b)) {directions.push("n"); other_tiles.push([x, y-1]);}
+        if (discovered_tiles.some(([a, b]) => x===a&&y+1===b)) {directions.push("s"); other_tiles.push([x, y+1]);}
+
         let dir_string = "[";
         for (let i = 0; i < directions.length; i++) {
             dir_string += '"' + directions[i] + '"';
             if (i < directions.length - 1) {dir_string += ",";}
         }
         dir_string += "]";
+
+        let other_tiles_x = "[";
+        let other_tiles_y = "[";
+        let others = false;
+
+        if (other_tiles.length > 0 && !no_others) {
+            others = true;
+
+
+            for (let i = 0; i < other_tiles.length; i++) {
+                other_tiles_x += other_tiles[i][0];
+                other_tiles_y += other_tiles[i][1];
+
+                if (i < other_tiles.length - 1) {
+                    other_tiles_x += ",";
+                    other_tiles_y += ",";
+                }
+            }
+        }
+
+        other_tiles_x += "]";
+        other_tiles_y += "]";
+
         return new Action("discover_tile", new Map([["x", x], ["y", y],
-            ["directions", dir_string]]));
+            ["directions", dir_string], ["others", others], ["other_tiles_x", other_tiles_x], ["other_tiles_y", other_tiles_y]]));
     }
 
     //Learned more JS, so I now use Objects for server

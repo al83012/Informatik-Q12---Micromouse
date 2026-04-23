@@ -104,14 +104,9 @@ export class BackendManager {
         }
 
         for (let i = 0; i < this.in_maze.discovered.length; i++) {
-            let directions = [];
             let x = this.in_maze.discovered[i][0];
             let y = this.in_maze.discovered[i][1];
-            if (this.in_maze.discovered.some(([a, b]) => x+1===a&&y===b)) {directions.push("e");}
-            if (this.in_maze.discovered.some(([a, b]) => x-1===a&&y===b)) {directions.push("w");}
-            if (this.in_maze.discovered.some(([a, b]) => x===a&&y-1===b)) {directions.push("n");}
-            if (this.in_maze.discovered.some(([a, b]) => x===a&&y+1===b)) {directions.push("s");}
-            actions.push(Actions.discover_tile(x, y, directions));
+            actions.push(Actions.discover_tile(x, y, this.in_maze.discovered, true));
         }
 
         actions.push(Actions.move_mouse(0, 0, this.in_mouse.pos[0], this.in_mouse.pos[1]));

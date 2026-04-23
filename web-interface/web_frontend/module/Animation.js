@@ -295,6 +295,8 @@ export class AnimBorderColor extends Animation {
 export class AnimCssChange extends Animation {
     constructor(duration, object, items, replacement) {
         super(duration, object);
+        this.log_name = object.className;
+        //console.log(this.log_name);
         this.items = items;
         this.replacement = replacement;
     }
@@ -303,14 +305,19 @@ export class AnimCssChange extends Animation {
         if (this.finished) {
             return;
         }
-        if (this.duration === this.remaining_duration) {
-            for (let i = 0; i < this.items.length; i++) {
-                if (this.object.className.includes(" " + this.items[i])) {
-                    this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
-                    break;
-                }
-            }
 
+        try {
+            if (this.duration === this.remaining_duration) {
+                for (let i = 0; i < this.items.length; i++) {
+                    if (this.object.className.includes(" " + this.items[i])) {
+                        this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
+                        break;
+                    }
+                }
+
+            }
+        } catch (e) {
+            console.log("Error in AnimCssChange of tile: " + this.log_name);
         }
 
         this.remaining_duration--;

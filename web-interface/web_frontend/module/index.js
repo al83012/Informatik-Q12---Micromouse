@@ -113,7 +113,11 @@ export class Index {
                     Index.animHandler.addImmediate(displayPathChange(data["path"]));
                     break;
                 case "discover_tile":
-                    discoverTile(data["x"], data["y"], data["directions"]);
+                    if (data["others"] === true) {
+                        discoverTile(data["x"], data["y"], data["directions"], data.other_tiles_x, data.other_tiles_y);
+                    } else {
+                        discoverTile(data["x"], data["y"], data["directions"]);
+                    }
                     break;
                 case "move_mouse":
                     let card_move = document.getElementById("sys-mouse_card");
@@ -182,7 +186,7 @@ export class Index {
     }
 }
 
-function discoverTile(x, y, directions) {
+function discoverTile(x, y, directions, x_other, y_other) {
     let index = co_crds_i([x, y]);
     let group = new AnimGroup(0);
     group.add(new AnimCssChange(10, document.getElementById("sys-arm_node_" + index),
@@ -191,7 +195,59 @@ function discoverTile(x, y, directions) {
         group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-" + directions[i] + "_" + index),
             ["undiscovered"], "discovered"));
     }
+
+    if (!(x_other === null || x_other === undefined)) {
+        for (let i = 0; i < x_other.length; i++) {
+
+            switch (x_other[i]-x) {
+                case 1:
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-e_" + co_crds_i([x+1, y])),
+                        ["undiscovered"], "discovered"));
+                break;
+
+                case -1:
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-w_" + co_crds_i([x-1, y])),
+                        ["undiscovered"], "discovered"));
+                break;
+
+                case 0:
+                    switch (y_other[i]-y) {
+                        case 1:
+                            group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-n_" + co_crds_i([x, y+1])),
+                                ["undiscovered"], "discovered"));
+                        break;
+
+                        case -1:
+                            group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-s_" + co_crds_i([x, y-1])),
+                                ["undiscovered"], "discovered"));
+                        break;
+                    }
+                break;
+            }
+        }
+    }
     Index.animHandler.addImmediate(group);
+}
+
+function flip_nswe_directions(directions) {
+    let new_directions = [];
+    for (let i = 0; i < directions.length; i++) {
+        switch (directions[i]) {
+            case "n":
+                new_directions.push("s");
+                break;
+            case "s":
+                new_directions.push("n");
+                break;
+            case "e":
+                new_directions.push("w");
+                break;
+            case "w":
+                new_directions.push("e");
+                break;
+        }
+    }
+    return new_directions;
 }
 
 //new function for initializing using the arm system
