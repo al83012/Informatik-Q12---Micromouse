@@ -26,7 +26,7 @@ export class BackendManager {
             "right_2": 0,
         }
     };
-    in_console = ["[D] TestDebug", "[D] TestDebug 2", "[D] TestDebug 3", "[D] TestDebug 4", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    in_console = ["[B] Connected"];
     algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
     in_algorithm = "A*";
     backend = null;
