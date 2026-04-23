@@ -38,7 +38,6 @@ export class Index {
             }));
         }
 
-
         let squares = document.getElementsByClassName("maze_tile");
 
         for (let i = 0; i < squares.length; i++) {

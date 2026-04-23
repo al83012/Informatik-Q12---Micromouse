@@ -79,7 +79,7 @@ export class BackendManager {
     f_handleError(body) {
         console.log("--------------------------------------------------------");
         console.log("[F] An Error occurred on the Frontend:");
-        console.log("[F->Error]: " + body);
+        console.log("[F->Error]: " + body.error);
         console.log("--------------------------------------------------------");
     }
 

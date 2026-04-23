@@ -206,7 +206,7 @@ app.get('/', (req, res) => {
     res.redirect("/home.html");
 });
 
-app.get('/error', (req, res) => {
+app.post('/error', (req, res) => {
     manager.f_handleError(req.body);
     res.send("handled");
 });
