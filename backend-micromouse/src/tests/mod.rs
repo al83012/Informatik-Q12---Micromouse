@@ -17,6 +17,8 @@ mod shortcircuit_discovery;
 pub mod follow_r_test;
 pub mod follow_r_test_short;
 pub mod micromouse_simulator;
+mod conn_website;
+mod spans;
 
 pub const TEST_MAP_SIZE: usize = 12;
 

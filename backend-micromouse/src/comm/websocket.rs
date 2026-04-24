@@ -13,9 +13,9 @@ use tokio_tungstenite::{accept_async, WebSocketStream};
 use tokio_util::{bytes::Buf, sync::CancellationToken};
 use tracing::{debug, error, info, warn};
 use tungstenite::{
-    protocol::{frame::coding::CloseCode, CloseFrame}, Error, Message,
+    protocol::{frame::coding::CloseCode, CloseFrame},
+    Error, Message,
 };
-
 
 use crate::comm::{ChannelConnConfig, ChannelConnError};
 #[cfg(feature = "comm_stats")]
@@ -459,6 +459,9 @@ impl WsChannel {
         tokio::spawn(async move {
             info!(target: "comm", "START WS THREAD");
             loop {
+                let stabilize_in_or_reconnect =
+                    tokio::time::sleep_until(ws_internal.last_pong + Duration::from_secs(10));
+
                 match ws_internal.mode {
                     // Sending is disabled until the ping indicates, that the connection is stable
                     WsChannelMode::Stabilize => {
@@ -476,7 +479,22 @@ impl WsChannel {
                             read_res = ws_internal.ws_stream.as_mut().expect("WS Stream should be Some outside reconnect").next() => {
                                 debug!(target: "comm", "STABILIZING READ");
                                 if let Some(read_res) = read_res {
+                                    debug!(target: "comm", "READ SOME");
                                     ws_internal.handle_read(read_res).await;
+                                } else {
+                                    let res = ws_internal.handle_recoverable_ws_error(Error::ConnectionClosed).await;
+                                    if let Err(res) = res {
+                                        error!(target: "comm", "Reopening failed");
+                                    }
+
+                                    debug!(target: "comm", "READ NONE");
+                                }
+                            }
+                            _ = stabilize_in_or_reconnect => {
+                                error!(target: "comm", "Stabilizing took too long; reopening connection");
+                                let res = ws_internal.handle_recoverable_ws_error(Error::ConnectionClosed).await;
+                                if let Err(res) = res {
+                                    error!(target: "comm", "Reopening failed");
                                 }
                             }
                         }
@@ -532,7 +550,6 @@ impl WsChannel {
         self.read_recv.lock().await.recv().await
     }
 
-
     pub async fn next_nonresolved_error(&self) -> Option<WsChannelConnError> {
         self.e_recv.lock().await.recv().await
     }
@@ -543,7 +560,6 @@ impl WsChannel {
             .await
             .expect("Error while writing to mpsc channel");
     }
-
 }
 
 impl Drop for WsChannel {

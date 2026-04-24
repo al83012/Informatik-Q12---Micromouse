@@ -21,6 +21,7 @@ tracing-appender = "0.2"
 console = "*"
 rand = "*"
 serde_json = "*"
+chrono = "*"
 
 [features]
 comm_stats = []

@@ -23,7 +23,8 @@ fn unbuffered_stdout() -> impl Write {
 }
 
 pub const ENABLED_LOG_TARGETS: [&str; 4] = ["comm", "strat", "main", "test"];
-pub const DISABLE_LOG_FILES: [&str; 1] = ["websocket"];
+// pub const DISABLE_LOG_FILES: [&str; 1] = ["websocket"];
+pub const DISABLE_LOG_FILES: [&str; 0] = [];
 
 pub struct TargetFilter;
 
@@ -216,10 +217,10 @@ pub fn init_logging() -> Vec<WorkerGuard> {
     let env_filter = EnvFilter::new("debug");
     let fmt_layer = fmt::layer()
         .event_format(MyFormatter::new())
-        .with_ansi(true)
-        .with_filter(FilterFn::new(|meta| {
-            !meta.module_path().unwrap_or("").ends_with("websocket")
-        }));
+        .with_ansi(true);
+    // .with_filter(FilterFn::new(|meta| {
+    //     !meta.module_path().unwrap_or("").ends_with("websocket")
+    // }));
 
     let (non_blocking, guard) = file_writer::file_appender("comm/msg_log", "messages");
 
@@ -273,3 +274,5 @@ pub fn run_test<T>(env_filter: &str, f: impl FnOnce() -> T) -> T {
     let (subscriber, _guards) = test_logging(env_filter);
     tracing::subscriber::with_default(subscriber, f)
 }
+
+

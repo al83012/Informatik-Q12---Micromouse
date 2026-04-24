@@ -10,6 +10,7 @@ use tokio::{
     time::{sleep_until, Instant},
 };
 use tokio_util::sync::CancellationToken;
+use tracing::{error, info};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -35,7 +36,7 @@ pub enum FrontendMessage {
     Debug(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub enum FrontendResponse {
     NewStrategy { strategy_type: StrategyType },
     // New Strategy will set the next strategy to be used after the execution finishes
@@ -84,6 +85,7 @@ pub struct FrontendManager {
     read_queue: Receiver<FrontendResponse>,
 }
 
+#[derive(Default)]
 pub struct FrontendConnectionConfig {
     pub batching_duration: Duration,
     pub ws_channel_config: WsChannelConfig,
@@ -103,6 +105,8 @@ impl FrontendManager {
 
         let cancellation_token = CancellationToken::new();
 
+        info!(target: "comm/webs", "Creating Internal Frontend Connection Handler");
+
         let mut internal = FrontendConnectionManagerInternal {
             batching_duration: config.batching_duration,
             send_queue: send_queue_receiver,
@@ -112,10 +116,12 @@ impl FrontendManager {
             read_queue: read_sender,
             send_batch: vec![],
         };
+        info!(target: "comm/webs", "Created Internal Frontend Connection Handler");
 
         tokio::task::spawn(async move {
             internal.handle_connection_loop().await;
         });
+        info!(target: "comm/webs", "Spawned frontend communication thread");
 
         let thread_connection = FrontendManager {
             cancellation_token,
@@ -134,7 +140,12 @@ impl FrontendConnectionManagerInternal {
             let batching_duration_clone = self.batching_duration.clone();
             let ws = &self.websocket;
             let send_queue = &mut self.send_queue;
+            let cancellation = self.cancellation_token.clone();
             tokio::select! {
+                _ = cancellation.cancelled() => {
+                    info!(target: "comm/webs", "CANCELLED FRONTEND INTERNAL LOOP");
+                    break;
+                }
                 _ = Self::batch_ready(first_element_send_time_clone, batching_duration_clone) => {
                     self.send_batch().await;
                 }
@@ -171,8 +182,19 @@ impl FrontendConnectionManagerInternal {
     }
     pub async fn propagate_read(&self, msg: Option<Message>) {
         // Parses and sends to the ConnectionHandler
-        let parsed_msg = todo!("Parse command or cmd close");
-        self.read_queue.send(parsed_msg);
+        let Some(msg) = msg else {
+            return;
+        };
+        let Message::Text(msg) = msg else {
+            return;
+        };
+
+        let Ok(parsed) = serde_json::de::from_str(msg.to_string().as_str()) else {
+            error!(target: "comm/webs", "Invalid message: {msg}");
+            return;
+        };
+        // let parsed_msg = todo!("Parse command or cmd close");
+        self.read_queue.send(parsed);
     }
     pub async fn send_batch(&mut self) {
         let mut empty = vec![];
@@ -191,6 +213,7 @@ impl FrontendConnectionManagerInternal {
 
 impl Drop for FrontendManager {
     fn drop(&mut self) {
+        info!(target: "comm/webs", "DROPPED FRONTEND MANAGER");
         self.cancellation_token.cancel();
     }
 }
