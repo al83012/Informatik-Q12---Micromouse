@@ -43,14 +43,14 @@ enum directions dir = posX;
 
 
 int SIM_FIELD[8][8] = {
-  { neY+neX, neY, neY, neY, neY, neY, neY, neY+poX },
+  { neY + neX, neY, neY, neY, neY, neY, neY, neY + poX },
   { neX, emp, poX, neX, emp, emp, emp, poX },
   { neX, emp, emp, emp, emp, emp, emp, poX },
   { neX, emp, poX, neX, emp, emp, emp, poX },
   { neX, emp, poX, neX, emp, emp, emp, poX },
   { neX, emp, poX, neX, emp, emp, emp, poX },
   { neX, emp, poX, neX, emp, emp, emp, poX },
-  { neX+poY, poY, poY, poY, poY, poY, poY, poX+poY }
+  { neX + poY, poY, poY, poY, poY, poY, poY, poX + poY }
 };
 
 //Live vars
@@ -64,7 +64,7 @@ struct MeasurementTask {
   char direction;
   int reaction;
 };
- 
+
 
 //Command config
 const int MAX_CMD_ARGS = 15;
@@ -157,11 +157,11 @@ int sim_measure(char scan_dir) {
 
 
 
-    if (scan_dir == 'L') {
+  if (scan_dir == 'L') {
     if (dir == posX) lookDir = negY;
-    else if (dir == posY) lookDir = negX;
+    else if (dir == posY) lookDir = posX;
     else if (dir == negX) lookDir = posY;
-    else if (dir == negY) lookDir = posX;
+    else if (dir == negY) lookDir = negX;
   }
 
   else if (scan_dir == 'R') {
@@ -171,27 +171,26 @@ int sim_measure(char scan_dir) {
     else if (dir == posY) lookDir = negX;
   }
 
- int wall_flag = 0;
+  int wall_flag = 0;
 
- if (lookDir == posX) {
-      wall_flag = 1;
-    } else if (lookDir == posY) {
-      wall_flag = 4;
-    } else if (lookDir == negX) {
-      wall_flag = 8;
-    } else if (lookDir == negY) {
-      wall_flag = 2;
-    }
+  if (lookDir == posX) {
+    wall_flag = poX;
+  } else if (lookDir == posY) {
+    wall_flag = poY;
+  } else if (lookDir == negX) {
+    wall_flag = neX;
+  } else if (lookDir == negY) {
+    wall_flag = neY;
+  }
 
   while (true) {
-   
+
     int next_X = check_X;
     int next_Y = check_Y;
 
-  
 
-    if (SIM_FIELD[check_Y][check_X] & wall_flag) { break; }
     if (distance >= SIM_SIZE) break;
+    if (SIM_FIELD[check_Y][check_X] & wall_flag) { break; }
 
     if (lookDir == posX) {
       next_X++;
@@ -251,9 +250,10 @@ void connectWS() {
   if (connected) {
     Serial.println("# CN SUCC!");
     debug("From the moment i understood the weakness of my flesh, it disgusted me...");
-    if(reset) {
-    debug("RESET");
-    reset = false;
+    if (reset) {
+      client.send("RESTART");
+      client.send("CONTINUE");
+      reset = false;
     }
     client.ping();
 
@@ -351,7 +351,7 @@ int measure(char dir) {
   }
 
 
-  return sim_measure(dir); //REMOVE AFTER SIM
+  return sim_measure(dir);  //REMOVE AFTER SIM
 }
 
 
@@ -362,67 +362,60 @@ void movePassive(int cells) {
 
 
 
-void moveActive(int cells, vector<MeasurementTask> activeTasks) {
+void moveActive(int cells, vector<MeasurementTask>& activeTasks) {
 
 
   for (int i = 0; i < cells; i++) {
     int sub_step = i;
-    for(auto task : activeTasks) {
+    for (int j = 0; j < activeTasks.size(); j++) {
+      auto task = activeTasks[j];
+
       Serial.println("#RSLV NEW TASK");
       Serial.println(task.subStep);
       Serial.println(task.direction);
       Serial.println(task.reaction);
 
-      if(task.subStep == sub_step || MAX_SUB_STEPS) {
+      if (task.subStep == sub_step || MAX_SUB_STEPS) {
         int distance = measure(task.direction);
+        Serial.print("Distance: ");
+        Serial.println(String(distance));
+
         String content;
         content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
-        
+
         if (distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
         Serial.println("#MSR > SRV");
         client.send(content);
 
-         if (distance > DISTANCE_THRESHOLD) {
-        if (task.reaction == STOP_IF_OPEN_ID) {
-          String content = String(sub_step) + "_" + task.direction + "STOP_IF_OPEN";
-          Serial.println("#STOPPED: STOP_IF_OPEN");
-          debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-          interrupt = true;
-          finishedAllInterrupt(content);
-          return;
+        if (distance > DISTANCE_THRESHOLD) {
+          if (task.reaction == STOP_IF_OPEN_ID) {
+            String content = String(sub_step) + "_" + task.direction + "_STOP-IF-OPEN";
+            Serial.println("#STOPPED: STOP-IF-OPEN");
+            debug("Interrupt at substep " + sub_step);
+            interrupt = true;
+            finishedAllInterrupt(content);
+            return;
+          }
+
+
+
+        } else {
+
+
+          if (task.direction == STOP_IF_BLOCKED_ID) {
+            String content = String(sub_step) + "_" + task.direction + "_STOP-IF-BLOCKED";
+            Serial.println("#STOPPED: STOP_IF_BLOCKED");
+            debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+            interrupt = true;
+            finishedAllInterrupt(content);
+            return;
+          }
         }
-
-        if (task.reaction != CONTINUE_ID) {
-          turnPassive(1);
-          return;
-        }
-
-      } else if (distance <= DISTANCE_THRESHOLD) {
-
-
-        if (task.direction == STOP_IF_BLOCKED_ID) {
-          String content = String(sub_step) + "_" + task.direction + "STOP_IF_BLOCKED";
-          Serial.println("#STOPPED: STOP_IF_BLOCKED");
-          debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-          interrupt = true;
-          finishedAllInterrupt(content);
-          return;
-        }
-
-        if (task.direction != CONTINUE_ID) {
-          turnPassive(1);
-          return;
-        }
-
-
-      }
-        
       }
     }
 
     movePassive(1);
-  
-}
+  }
 }
 
 void turnPassive(int turns) {
@@ -441,6 +434,7 @@ void turnPassive(int turns) {
 
 
   }*/
+  Serial.println("# TURN > SRV");
   sim_turn(turns);  //REMOVE AFTER SIM
 }
 
@@ -451,60 +445,50 @@ void turnActive(int turns, vector<MeasurementTask> activeTasks) {
     counterclock = true;
   }
 
-  for(int i = 0; i <= turns; i++) {
-      int sub_step = i;
-    for(auto task : activeTasks) {
-      if(task.subStep == sub_step || MAX_SUB_STEPS) {
+  for (int i = 0; i <= turns; i++) {
+    int sub_step = i;
+    for (auto task : activeTasks) {
+      if (task.subStep == sub_step || MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         String content;
         content = String("MEASUREMENT #") + currCMD_ID + " " + String(sub_step) + "_" + task.direction + " " + String(distance);
-        
+
         if (distance >= SENSORLIMIT) { content = content + String(" SENSORLIMIT"); }
         Serial.println("#MSR > SRV");
         client.send(content);
 
-         if (distance > DISTANCE_THRESHOLD) {
-        if (task.reaction == STOP_IF_OPEN_ID) {
-          String content = String(sub_step) + "_" + task.direction + "STOP_IF_OPEN";
-          debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-          interrupt = true;
-          finishedAllInterrupt(content);
-          return;
-        }
-
-        if (task.reaction != CONTINUE_ID) {
-          turnPassive(1);
-          return;
-        }
-
-      } else if (distance <= DISTANCE_THRESHOLD) {
+        if (distance > DISTANCE_THRESHOLD) {
+          if (task.reaction == STOP_IF_OPEN_ID) {
+            String content = String(sub_step) + "_" + task.direction + "_STOP-IF-OPEN";
+            debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+            interrupt = true;
+            finishedAllInterrupt(content);
+            return;
+          }
 
 
-        if (task.direction == STOP_IF_BLOCKED_ID) {
-          String content = String(sub_step) + "_" + task.direction + "STOP_IF_BLOCKED";
-          debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-          interrupt = true;
-          finishedAllInterrupt(content);
-          return;
-        }
 
-        if (task.direction != CONTINUE_ID) {
-          turnPassive(1);
-          return;
+        } else {
+
+
+          if (task.reaction == STOP_IF_BLOCKED_ID) {
+            String content = String(sub_step) + "_" + task.direction + "_STOP-IF-BLOCKED";
+            debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
+            interrupt = true;
+            finishedAllInterrupt(content);
+            return;
+          }
         }
       }
-        
-      }
 
-      
-      if(counterclock) {
+
+      if (counterclock) {
         turnPassive(-1);
       } else {
         turnPassive(1);
       }
     }
-}
-
+  }
 }
 
 
@@ -554,11 +538,9 @@ void finishedAll() {
 }
 
 void finishedAllInterrupt(String message) {
-  String content = "CMD-FINISHED #";
+  String content = "CMD-FINISHED #" + String(currCMD_ID) + " " + message;
   Serial.println("# CMD DONE INTRPT > SRV");
-  content = content + currCMD_ID;
-  content = content + " " + message;
-  client.send(message);
+  client.send(content);
 }
 
 
@@ -596,6 +578,24 @@ void handleEvent(WebsocketsEvent event, String data) {
 
 
 void handleCommand(WebsocketsMessage WSmessage) {
+  bool oleg = true;
+  dir = posY;
+  for (int i = 0; i < 8; i++) {
+    for (int j = 0; j < 8; j++) {
+      X = i;
+      Y = j;
+      Serial.println("X: " + String(i) + "Y: " + String(j));
+      Serial.println("F: " + String(sim_measure('F')));
+      Serial.println("R: " + String(sim_measure('R')));
+      Serial.println("L: " + String(sim_measure('L')));
+    }
+  }
+  if (oleg) {
+    X = 0; Y = 0;
+    oleg = false;
+  }
+
+
   String message = WSmessage.data();
   Serial.println(">> " + message);
   String arguments[MAX_CMD_ARGS];
@@ -644,17 +644,17 @@ void handleCommand(WebsocketsMessage WSmessage) {
             turnPassive(arguments[2].toInt());
             finishedAll();
           }
-        //Passive movement end
+          //Passive movement end
 
 
-        } else { // if not passive -> must be active
+        } else {  // if not passive -> must be active
           MeasurementTask task;
 
           int cells = arguments[2].toInt();
           if (arguments[3] == "MEASURE") {
             for (int j = 4; j < words; j++) {
               String word = arguments[j];
-      
+
               int sub_step;
               if (word[0] != 'X') {
                 int dirIndex = -1;
@@ -666,10 +666,10 @@ void handleCommand(WebsocketsMessage WSmessage) {
                 }
 
 
-                if (dirIndex != -1) {  
-                  
+                if (dirIndex != -1) {
+
                   task.subStep = word.substring(0, dirIndex).toInt();
-                  task.direction = word[dirIndex +1];
+                  task.direction = word[dirIndex + 1];
 
                 } else {
                   Serial.println("# INVLD DIR ARGS");
@@ -679,7 +679,6 @@ void handleCommand(WebsocketsMessage WSmessage) {
               } else {
                 task.subStep = MAX_SUB_STEPS;
                 task.direction = word[2];
-
               }
               char dir = word[2];
               task.direction = dir;
@@ -702,17 +701,25 @@ void handleCommand(WebsocketsMessage WSmessage) {
               Serial.println(task.direction);
               Serial.println(task.reaction);
             }
-            
+
+            Serial.println("activeTasks:");
+            for (int k = 0; k < activeTasks.size(); k++) {
+              Serial.println(String(activeTasks[k].subStep));
+            }
+
             if (arguments[0] == "MOVE") {
               moveActive(cells, activeTasks);
             } else if (arguments[0] == "TURN") {
               turnActive(cells, activeTasks);
             }
             activeTasks.clear();
-            
 
 
-           if(!interrupt) {finishedAll(); interrupt = false;}  
+
+            if (!interrupt) {
+              finishedAll();
+              interrupt = false;
+            }
 
           } else {
             Serial.println("# INVLD MOV ARGS > SRV");
@@ -748,13 +755,10 @@ void loop() {
     Serial.println("# CN LOST!");
     Serial.println("# RE-CN...");
     connectWS();
-    if(client.available()) {
-    Serial.println("# RE-CN SUCC!");
-
-    debug("CONTINUE");
+    if (client.available()) {
+      Serial.println("# RE-CN SUCC!");
+      client.send("CONTINUE");
     }
-
-
   }
 
   // delay(1000/stepFreq);
