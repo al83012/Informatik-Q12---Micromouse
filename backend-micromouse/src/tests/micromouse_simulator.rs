@@ -2,13 +2,13 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     comm::micromouse_message::{
         CommandMessage, InterruptAction, InterruptOccurence, MeasurementMessage,
-        MeasurementOccurrence, TransformedMovement,
+        MeasurementOccurrence, MicromouseResponse, TransformedMovement,
     },
     map::{
         map::Map,
@@ -37,6 +37,15 @@ impl<const N: usize> MicromouseSimulator<N> {
             .expect("Connection failed");
         info!(target: "test/sim", " < Connection Response = {response:?}");
 
+        ws_stream
+            .send(Message::Text(Utf8Bytes::from("RESTART".to_string())))
+            .await
+            .expect("Error sending opening msg");
+        ws_stream
+            .send(Message::Text(Utf8Bytes::from("CONTINUE".to_string())))
+            .await
+            .expect("Error sending opening msg");
+
         'next_cmd: while let Some(msg) = ws_stream.next().await {
             let msg = match msg {
                 Ok(o) => o,
@@ -52,7 +61,7 @@ impl<const N: usize> MicromouseSimulator<N> {
             };
             let msg = CommandMessage::try_from(msg.to_string());
             if let Err(e) = &msg {
-                error!(target: "test/sim", "Got non-cmd message: {e}");
+                warn!(target: "test/sim", "Got non-cmd message: {e}");
                 continue;
             }
             let msg = msg.expect("Checked");

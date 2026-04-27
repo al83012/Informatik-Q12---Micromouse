@@ -18,7 +18,9 @@ use tracing::{
     Event, Level, Subscriber,
 };
 
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+use tracing_subscriber::{
+    filter::FilterFn, layer::Context, registry::LookupSpan, EnvFilter, Layer,
+};
 
 use pathdiff::diff_paths;
 
@@ -174,7 +176,7 @@ where
 
             if parent_dir != current_dir {
                 let rel = diff_paths(&parent_file, &current_dir).unwrap();
-                writeln!(file, "{}", link_str(rel.to_string_lossy(), "SOURCE")).ok();
+                writeln!(file, "{} ->", link_str(rel.to_string_lossy(), "SOURCE")).ok();
                 // writeln!(file, "[SOURCE]({})", rel.display()).ok();
             }
         }
@@ -183,13 +185,13 @@ where
         {
             let mut file = self.get_file(&parent_file);
             let rel = diff_paths(&current_file, &parent_dir).unwrap();
-            writeln!(file, "{}", link_str(rel.to_string_lossy(), name)).ok();
+            writeln!(file, "-> {}", link_str(rel.to_string_lossy(), name)).ok();
             // writeln!(file, "[{name}]({})", rel.display()).ok();
         }
     }
 
-    fn on_exit(&self, id: &span::Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).unwrap();
+    fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
+        let span = ctx.span(&id).unwrap();
 
         let extensions = span.extensions();
 
@@ -203,7 +205,7 @@ where
         let mut file = self.get_file(&span_file);
         writeln!(
             file,
-            "{}\n",
+            "<- {}\n",
             link_str("../index.md", parent_span.to_string_lossy())
         )
         .ok();
@@ -255,6 +257,7 @@ where
         let event_str =
             format!("{info}{pad_str}   {RESET_COLOR} ] {level_color} {msg}{RESET_COLOR}");
 
+        println!("{event_str}");
         let event_str = ansi_to_html::convert(&event_str).expect("unable to convert ANSI to HTML");
 
         // write to span file
@@ -328,11 +331,17 @@ fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
 pub fn init_tree_logger() {
     use tracing_subscriber::prelude::*;
     tracing_subscriber::registry()
+        .with(EnvFilter::new("debug"))
         .with(RoutingLayer::new())
         .init();
 }
 
-pub fn process_span(span_name: impl Into<String>) -> EnteredSpan {
+pub fn enter_process(span_name: impl Into<String>) -> EnteredSpan {
     let span_name = span_name.into();
     tracing::span!(Level::DEBUG, "process_span", name = span_name).entered()
+}
+
+pub fn process_span(span_name: impl Into<String>) -> tracing::span::Span {
+    let span_name = span_name.into();
+    tracing::span!(Level::DEBUG, "process_span", name = span_name)
 }

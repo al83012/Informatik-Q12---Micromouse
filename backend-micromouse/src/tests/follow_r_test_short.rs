@@ -1,9 +1,11 @@
-use std::{ops::Deref, time::Duration};
+use std::{ops::Deref, os::windows::process, time::Duration};
 
 use tokio::time::{self, Instant, Interval};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+use tracing::Instrument;
 
+use crate::utils::hyperlink_logging::process_span;
 use crate::{
     comm::{
         micromouse_manager::{MicromouseEvent, MicromouseManager},
@@ -16,14 +18,19 @@ use crate::{
         TEST_MAP_SIZE,
     },
     transform::direction::RelativeDirection,
-    utils::logging::{init_logging, run_test},
+    utils::{
+        hyperlink_logging::{init_tree_logger, enter_process},
+        logging::{init_logging, run_test},
+    },
 };
 
 #[ignore]
 #[test]
 pub fn follow_r() {
     let world = super::test_map(0.5);
-    let guards = init_logging();
+    init_tree_logger();
+    let _s = enter_process("test");
+    // let guards = init_logging();
     info!(target: "tests/map", "TEST WORLD:\n{world}");
     let mut micromouse_simulator = MicromouseSimulator::new(world);
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -31,13 +38,15 @@ pub fn follow_r() {
     let mut cancel = CancellationToken::new();
     let local_cancel = cancel.clone();
 
-    rt.spawn(async move {
-        tokio::select! {
-            _ = cancel.cancelled() => {},
-            _ = micromouse_simulator.run(2) => {},
+    rt.spawn(
+        async move {
+            tokio::select! {
+                _ = cancel.cancelled() => {},
+                _ = micromouse_simulator.run(2) => {},
 
-        }
-    });
+            }
+        }.instrument(process_span("simulator"))
+    );
     info!(target: "comm/msg_log", "****************************************************************************************");
     // run_test("trace", || {
     rt.block_on(async {
@@ -93,6 +102,7 @@ pub fn follow_r() {
             info!(target: "test/comm", "TEST TICK");
             tokio::select! {
                 _ = micromouse_manager.notified_empty_queue() => {
+                    let _s = enter_process("notify_empty");
                     info!(target: "comm/mng", "EMPTY QUEUE");
                     let next_cmd = always_right_commands[next_cmd_id].clone();
                     info!(target: "comm/mng/cmd", "SENT NEXT COMMAND: {next_cmd:?}");
@@ -101,6 +111,7 @@ pub fn follow_r() {
                     // Need next command
                 }
                 msg = micromouse_manager.next_read() => {
+                    let _s = enter_process("read");
                     // WARN: Have to move the code for parsing etc. here: It has to be blocking (at
                     // least relative to sending commands, as the order might get screwed up
                     // otherwise when the command sending takes precedence and cancels next() -->
@@ -123,6 +134,7 @@ pub fn follow_r() {
                     }
                 }
                 _ = recheck_cmd_tick.tick() => {
+                    let _s = enter_process("recheck_tick");
                     // Periodic updates so that we don't have to just rely on the chain of updates
                     // to continue
                     info!(target: "comm/mng/cmd", "RECHECKING QUEUE COUNT");
@@ -131,7 +143,7 @@ pub fn follow_r() {
                 }
             }
         }
-    });
+    }.instrument(process_span("manager")));
     local_cancel.cancel();
     // });
 }
