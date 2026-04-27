@@ -55,7 +55,7 @@ where
     }
 }
 
-fn level_color(level: &tracing::Level) -> &'static str {
+pub fn level_color(level: &tracing::Level) -> &'static str {
     match *level {
         tracing::Level::ERROR => "\x1b[31m", // red
         tracing::Level::WARN => "\x1b[33m",  // yellow
@@ -65,7 +65,7 @@ fn level_color(level: &tracing::Level) -> &'static str {
     }
 }
 
-fn level_bg_color(level: &tracing::Level) -> &'static str {
+pub fn level_bg_color(level: &tracing::Level) -> &'static str {
     match *level {
         tracing::Level::ERROR => "\x1b[41m",  // red background
         tracing::Level::WARN => "\x1b[43m",   // yellow background
@@ -75,9 +75,9 @@ fn level_bg_color(level: &tracing::Level) -> &'static str {
     }
 }
 
-const RESET_COLOR: &str = "\x1b[0m";
-const BLACK: &str = "\x1b[30m";
-const STD_BG: &str = "\x1b[0;100m";
+pub const RESET_COLOR: &str = "\x1b[0m";
+pub const BLACK: &str = "\x1b[30m";
+pub const STD_BG: &str = "\x1b[0;100m";
 
 pub struct MyFormatter {
     start_time: Instant,
@@ -199,8 +199,8 @@ where
     }
 }
 
-struct MessageVisitor {
-    msg: Option<String>,
+pub struct MessageVisitor {
+    pub msg: Option<String>,
 }
 
 impl Visit for MessageVisitor {
@@ -274,5 +274,3 @@ pub fn run_test<T>(env_filter: &str, f: impl FnOnce() -> T) -> T {
     let (subscriber, _guards) = test_logging(env_filter);
     tracing::subscriber::with_default(subscriber, f)
 }
-
-

@@ -797,6 +797,15 @@ pub struct AbsoluteNodeId {
     node_id: RelativeNodeId,
 }
 
+impl AbsoluteNodeId {
+    pub fn layer_id(&self) -> &AbsoluteLayerId {
+        &self.layer_id
+    }
+    pub fn node_id(&self) -> &RelativeNodeId {
+        &self.node_id
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct AbsolutePathId {
     from_node: AbsoluteNodeId,

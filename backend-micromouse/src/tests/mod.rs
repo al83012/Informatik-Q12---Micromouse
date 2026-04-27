@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use rand::Rng;
+use rand::{Rng, RngExt};
 use tracing::debug;
 
 use crate::{
@@ -69,13 +69,13 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
 
     debug!(target: "tests/map/gen", "Initialized: All blocked...\n{map}");
 
-    let mut rand = rand::thread_rng();
+    let mut rand = rand::rng();
     while !possible_connections.is_empty() {
         let num_of_conn_sources = possible_connections.len();
         debug!(target: "tests/map/gen", "Sources left = {num_of_conn_sources}");
         let rand_key = {
             let mut keys = possible_connections.keys();
-            keys.nth(rand.gen_range(0..num_of_conn_sources))
+            keys.nth(rand.random_range(0..num_of_conn_sources))
                 .expect("should exist")
                 .clone()
         };
@@ -88,7 +88,7 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
             let conn_dir = {
                 conn_options
                     .iter()
-                    .nth(rand.gen_range(0..conn_options.len()))
+                    .nth(rand.random_range(0..conn_options.len()))
                     .expect("should exist")
                     .clone()
             };

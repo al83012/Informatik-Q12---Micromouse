@@ -1,39 +1,132 @@
 use std::{
     collections::HashMap,
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     io::Write,
-    path::{absolute, Path},
+    ops::Deref,
+    path::{Path, PathBuf},
     sync::Mutex,
+    time::Instant,
 };
+
+use crate::utils::logging::{BLACK, RESET_COLOR, STD_BG};
+
+use chrono::Local;
+
 use tracing::{
-    field::{Field, Visit},
-    span::EnteredSpan,
-    Event, Subscriber,
+    field::{Field, Value, Visit},
+    span::{self, EnteredSpan},
+    Event, Level, Subscriber,
 };
-use tracing_subscriber::{layer::SubscriberExt, registry::LookupSpan, Layer};
 
-use chrono::{self, Local};
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
-use crate::comm::micromouse_message::CommandId;
+use pathdiff::diff_paths;
 
-struct LogFileSpan {
-    dir_path: String,
+use crate::{
+    comm::micromouse_message::CommandId,
+    strategy::strategy_tree::AbsoluteNodeId,
+    utils::logging::{level_bg_color, level_color, MessageVisitor, MyFormatter},
+};
+
+struct NameVisitor {
+    pub name: Option<String>,
 }
 
-struct RoutingLayer {
-    files: Mutex<HashMap<String, std::fs::File>>,
-    run_id: String,
+struct LinkVisitor {
+    pub links: Vec<Link>,
 }
 
-struct FieldVisitor {
-    log_file: Option<String>,
+struct Link {
+    category: String,
+    name: String,
 }
 
-impl Visit for FieldVisitor {
-    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
-        if field.name() == "log_dir" {
-            self.log_file = Some(format!("{:?}", value));
+pub trait LinkFileName {
+    fn link(&self) -> String;
+}
+
+impl LinkFileName for CommandId {
+    fn link(&self) -> String {
+        format!("cmd_{}", self.0)
+    }
+}
+
+impl LinkFileName for AbsoluteNodeId {
+    fn link(&self) -> String {
+        format!("node_L{}_N{}", self.layer_id().0, self.node_id().0)
+    }
+}
+
+impl Visit for LinkVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        const LINK_PREFIX: &str = "link_";
+        if field.name() != LINK_PREFIX && field.name().starts_with(LINK_PREFIX) {
+            let category = &field.name()[LINK_PREFIX.len()..];
+            self.links.push(Link {
+                category: category.to_string(),
+                name: value.to_string(),
+            })
         }
+    }
+    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
+        // self.record_str(field, format!("{value:?}").as_str());
+        // panic!("Just using Debug will result in wrong file names");
+    }
+}
+
+impl Visit for NameVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
+        // self.record_str(field, &format!("{value:?}"));
+        // panic!("Just using Debug will result in wrong file names");
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "name" {
+            self.name = Some(value.to_string())
+        }
+    }
+}
+
+struct LogSpan {
+    dir: PathBuf,
+}
+
+pub struct RoutingLayer {
+    files: Mutex<HashMap<PathBuf, File>>,
+    run_root: PathBuf,
+    start_time: Instant,
+}
+
+impl RoutingLayer {
+    pub fn new() -> Self {
+        let run_id = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+        let root = PathBuf::from("logs").join(run_id);
+
+        Self {
+            files: Mutex::new(HashMap::new()),
+            run_root: root,
+            start_time: Instant::now(),
+        }
+    }
+
+    fn get_file(&self, path: &Path) -> File {
+        let mut files = self.files.lock().unwrap();
+
+        if !files.contains_key(path) {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).unwrap();
+            }
+
+            let file = OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(path)
+                .unwrap();
+
+            files.insert(path.to_path_buf(), file);
+        }
+
+        files.get(path).unwrap().try_clone().unwrap()
     }
 }
 
@@ -41,132 +134,205 @@ impl<S> Layer<S> for RoutingLayer
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
-    fn on_event(&self, event: &Event<'_>, ctx: tracing_subscriber::layer::Context<'_, S>) {
-        if let Some(scope) = ctx.event_scope(event) {
-            if let Some(span) = scope.from_root().last() {
-                if let Some(data) = span.extensions().get::<LogFileSpan>() {
-                    println!("Processing event {event:?}");
-                    // let path = format!(
-                    //     "logs/{}/{}/{}.md",
-                    //     self.run_id,
-                    //     data.dir_path,
-                    //     event.metadata().target().replace('.', "/")
-                    // );
-                    let path = format!("{}/index.md", data.dir_path);
-
-                    let mut files_lock = self.files.lock().expect("Should not be poisoned");
-                    let file = files_lock.entry(path.clone()).or_insert_with(|| {
-                        std::fs::create_dir_all(std::path::Path::new(&path).parent().unwrap()).ok();
-                        OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open(&path)
-                            .unwrap()
-                    });
-                    writeln!(file, "{:?}", event).expect("Error while writing to file")
-                }
-            }
-        }
-    }
     fn on_new_span(
         &self,
         attrs: &tracing::span::Attributes<'_>,
         id: &tracing::Id,
-        ctx: tracing_subscriber::layer::Context<'_, S>,
+        ctx: Context<'_, S>,
     ) {
         let span = ctx.span(id).unwrap();
-        let mut visitor = FieldVisitor { log_file: None };
-        attrs.record(&mut visitor);
 
-        let name = visitor
-            .log_file
-            .unwrap_or_else(|| span.metadata().name().to_string());
         // let name = span.metadata().name();
+        let mut name_visitor = NameVisitor { name: None };
+        attrs.record(&mut name_visitor);
+        let name = name_visitor
+            .name
+            .as_deref()
+            .unwrap_or(span.metadata().name());
 
-        let parent_folder_path = if let Some(parent) = span.parent() {
-            if let Some(parent_file) = parent.extensions().get::<LogFileSpan>() {
-                parent_file.dir_path.clone()
-            } else {
-                format!("logs/{}", self.run_id)
-            }
-        } else {
-            format!("logs/{}", self.run_id)
-        };
-        // create file path
-        let child_folder_path = format!("{parent_folder_path}/{name}");
-        let child_file_path = format!("{child_folder_path}/index.md");
-        let parent_file_path = format!("{parent_folder_path}/index.md");
-        // let [parent_name, _p] = parent_file_path
-        let parent_name = parent_folder_path
-            .rsplitn(2, "/")
-            .next()
-            .expect("Should be at least 1");
-        // let parent_file_path_abs = absolute(parent_file_path);
+        let parent_dir = span
+            .parent()
+            .as_ref()
+            .map(|p| p.extensions())
+            .as_ref()
+            .and_then(|e| e.get::<LogSpan>())
+            .map(|s| s.dir.clone())
+            .unwrap_or_else(|| self.run_root.clone());
 
-        // store in extensions
-        span.extensions_mut().insert(LogFileSpan {
-            dir_path: child_folder_path.clone(),
+        let current_dir = parent_dir.join(name);
+        let current_file = current_dir.join("index.md");
+        let parent_file = parent_dir.join("index.md");
+
+        span.extensions_mut().insert(LogSpan {
+            dir: current_dir.clone(),
         });
 
-        // ensure file exists / create the new file
-        // INFO: Create the new span's file
-        println!("child_folder_path = {child_folder_path}, child_file_path = {child_file_path}");
-        std::fs::create_dir_all(std::path::Path::new(&child_file_path).parent().unwrap()).ok();
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&child_file_path)
-            .unwrap();
+        // create current file
+        {
+            let mut file = self.get_file(&current_file);
+            writeln!(file, "# Span: {name}\n").ok();
 
-        writeln!(file, "# Span: {}", name).ok();
+            if parent_dir != current_dir {
+                let rel = diff_paths(&parent_file, &current_dir).unwrap();
+                writeln!(file, "{}", link_str(rel.to_string_lossy(), "SOURCE")).ok();
+                // writeln!(file, "[SOURCE]({})", rel.display()).ok();
+            }
+        }
 
-        // if let Ok(parent_file_path_abs) = parent_file_path_abs {
-        writeln!(file, "[SOURCE](../index.md)").expect("Error while writing to file");
-
-        let mut file_lock = self.files.lock().expect("Should not be poisoned");
-
-        let parent_file = file_lock
-            .entry(parent_file_path.clone())
-            .or_insert_with(|| {
-                std::fs::create_dir_all(
-                    std::path::Path::new(&parent_folder_path).parent().unwrap(),
-                )
-                .ok();
-                OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&parent_file_path)
-                    .unwrap()
-            });
-
-        writeln!(parent_file, "[{name}](./{name}/index.md)").expect("Error while writing to file");
-    }
-}
-
-impl RoutingLayer {
-    pub fn new() -> Self {
-        let date = Local::now();
-        Self {
-            files: Mutex::new(HashMap::new()),
-            run_id: date.format("%Y-%m-%d_%H-%M-%S").to_string(),
+        // link from parent
+        {
+            let mut file = self.get_file(&parent_file);
+            let rel = diff_paths(&current_file, &parent_dir).unwrap();
+            writeln!(file, "{}", link_str(rel.to_string_lossy(), name)).ok();
+            // writeln!(file, "[{name}]({})", rel.display()).ok();
         }
     }
+
+    fn on_exit(&self, id: &span::Id, ctx: Context<'_, S>) {
+        let span = ctx.span(id).unwrap();
+
+        let extensions = span.extensions();
+
+        let Some(span_data) = extensions.get::<LogSpan>() else {
+            return;
+        };
+
+        let span_file = span_data.dir.join("index.md");
+        let parent_span = span_data.dir.parent().unwrap_or(self.run_root.as_path());
+
+        let mut file = self.get_file(&span_file);
+        writeln!(
+            file,
+            "{}\n",
+            link_str("../index.md", parent_span.to_string_lossy())
+        )
+        .ok();
+    }
+
+    fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+        let span = match ctx.event_scope(event).and_then(|s| s.from_root().last()) {
+            Some(s) => s,
+            None => return,
+        };
+
+        let extensions = span.extensions();
+        let span_data = match extensions.get::<LogSpan>() {
+            Some(d) => d,
+            None => return,
+        };
+
+        let current_dir = &span_data.dir;
+        let current_file = current_dir.join("index.md");
+
+        let mut link_visitor = LinkVisitor { links: vec![] };
+        event.record(&mut link_visitor);
+
+        let meta = event.metadata();
+        let module = meta.module_path().unwrap_or("");
+        let module = module.rsplit("::").next().unwrap_or("");
+        let target = meta.target();
+        let level = meta.level();
+        let time = self.start_time.elapsed().as_secs_f64();
+
+        let level_color = level_color(level);
+        let level_bg_color = level_bg_color(level);
+
+        let level = format!("{level_bg_color} {level:<6} {STD_BG}");
+
+        let info = format!("[{time:>8.2}] [{BLACK} {level} {module:<10} {target:<6}");
+
+        let info_len = console::measure_text_width(info.as_str());
+
+        let target_len = 55;
+        let pad = target_len - usize::min(target_len, info_len);
+
+        let pad_str = " ".repeat(pad);
+
+        let mut visitor = MessageVisitor { msg: None };
+        let num_links = link_visitor.links.len();
+        event.record(&mut visitor);
+        let msg = visitor.msg.unwrap_or_default();
+        let event_str =
+            format!("{info}{pad_str}   {RESET_COLOR} ] {level_color} {msg}{RESET_COLOR}");
+
+        let event_str = ansi_to_html::convert(&event_str).expect("unable to convert ANSI to HTML");
+
+        // write to span file
+        {
+            let mut file = self.get_file(&current_file);
+            write!(file, "{event_str}").ok();
+
+            // process links
+            if num_links > 0 {
+                write!(file, "\n(").ok();
+            }
+        }
+        for link in link_visitor.links {
+            let link_dir = self.run_root.join(link.category());
+            let link_path = link_dir.join(link.file_name()).with_extension("md");
+
+            let mut link_file = self.get_file(&link_path);
+
+            // eprintln!("current_file = {current_file:?}");
+            // eprintln!("link_path = {link_path:?}");
+
+            let rel_from_link = diff_paths(&current_file, &link_dir).unwrap();
+            // eprintln!("rel_from_link = {rel_from_link:?}");
+
+            // writeln!(link_file, "[{}]({})", event_str, rel.display()).ok();
+            writeln!(
+                link_file,
+                "{}",
+                link_str(rel_from_link.to_string_lossy(), &event_str,)
+            )
+            .ok();
+
+            // backlink
+            let mut file = self.get_file(&current_file);
+            let rel_back = diff_paths(&link_path, current_dir).unwrap();
+            // eprintln!("rel_from_current = {rel_back:?}");
+
+            write!(
+                file,
+                "{} ",
+                link_str(rel_back.to_string_lossy(), link.file_name())
+            )
+            .ok();
+            // writeln!(file, "[{}]({})", link.file_name(), rel_back.display()).ok();
+        }
+        let mut file = self.get_file(&current_file);
+        if num_links > 0 {
+            write!(file, ") ").ok();
+        }
+        writeln!(file).ok();
+    }
 }
 
-// pub struct CommandLink {
-//     pub cmd_id: CommandId,
-// }
+impl Link {
+    pub fn category(&self) -> &str {
+        &self.category
+    }
+    pub fn file_name(&self) -> &str {
+        &self.name
+    }
+}
+
+fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
+    format!(
+        "<a href = \"{}\" style=\"text-decoration:none\">{}</a>",
+        to.into(),
+        content.into()
+    )
+}
 
 pub fn init_tree_logger() {
-    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::prelude::*;
     tracing_subscriber::registry()
         .with(RoutingLayer::new())
         .init();
 }
 
-pub fn process_span(name: impl Into<String>) -> EnteredSpan {
-    use tracing::span;
-    use tracing::Level;
-    let name: String = name.into();
-    span!(Level::DEBUG, "process", log_dir = %name).entered()
+pub fn process_span(span_name: impl Into<String>) -> EnteredSpan {
+    let span_name = span_name.into();
+    tracing::span!(Level::DEBUG, "process_span", name = span_name).entered()
 }

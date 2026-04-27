@@ -14,14 +14,16 @@ futures-util = "0.3"
 tokio-util = "*"
 incr_stats = "*"
 # log4rs 
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-tracing-log = "0.2" # optional= "*"
+tracing = "0.1.44"
+tracing-subscriber = { version = "*", features = ["fmt", "env-filter"] }
+tracing-log = "0.2" 
 tracing-appender = "0.2"
 console = "*"
 rand = "*"
 serde_json = "*"
 chrono = "*"
+pathdiff = "*"
+ansi-to-html = "*"
 
 [features]
 comm_stats = []
