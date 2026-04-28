@@ -28,7 +28,10 @@ use crate::{
         world_data::WorldData,
     },
     transform::position::MouseTransform,
-    utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
+    utils::{
+        hyperlink_logging::process_span,
+        nonempty::{NonEmpty, PotentiallyNonEmpty},
+    },
 };
 
 pub struct MicromouseManager<const N: usize> {
@@ -54,6 +57,7 @@ pub struct InternalMapUpdate {
 
 impl<const N: usize> MicromouseManager<N> {
     pub async fn new() -> Result<Self, WsChannelConnError> {
+        let _s = process_span("MicromouseManager_new");
         info!(target: "comm/mng", "CREATING NEW MicromouseManager");
         let new_channel = WsChannel::new(WsChannelConfig::default(), 9001).await?;
         let (queue_length_sender, queue_length_receiver) = watch::channel(0);
@@ -78,6 +82,7 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
+        let _s = process_span("MicromouseManager_send_command");
         debug!(target: "comm/mng/cmd", "Adding cmd to queue {cmd:?}");
         let cmd_id = CommandId(
             self.next_cmd_send_id
@@ -102,6 +107,7 @@ impl<const N: usize> MicromouseManager<N> {
 
     // Returns boolean --> true = was resent, false = already finished, exited queue
     async fn resend(&self, cmd_id: CommandId) -> bool {
+        let _s = process_span("MicromouseManager_resend");
         warn!(target: "comm/mng/cmd", "RESENDING {cmd_id:?}");
         if let Some(msg) = self.unconfirmed_cmd.lock().await.get(&cmd_id) {
             info!(target: "comm/msg_log", "> {msg:?}");
@@ -114,6 +120,7 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     pub async fn next_read(&self) -> Option<Message> {
+        let _s = process_span("MicromouseManager_next_read");
         self.channel.read().await
     }
 
@@ -124,6 +131,7 @@ impl<const N: usize> MicromouseManager<N> {
         &self,
         read: Option<Message>,
     ) -> Result<Vec<MicromouseEvent>, MicromouseManagerError> {
+        let _s = process_span("MicromouseManager_next");
         info!(target: "comm/mng", "Read tick");
         if read.is_none() {
             error!(target: "comm/mng", "CONNECTION CLOSED DELIBERATELY & PERMANENTLY");
@@ -135,10 +143,12 @@ impl<const N: usize> MicromouseManager<N> {
         info!(target: "comm/mng", "NEXT RESPONSE: {next_response:?}");
         match next_response {
             MicromouseResponse::Debug(msg) => {
+                let _s = process_span("MicromouseManager_process_dbg");
                 debug!(target: "comm/mng/dbg", "READ DEBUG {msg}");
                 Ok(vec![MicromouseEvent::DebugMessage(msg)])
             }
             MicromouseResponse::Measurement(measurement_message) => {
+                let _s = process_span("MicromouseManager_process_measurement");
                 info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
                 // Check whether command is new
                 let mut current_cmd = self.current_command.lock().await;
@@ -155,6 +165,7 @@ impl<const N: usize> MicromouseManager<N> {
                 Ok(map_update.into())
             }
             MicromouseResponse::CommandFinished(command_finished_message) => {
+                let _s = process_span("MicromouseManager_cmd_finished");
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
                 let mut just_finished_cmd = self.current_command.lock().await;
                 self.update_current_command_id(
@@ -211,6 +222,7 @@ impl<const N: usize> MicromouseManager<N> {
                 .collect())
             }
             MicromouseResponse::Desync(command_ids) => {
+                let _s = process_span("MicromouseManager_process_desync");
                 warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
                 for c in command_ids {
                     if !self.resend(c).await {
@@ -221,22 +233,26 @@ impl<const N: usize> MicromouseManager<N> {
                 Ok(vec![])
             }
             MicromouseResponse::Stop => {
+                let _s = process_span("MicromouseManager_process_stop");
                 info!(target: "comm/mng", "STOPPED");
                 *self.mode.lock().await = MicromouseMode::Stopped;
                 Ok(vec![MicromouseEvent::Stop])
             }
             MicromouseResponse::Restart => {
+                let _s = process_span("MicromouseManager_process_restart");
                 info!(target: "comm/mng", "RESTARTED");
                 self.restart().await;
                 *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Restart])
             }
             MicromouseResponse::Continue => {
+                let _s = process_span("MicromouseManager_process_continue");
                 info!(target: "comm/mng", "CONTINUED");
                 *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Continue])
             }
             MicromouseResponse::Battery(b_100) => {
+                let _s = process_span("MicromouseManager_process_battery");
                 debug!(target: "comm/mng/battery", "BATTERY: {b_100}/100");
                 let f_b = b_100 as f32 / 100.0;
                 *self.battery.lock().await = f_b;
@@ -245,6 +261,7 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
     pub async fn restart(&self) {
+        let _s = process_span("MicromouseManager_restart");
         debug!(target: "comm/mng", "Doing Restart...");
         self.next_cmd_send_id
             .store(0, std::sync::atomic::Ordering::SeqCst);
@@ -282,6 +299,7 @@ impl<const N: usize> MicromouseManager<N> {
         measurement: Option<MeasurementMessage>,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<InternalMapUpdate, MicromouseManagerError> {
+        let _s = process_span("MicromouseManager_update_cmd_application");
         debug!(target: "comm/mng/map", "UPDATE INTERNAL MAP (step = {step_number}, measurement = {measurement:?})");
         // let mut  current_cmd = self.current_command.lock().await;
 
@@ -363,6 +381,7 @@ impl<const N: usize> MicromouseManager<N> {
 
     // WARN: LOCKS THE QUEUE RECEIVER; Also returns pending as long as the micromouse is stopped
     pub async fn notified_empty_queue(&self) {
+        let _s = process_span("MicromouseManager_notify_empty_queue");
         if *self.mode.lock().await == MicromouseMode::Stopped {
             info!(target: "comm/mng/cmd", "COMMAND PENDING; Micromouse Stopped");
             return pending().await;
@@ -380,6 +399,7 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     pub async fn update_queue_count(&self) {
+        let _s = process_span("MicromouseManager_update_queue_count");
         self.queue_length_sender
             .send(self.unconfirmed_cmd.lock().await.len())
             .expect("Stays const, shouldn't error");
@@ -397,6 +417,7 @@ impl<const N: usize> MicromouseManager<N> {
         &self,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Option<FilteredCommandApplication<N>> {
+        let _s = process_span("MicromouseManager_clear_current_command");
         debug!(target: "comm/mng/cmd", "CLEARING CURRENT COMMAND");
         debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
         // let mut current_cmd = self.current_command.lock().await;
@@ -411,6 +432,7 @@ impl<const N: usize> MicromouseManager<N> {
         response_cmd_id: CommandId,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<(), MicromouseManagerError> {
+        let _s = process_span("MicromouseManager_update_current_command_id");
         info!(target: "comm/mng/cmd", "UPDATING CURRENT CMD ID");
         // let (transformed_cmd, mut current_cmd) = self.current_command.lock().await;
         // let mut current_cmd = self.current_command.lock().await;

@@ -3,7 +3,7 @@ use std::{ops::Deref, os::windows::process, time::Duration};
 use tokio::time::{self, Instant, Interval};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
-use tracing::Instrument;
+use tracing::{Instrument, Span};
 
 use crate::utils::hyperlink_logging::process_span;
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
     },
     transform::direction::RelativeDirection,
     utils::{
-        hyperlink_logging::{init_tree_logger, enter_process},
+        hyperlink_logging::{enter_process, init_tree_logger},
         logging::{init_logging, run_test},
     },
 };
@@ -29,7 +29,7 @@ use crate::{
 pub fn follow_r() {
     let world = super::test_map(0.5);
     init_tree_logger();
-    let _s = enter_process("test");
+    let s = enter_process("test");
     // let guards = init_logging();
     info!(target: "tests/map", "TEST WORLD:\n{world}");
     let mut micromouse_simulator = MicromouseSimulator::new(world);
@@ -43,9 +43,9 @@ pub fn follow_r() {
             tokio::select! {
                 _ = cancel.cancelled() => {},
                 _ = micromouse_simulator.run(2) => {},
-
             }
-        }.instrument(process_span("simulator"))
+        }
+        .instrument(process_span("simulator")),
     );
     info!(target: "comm/msg_log", "****************************************************************************************");
     // run_test("trace", || {

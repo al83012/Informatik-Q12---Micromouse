@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{error, info, warn, Instrument};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -16,6 +16,7 @@ use crate::{
         world_data::{self, WorldData},
     },
     transform::position::MouseTransform,
+    utils::hyperlink_logging::{enter_process, process_span},
 };
 
 pub struct MicromouseSimulator<const N: usize> {
@@ -72,52 +73,64 @@ impl<const N: usize> MicromouseSimulator<N> {
             info!(target: "test/sim", "AT CMD SIM {}", msg.cmd_id);
 
             for i in 0..=current_cmd.max_step_count() {
-                // tokio::time::sleep(Duration::from_millis(500)).await;
-                info!(target: "test/sim", "Sim at step {i}");
-                let current_transf = transformed_move.at_step(i).expect("In valid range");
-                self.full_map.mouse = current_transf;
-                for interrupt in current_cmd.interrupts.iter() {
-                    if !interrupt.at_step.matches(i) {
-                        continue;
-                    }
-                    let measurement = self
-                        .full_map
-                        .measure(interrupt.direction, max_measure_depth);
-                    let (depth, is_sensorlimit) = match measurement.value {
-                        MeasurementValue::OutsideRange { at_least_cells } => (at_least_cells, true),
-                        MeasurementValue::Value { cells } => (cells, false),
-                    };
-                    let measurement_msg = MeasurementMessage {
-                        from_cmd: msg.cmd_id,
-                        interrupt: MeasurementOccurrence {
-                            direction: interrupt.direction,
-                            at_step: i as u32,
-                        },
-                        depth,
-                        is_sensorlimit,
-                    };
-                    info!(target: "test/sim", "Measured: {measurement_msg:?}");
+                let continue_next_cmd: bool = async {
+                    info!(target: "test/sim", "Sim at step {i}");
+                    let current_transf = transformed_move.at_step(i).expect("In valid range");
+                    self.full_map.mouse = current_transf;
+                    for interrupt in current_cmd.interrupts.iter() {
+                        if !interrupt.at_step.matches(i) {
+                            continue;
+                        }
+                        let measurement = self
+                            .full_map
+                            .measure(interrupt.direction, max_measure_depth);
+                        let (depth, is_sensorlimit) = match measurement.value {
+                            MeasurementValue::OutsideRange { at_least_cells } => {
+                                (at_least_cells, true)
+                            }
+                            MeasurementValue::Value { cells } => (cells, false),
+                        };
+                        let measurement_msg = MeasurementMessage {
+                            from_cmd: msg.cmd_id,
+                            interrupt: MeasurementOccurrence {
+                                direction: interrupt.direction,
+                                at_step: i as u32,
+                            },
+                            depth,
+                            is_sensorlimit,
+                        };
+                        info!(target: "test/sim", "Measured: {measurement_msg:?}");
 
-                    ws_stream
-                        .send(Message::Text(Utf8Bytes::from(String::from(
-                            measurement_msg,
-                        ))))
-                        .await
-                        .expect("Panic on sending measurement");
-
-                    if (interrupt.action == InterruptAction::StopIfBlocked && depth == 0)
-                        || (interrupt.action == InterruptAction::StopIfOpen && depth != 0)
-                    {
                         ws_stream
-                            .send(Message::Text(Utf8Bytes::from(format!(
-                                "CMD-FINISHED {}",
-                                msg.cmd_id
+                            .send(Message::Text(Utf8Bytes::from(String::from(
+                                measurement_msg,
                             ))))
                             .await
-                            .expect("Panic on sendinc cmd_finished");
-                        continue 'next_cmd;
+                            .expect("Panic on sending measurement");
+
+                        if (interrupt.action == InterruptAction::StopIfBlocked && depth == 0)
+                            || (interrupt.action == InterruptAction::StopIfOpen && depth != 0)
+                        {
+                            ws_stream
+                                .send(Message::Text(Utf8Bytes::from(format!(
+                                    "CMD-FINISHED {}",
+                                    msg.cmd_id
+                                ))))
+                                .await
+                                .expect("Panic on sendinc cmd_finished");
+                            // continue 'next_cmd;
+                            return true;
+                        }
                     }
+                    false
                 }
+                .instrument(process_span(format!("sim_span_step_{i}")))
+                .await;
+                if continue_next_cmd {
+                    continue 'next_cmd;
+                }
+                // let _s = enter_process(format!("sim_span_step{i}"));
+                // tokio::time::sleep(Duration::from_millis(500)).await;
             }
             self.full_map.mouse = transformed_move
                 .at_step(current_cmd.max_step_count())
