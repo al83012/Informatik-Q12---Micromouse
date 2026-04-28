@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    fmt::Display,
     fs::{File, OpenOptions},
     io::Write,
     ops::Deref,
@@ -30,14 +31,19 @@ use crate::{
     utils::logging::{level_bg_color, level_color, MessageVisitor, MyFormatter},
 };
 
+pub const BASE_FILE: &str = "index.html";
+pub const BASE_EXTENSION: &str = "html";
+
 struct NameVisitor {
     pub name: Option<String>,
 }
 
+#[derive(Clone)]
 struct LinkVisitor {
     pub links: Vec<Link>,
 }
 
+#[derive(Clone)]
 struct Link {
     category: String,
     name: String,
@@ -91,6 +97,7 @@ impl Visit for NameVisitor {
 
 struct LogSpan {
     dir: PathBuf,
+    links: LinkVisitor,
 }
 
 pub struct RoutingLayer {
@@ -119,11 +126,68 @@ impl RoutingLayer {
                 std::fs::create_dir_all(parent).unwrap();
             }
 
-            let file = OpenOptions::new()
+            let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(path)
                 .unwrap();
+
+            writeln!(
+                file,
+                "<style>
+  /* 1. Global Page Style */
+  html, body {{
+    /* Optional: add a subtle gradient to make the transparency visible */
+    background-image: radial-gradient(circle at top right, #1a1a2e, #0a0a0c);
+    color: #e0e0e0;
+    margin: 0;
+    padding: 20px;
+    font-family: 'Consolas', monospace;
+  }}
+
+  /* 2. Styling all Divs */
+  div {{
+    margin: 15px; /* Adds vertical breathing room between groups */
+    padding: 15px;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0.05, 0.1); 
+    backdrop-filter: blur(8px);
+  }}
+
+  /* 3. The Smokey Glass <pre> effect */
+  pre {{
+    background-color: rgba(0, 0, 0.05, 0.1); 
+    
+    /* The \"Frosting\" - blurs what is behind the element */
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px); /* Safari support */
+
+    /* Aesthetics: subtle border and rounded corners */
+    // border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    line-height: 1;
+    
+    /* Ensure the art doesn't spill out */
+    overflow-x: auto;
+  }}
+
+  /* 4. Link handling */
+  a {{
+    color: #4ec9b0;
+    text-decoration: none;
+    background: transparent; /* Remove that boxy background if you prefer the glass look */
+  }}
+  a:visited {{
+    color: #c586c0;
+  }}
+  a:hover {{
+    color: #fff;
+    //text-shadow: 0 0 8px #4ec9b0; /* Subtle neon glow on hover */
+  }}
+</style>"
+            )
+            .ok();
 
             files.insert(path.to_path_buf(), file);
         }
@@ -162,21 +226,39 @@ where
             .unwrap_or_else(|| self.run_root.clone());
 
         let current_dir = parent_dir.join(name);
-        let current_file = current_dir.join("index.md");
-        let parent_file = parent_dir.join("index.md");
+        let current_file = current_dir.join(BASE_FILE);
+        let parent_file = parent_dir.join(BASE_FILE);
+
+        let mut links = span
+            .parent()
+            .as_ref()
+            .map(|p| p.extensions())
+            .as_ref()
+            .and_then(|e| e.get::<LogSpan>())
+            .map(|s| s.links.clone())
+            .unwrap_or(LinkVisitor { links: vec![] });
+        // let mut links = LinkVisitor { links: vec![] };
+
+        attrs.record(&mut links);
 
         span.extensions_mut().insert(LogSpan {
             dir: current_dir.clone(),
+            links,
         });
 
         // create current file
         {
             let mut file = self.get_file(&current_file);
-            writeln!(file, "# Span: {name}\n").ok();
 
             if parent_dir != current_dir {
                 let rel = diff_paths(&parent_file, &current_dir).unwrap();
-                writeln!(file, "{} ->", link_str(rel.to_string_lossy(), "SOURCE")).ok();
+                writeln!(
+                    file,
+                    "\n<div><code>{}</code>",
+                    link_str(rel.to_string_lossy(), parent_dir.to_string_lossy())
+                )
+                .ok();
+            writeln!(file, "<h3>{name}</h3>\n").ok();
                 // writeln!(file, "[SOURCE]({})", rel.display()).ok();
             }
         }
@@ -185,7 +267,12 @@ where
         {
             let mut file = self.get_file(&parent_file);
             let rel = diff_paths(&current_file, &parent_dir).unwrap();
-            writeln!(file, "-> {}", link_str(rel.to_string_lossy(), name)).ok();
+            writeln!(
+                file,
+                "<code><pre>{}</pre></code>",
+                link_str(rel.to_string_lossy(), name)
+            )
+            .ok();
             // writeln!(file, "[{name}]({})", rel.display()).ok();
         }
     }
@@ -199,14 +286,14 @@ where
             return;
         };
 
-        let span_file = span_data.dir.join("index.md");
+        let span_file = span_data.dir.join(BASE_FILE);
         let parent_span = span_data.dir.parent().unwrap_or(self.run_root.as_path());
 
         let mut file = self.get_file(&span_file);
         writeln!(
             file,
-            "<- {}\n",
-            link_str("../index.md", parent_span.to_string_lossy())
+            "<code>{}</code></div>",
+            link_str(format!("../{BASE_FILE}"), parent_span.to_string_lossy())
         )
         .ok();
     }
@@ -224,9 +311,10 @@ where
         };
 
         let current_dir = &span_data.dir;
-        let current_file = current_dir.join("index.md");
+        let current_file = current_dir.join(BASE_FILE);
 
-        let mut link_visitor = LinkVisitor { links: vec![] };
+        let mut link_visitor = span_data.links.clone();
+        // let mut link_visitor = LinkVisitor { links: vec![] };
         event.record(&mut link_visitor);
 
         let meta = event.metadata();
@@ -254,11 +342,13 @@ where
         let num_links = link_visitor.links.len();
         event.record(&mut visitor);
         let msg = visitor.msg.unwrap_or_default();
-        let event_str =
+        let ansii_event_str =
             format!("{info}{pad_str}   {RESET_COLOR} ] {level_color} {msg}{RESET_COLOR}");
 
-        println!("{event_str}");
-        let event_str = ansi_to_html::convert(&event_str).expect("unable to convert ANSI to HTML");
+        println!("{ansii_event_str}");
+        let event_str = preformatted_str_start(
+            ansi_to_html::convert(&ansii_event_str).expect("unable to convert ANSI to HTML"),
+        );
 
         // write to span file
         {
@@ -267,12 +357,14 @@ where
 
             // process links
             if num_links > 0 {
-                write!(file, "\n(").ok();
+                write!(file, "\n<pre><code>").ok();
             }
         }
         for link in link_visitor.links {
             let link_dir = self.run_root.join(link.category());
-            let link_path = link_dir.join(link.file_name()).with_extension("md");
+            let link_path = link_dir
+                .join(link.file_name())
+                .with_extension(BASE_EXTENSION);
 
             let mut link_file = self.get_file(&link_path);
 
@@ -285,8 +377,9 @@ where
             // writeln!(link_file, "[{}]({})", event_str, rel.display()).ok();
             writeln!(
                 link_file,
-                "{}",
-                link_str(rel_from_link.to_string_lossy(), &event_str,)
+                " {}{} ",
+                link_str(rel_from_link.to_string_lossy(), &event_str),
+                preformatted_str_end()
             )
             .ok();
 
@@ -305,10 +398,17 @@ where
         }
         let mut file = self.get_file(&current_file);
         if num_links > 0 {
-            write!(file, ") ").ok();
+            write!(file, "</code></pre> ").ok();
         }
-        writeln!(file).ok();
+        writeln!(file, "{}", preformatted_str_end()).ok();
     }
+}
+
+pub fn preformatted_str_start(from: impl Display) -> String {
+    format!("<pre>{from}")
+}
+pub fn preformatted_str_end() -> String {
+    "</pre>".into()
 }
 
 impl Link {
@@ -321,11 +421,7 @@ impl Link {
 }
 
 fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
-    format!(
-        "<a href = \"{}\" style=\"text-decoration:none\">{}</a>",
-        to.into(),
-        content.into()
-    )
+    format!("<a href = \"{}\">{}</a>", to.into(), content.into())
 }
 
 pub fn init_tree_logger() {

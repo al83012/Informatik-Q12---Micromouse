@@ -8,7 +8,7 @@ use console::Style;
 use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 use tungstenite::Message;
 
 use crate::{
@@ -56,8 +56,9 @@ pub struct InternalMapUpdate {
 }
 
 impl<const N: usize> MicromouseManager<N> {
+    #[instrument(name = "new")]
     pub async fn new() -> Result<Self, WsChannelConnError> {
-        let _s = process_span("MicromouseManager_new");
+        // let _s = process_span("MicromouseManager_new");
         info!(target: "comm/mng", "CREATING NEW MicromouseManager");
         let new_channel = WsChannel::new(WsChannelConfig::default(), 9001).await?;
         let (queue_length_sender, queue_length_receiver) = watch::channel(0);
@@ -81,8 +82,8 @@ impl<const N: usize> MicromouseManager<N> {
         })
     }
 
+    #[instrument(skip(self), name = "send_command")]
     pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
-        let _s = process_span("MicromouseManager_send_command");
         debug!(target: "comm/mng/cmd", "Adding cmd to queue {cmd:?}");
         let cmd_id = CommandId(
             self.next_cmd_send_id
@@ -106,8 +107,8 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     // Returns boolean --> true = was resent, false = already finished, exited queue
+    #[instrument(skip(self), name = "resend")]
     async fn resend(&self, cmd_id: CommandId) -> bool {
-        let _s = process_span("MicromouseManager_resend");
         warn!(target: "comm/mng/cmd", "RESENDING {cmd_id:?}");
         if let Some(msg) = self.unconfirmed_cmd.lock().await.get(&cmd_id) {
             info!(target: "comm/msg_log", "> {msg:?}");
@@ -119,19 +120,19 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
+    #[instrument(skip(self), name = "next_read")]
     pub async fn next_read(&self) -> Option<Message> {
-        let _s = process_span("MicromouseManager_next_read");
         self.channel.read().await
     }
 
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
     /// communication to continue (even though the channel will spin up a separate thread to keep
     /// the connection alive, it won't handle desyncs and the like)
+    #[instrument(skip(self), name = "next")]
     pub async fn next(
         &self,
         read: Option<Message>,
     ) -> Result<Vec<MicromouseEvent>, MicromouseManagerError> {
-        let _s = process_span("MicromouseManager_next");
         info!(target: "comm/mng", "Read tick");
         if read.is_none() {
             error!(target: "comm/mng", "CONNECTION CLOSED DELIBERATELY & PERMANENTLY");
@@ -260,8 +261,8 @@ impl<const N: usize> MicromouseManager<N> {
             }
         }
     }
+    #[instrument(skip(self), name = "restart")]
     pub async fn restart(&self) {
-        let _s = process_span("MicromouseManager_restart");
         debug!(target: "comm/mng", "Doing Restart...");
         self.next_cmd_send_id
             .store(0, std::sync::atomic::Ordering::SeqCst);
@@ -275,6 +276,7 @@ impl<const N: usize> MicromouseManager<N> {
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }
 
+    #[instrument(skip(self), name = "remove_unordered")]
     async fn remove_unordered(
         &self,
         cmd_to_remove: CommandId,
@@ -293,13 +295,13 @@ impl<const N: usize> MicromouseManager<N> {
 
     /// Uses a measurement or a command finished message (-> measurment = None) to update the
     /// current position (as those messages carry a step-number)
+    #[instrument(skip(self, current_cmd), name = "update_cmd_application")]
     async fn update_cmd_application<'a>(
         &self,
         step_number: StepNum,
         measurement: Option<MeasurementMessage>,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<InternalMapUpdate, MicromouseManagerError> {
-        let _s = process_span("MicromouseManager_update_cmd_application");
         debug!(target: "comm/mng/map", "UPDATE INTERNAL MAP (step = {step_number}, measurement = {measurement:?})");
         // let mut  current_cmd = self.current_command.lock().await;
 
@@ -380,8 +382,8 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     // WARN: LOCKS THE QUEUE RECEIVER; Also returns pending as long as the micromouse is stopped
+    #[instrument(skip(self), name = "notified_empty_queue")]
     pub async fn notified_empty_queue(&self) {
-        let _s = process_span("MicromouseManager_notify_empty_queue");
         if *self.mode.lock().await == MicromouseMode::Stopped {
             info!(target: "comm/mng/cmd", "COMMAND PENDING; Micromouse Stopped");
             return pending().await;
@@ -398,8 +400,8 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
+    #[instrument(skip(self), name = "update_queue_count")]
     pub async fn update_queue_count(&self) {
-        let _s = process_span("MicromouseManager_update_queue_count");
         self.queue_length_sender
             .send(self.unconfirmed_cmd.lock().await.len())
             .expect("Stays const, shouldn't error");
@@ -413,11 +415,11 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None
+    #[instrument(skip(self, current_cmd), name = "clear_current_command")]
     async fn clear_current_command<'a>(
         &self,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Option<FilteredCommandApplication<N>> {
-        let _s = process_span("MicromouseManager_clear_current_command");
         debug!(target: "comm/mng/cmd", "CLEARING CURRENT COMMAND");
         debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
         // let mut current_cmd = self.current_command.lock().await;
@@ -427,12 +429,12 @@ impl<const N: usize> MicromouseManager<N> {
 
     /// Checks whether the cmd_id contained in the response is a new one --> Would mean, that the
     /// previous command **has** to be finished and a new cmd started
+    #[instrument(skip(self, current_cmd), name = "update_current_command_id")]
     async fn update_current_command_id<'a>(
         &self,
         response_cmd_id: CommandId,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<(), MicromouseManagerError> {
-        let _s = process_span("MicromouseManager_update_current_command_id");
         info!(target: "comm/mng/cmd", "UPDATING CURRENT CMD ID");
         // let (transformed_cmd, mut current_cmd) = self.current_command.lock().await;
         // let mut current_cmd = self.current_command.lock().await;
@@ -511,6 +513,7 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
+    #[instrument(skip(self), name = "current_world_lock")]
     pub async fn current_world_lock(&self) -> RwLockReadGuard<'_, WorldData<N>> {
         self.current_world.read().await
     }
