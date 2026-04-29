@@ -162,16 +162,66 @@ impl RoutingLayer {
             dt { color: #569cd6; font-weight: bold; }
             dd { margin: 0; color: #ce9178; }
             dd code { background: rgba(255, 255, 255, 0.05); padding: 2px 4px; border-radius: 3px; }
-            details summary { cursor: pointer; color: #4ec9b0; outline: none; }
-            pre {
-                background-color: rgba(0, 0, 0, 0.2);
-                padding: 10px;
-                border-radius: 5px;
-                overflow-x: auto;
-                white-space: pre-wrap;
-                margin: 5px 0;
-                line-height: 1;
-            }
+            /* 1. Universal Log Style - Everything starts at the same X-coordinate */
+/* The main container for EVERY log line */
+.log-entry {
+    position: relative;
+    margin-bottom: 6px;
+    padding: 8px 12px 8px 25px; /* 25px left padding creates the 'gutter' */
+    background-color: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    display: block;
+    transition: background 0.2s;
+}
+
+/* The Teal Indicator - Positioned absolutely so it NEVER shifts text */
+details.log-entry > summary::before {
+    content: "";
+    position: absolute;
+    left: 8px;   /* Inside the 25px gutter */
+    top: 8px;    /* Aligned with top padding */
+    bottom: 8px; /* Aligned with bottom padding */
+    width: 4px;
+    background-color: #4ec9b0;
+    border-radius: 2px;
+    opacity: 0.6;
+}
+
+/* Hover/Open States */
+.log-entry:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+details[open].log-entry > summary::before {
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(78, 201, 176, 0.4);
+}
+
+/* Clean up summary/pre tag defaults */
+summary {
+    list-style: none;
+    outline: none;
+    cursor: pointer;
+}
+summary::-webkit-details-marker { display: none; }
+
+pre {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    font-family: 'Consolas', monospace;
+    white-space: pre-wrap;
+}
+
+.expanded-entry {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
             a { color: #4ec9b0; text-decoration: none; border-bottom: 1px dashed rgba(78, 201, 176, 0.3); }
             a:hover { color: #fff; border-bottom: 1px solid #4ec9b0; }
         </style>"#
@@ -279,7 +329,7 @@ where
             let rel_down = diff_paths(&current_file, &parent_dir).unwrap();
             writeln!(
                 file,
-                "<div>↳ Entering Span: {}</div>",
+                "<div class = 'log-entry'>↳ Entering Span: {}</div>",
                 link_str(rel_down.to_string_lossy(), name)
             )
             .ok();
@@ -343,19 +393,19 @@ where
         let event_str = ansi_to_html::convert(ansii_event_str.as_str())
             .expect("unable to convert ANSI to HTML");
 
-        writeln!(file, "<div class='log-entry'>").ok();
-        writeln!(file, "  <pre>{}</pre>", event_str).ok();
+        let all_empty = visitor.links.is_empty() && visitor.fields.is_empty();
 
-        if !visitor.fields.is_empty() {
-            writeln!(file, "  <dl>").ok();
-            for (k, v) in visitor.fields {
-                writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
-            }
-            writeln!(file, "  </dl>").ok();
+        if !all_empty {
+            writeln!(file, "<details class='log-entry'><summary>").ok();
+            writeln!(file, "  <pre>{}</pre>", event_str).ok();
+            writeln!(file, "</summary><div class='expanded-entry'><dl>").ok();
+        } else {
+            writeln!(file, "<div class='log-entry'>").ok();
+            writeln!(file, "  <pre>{}</pre>", event_str).ok();
         }
 
-        if !visitor.links.is_empty() {
-            writeln!(file, "<details><summary>Related</summary><dl>").ok();
+        for (k, v) in visitor.fields {
+            writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
         }
 
         for link in visitor.links.iter() {
@@ -374,17 +424,17 @@ where
             let rel_to = diff_paths(&link_path, &span_data.dir).unwrap();
             writeln!(
                 file,
-                "<div>→ Related: {}</div>",
+                "<dt>→ Related: </dt><dd>{}</dd>",
                 link_str(rel_to.to_string_lossy(), &link.name)
             )
             .ok();
         }
 
-        if !visitor.links.is_empty() {
-            writeln!(file, "</dl></details>");
+        if !all_empty {
+            writeln!(file, "</dl></div></details>").ok();
+        } else {
+            writeln!(file, "</div>").ok();
         }
-
-        writeln!(file, "</div>").ok();
     }
 
     fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
