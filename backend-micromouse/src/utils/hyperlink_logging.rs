@@ -244,7 +244,10 @@ where
                 }
                 writeln!(file, "  </dl></details>").ok();
             }
-            for link in visitor.links {
+            if !visitor.links.is_empty() {
+                writeln!(file, "<details><summary>Related</summary><dl>").ok();
+            }
+            for link in visitor.links.iter() {
                 let link_dir = self.run_root.join(&link.category);
                 let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
                 let mut link_file = self.get_file(&link_path);
@@ -252,7 +255,7 @@ where
                 let rel_back = diff_paths(&current_file, &link_dir).unwrap();
                 writeln!(
                     link_file,
-                    "<div>Linked from: {}</div>",
+                    "<div>Linked span: {}</div>",
                     link_str(rel_back.to_string_lossy(), name)
                 )
                 .ok();
@@ -261,9 +264,12 @@ where
                 writeln!(
                     file,
                     "<div>→ Related: {}</div>",
-                    link_str(rel_to.to_string_lossy(), link.name)
+                    link_str(rel_to.to_string_lossy(), &link.name)
                 )
                 .ok();
+            }
+            if !visitor.links.is_empty() {
+                writeln!(file, "</details>").ok();
             }
         }
 
@@ -360,9 +366,8 @@ where
             let rel_back = diff_paths(&current_file, &link_dir).unwrap();
             writeln!(
                 link_file,
-                "<div class = 'log-entry'>{} <pre>{}</pre></div>",
-                link_str(rel_back.to_string_lossy(), "→"),
-                event_str
+                "<div class = 'log-entry'><pre>{}</pre></div>",
+                link_str(rel_back.to_string_lossy(), event_str.clone())
             )
             .ok();
 
