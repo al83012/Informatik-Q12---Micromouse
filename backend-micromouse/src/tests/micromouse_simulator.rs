@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, span, warn, Instrument, Level};
+use tracing::{error, info, instrument, span, warn, Instrument, Level};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -32,6 +32,7 @@ impl<const N: usize> MicromouseSimulator<N> {
             },
         }
     }
+    #[instrument(skip(self), name = "run")]
     pub async fn run(&mut self, max_measure_depth: u8) {
         let (mut ws_stream, response) = tokio_tungstenite::connect_async("ws://localhost:9001")
             .await

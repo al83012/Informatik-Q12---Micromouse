@@ -49,6 +49,10 @@ struct Link {
     name: String,
 }
 
+struct DebugVisitor {
+    pub fields: HashMap<String, String>,
+}
+
 pub trait LinkFileName {
     fn link(&self) -> String;
 }
@@ -62,6 +66,13 @@ impl LinkFileName for CommandId {
 impl LinkFileName for AbsoluteNodeId {
     fn link(&self) -> String {
         format!("node_L{}_N{}", self.layer_id().0, self.node_id().0)
+    }
+}
+
+impl Visit for DebugVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
+        self.fields
+            .insert(field.name().to_string(), format!("{:?}", value));
     }
 }
 
@@ -134,58 +145,118 @@ impl RoutingLayer {
 
             writeln!(
                 file,
-                "<style>
+                r#"<style>
   /* 1. Global Page Style */
   html, body {{
-    /* Optional: add a subtle gradient to make the transparency visible */
     background-image: radial-gradient(circle at top right, #1a1a2e, #0a0a0c);
     color: #e0e0e0;
     margin: 0;
     padding: 20px;
-    font-family: 'Consolas', monospace;
+    font-family: 'Consolas', 'Monaco', monospace;
+    line-height: 1.5;
   }}
 
-  /* 2. Styling all Divs */
-  div {{
-    margin: 15px; /* Adds vertical breathing room between groups */
+  /* 2. Log Entry Container (Replacing/Extending Div) */
+  section, .log-entry {{
+    margin-bottom: 20px;
     padding: 15px;
     border-radius: 8px;
-    background-color: rgba(0, 0, 0.05, 0.1); 
+    background-color: rgba(255, 255, 255, 0.03); 
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }}
 
-  /* 3. The Smokey Glass <pre> effect */
+  /* 3. The Fields (Description List) */
+  dl {{
+    display: grid;
+    grid-template-columns: max-content auto; /* Aligns keys and values in a neat grid */
+    gap: 5px 15px;
+    margin: 10px 0;
+    font-size: 0.9em;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }}
+  dt {{
+    color: #569cd6; /* Light blue for field names */
+    font-weight: bold;
+    opacity: 0.8;
+  }}
+  dd {{
+    margin: 0;
+    color: #ce9178; /* Muted orange/ginger for values */
+  }}
+  dd code {{
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 4px;
+    border-radius: 3px;
+  }}
+
+  /* 4. Interactive Spans (Details/Summary) */
+  details {{
+    cursor: pointer;
+  }}
+  summary {{
+    list-style: none; /* Hides default arrow in some browsers */
+    outline: none;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }}
+  summary::-webkit-details-marker {{ display: none; }} /* Hides arrow in Safari */
+  
+  summary:hover {{
+    background: rgba(255, 255, 255, 0.05);
+  }}
+  
+  summary::before {{
+    content: "▶";
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 0.8em;
+    color: #4ec9b0;
+    transition: transform 0.2s;
+  }}
+  details[open] summary::before {{
+    transform: rotate(90deg);
+  }}
+
+  /* 5. Code & Pre blocks */
   pre {{
-    background-color: rgba(0, 0, 0.05, 0.1); 
-    
-    /* The \"Frosting\" - blurs what is behind the element */
+    background-color: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px); /* Safari support */
-
-    /* Aesthetics: subtle border and rounded corners */
-    // border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 15px;
-    line-height: 1;
-    
-    /* Ensure the art doesn't spill out */
     overflow-x: auto;
+    border: 1px solid rgba(78, 201, 176, 0.2); /* Subtle teal border */
   }}
 
-  /* 4. Link handling */
+  /* 6. Link handling */
   a {{
     color: #4ec9b0;
     text-decoration: none;
-    background: transparent; /* Remove that boxy background if you prefer the glass look */
+    border-bottom: 1px dashed rgba(78, 201, 176, 0.3);
+  }}
+  a:hover {{
+    color: #fff;
+    border-bottom: 1px solid #4ec9b0;
   }}
   a:visited {{
     color: #c586c0;
   }}
-  a:hover {{
-    color: #fff;
-    //text-shadow: 0 0 8px #4ec9b0; /* Subtle neon glow on hover */
-  }}
-</style>"
+
+.inline-fields {
+    display: inline-flex;
+    gap: 10px;
+    font-size: 0.8em;
+    margin-left: 20px;
+    background: none;
+    padding: 0;
+}
+.inline-fields dt { color: #569cd6; }
+.inline-fields dd { color: #ce9178; margin-right: 10px; }
+</style>"#
             )
             .ok();
 
@@ -241,6 +312,11 @@ where
 
         attrs.record(&mut links);
 
+        let mut attr_visitor = DebugVisitor {
+            fields: HashMap::new(),
+        };
+        attrs.record(&mut attr_visitor);
+
         span.extensions_mut().insert(LogSpan {
             dir: current_dir.clone(),
             links,
@@ -258,8 +334,21 @@ where
                     link_str(rel.to_string_lossy(), parent_dir.to_string_lossy())
                 )
                 .ok();
-            writeln!(file, "<h3>{name}</h3>\n").ok();
-                // writeln!(file, "[SOURCE]({})", rel.display()).ok();
+                writeln!(file, "<details>").ok();
+                writeln!(file, "<summary><strong>{name}</strong></summary>\n").ok();
+                if !attr_visitor.fields.is_empty() {
+                    writeln!(file, "<dl>").ok();
+                }
+
+                for (field_k, field_v) in attr_visitor.fields.iter() {
+                    writeln!(file, "<dt>{field_k}</dt> <dd><code>{field_v}</code></dd>").ok();
+                }
+
+                if !attr_visitor.fields.is_empty() {
+                    writeln!(file, "</dl>").ok();
+                }
+
+                writeln!(file, "</details>").ok();
             }
         }
 
