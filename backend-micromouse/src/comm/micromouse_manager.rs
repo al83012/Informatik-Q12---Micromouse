@@ -8,7 +8,7 @@ use console::Style;
 use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{Instrument, Level, debug, error, info, instrument, span, warn};
 use tungstenite::Message;
 
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
     },
     transform::position::MouseTransform,
     utils::{
-        hyperlink_logging::process_span,
+        hyperlink_logging::{LinkFileName, process_span},
         nonempty::{NonEmpty, PotentiallyNonEmpty},
     },
 };
@@ -90,19 +90,28 @@ impl<const N: usize> MicromouseManager<N> {
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         );
 
-        debug!(target: "comm/mng/cmd", "Got Id {cmd_id:?}");
-        let msg = CommandMessage { cmd, cmd_id };
-        let cmd_msg = (&msg).into();
-        let cmd_str: String = (&msg).into();
+        async {
+            debug!(target: "comm/mng/cmd", "Got Id {cmd_id:?}");
+            let msg = CommandMessage { cmd, cmd_id };
+            let cmd_msg = (&msg).into();
+            let cmd_str: String = (&msg).into();
 
-        info!(target: "comm/msg_log", "> {cmd_str:?}");
-        self.channel.send(cmd_msg).await;
-        let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
-        unconfirmed_cmd_queue.insert(cmd_id, msg);
-        debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
-        self.queue_length_sender
-            .send(unconfirmed_cmd_queue.len())
-            .expect("Channels stay const");
+            info!(target: "comm/msg_log", "> {cmd_str:?}");
+            self.channel.send(cmd_msg).await;
+            let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
+            unconfirmed_cmd_queue.insert(cmd_id, msg);
+            debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
+            self.queue_length_sender
+                .send(unconfirmed_cmd_queue.len())
+                .expect("Channels stay const");
+        }
+        .instrument(span!(
+            Level::DEBUG,
+            "send_cmd_with_id",
+            name = format!("send_cmd_id_{}", cmd_id.0),
+            link_cmd_id = cmd_id.link(),
+        ))
+        .await;
         Ok(cmd_id)
     }
 

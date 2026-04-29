@@ -289,7 +289,7 @@ where
                     "  <details open><summary>Captured Fields</summary><dl>"
                 )
                 .ok();
-                for (k, v) in visitor.fields {
+                for (k, v) in visitor.fields.iter() {
                     writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
                 }
                 writeln!(file, "  </dl></details>").ok();
@@ -303,12 +303,28 @@ where
                 let mut link_file = self.get_file(&link_path);
 
                 let rel_back = diff_paths(&current_file, &link_dir).unwrap();
+                // writeln!(link_file, "<section class = 'span-container'>").ok();
+
+                writeln!(link_file, "<details class='log-entry'><summary>").ok();
+                writeln!(link_file, "  <pre>Linked span: {}</pre>", name).ok();
+                writeln!(link_file, "</summary><div class='expanded-entry'><dl>").ok();
+                for (field_k, field_v) in visitor.fields.iter() {
+                    writeln!(link_file, "<dt>{field_k}</dt><dd>{field_v}</dd>").ok();
+                }
                 writeln!(
                     link_file,
-                    "<div>Linked span: {}</div>",
+                    "<dt>SOURCE</dt><dd>{}</dd>",
                     link_str(rel_back.to_string_lossy(), name)
                 )
                 .ok();
+                writeln!(link_file, "</dl></details>").ok();
+
+                // writeln!(
+                //     link_file,
+                //     "<div>Linked span: {}</div>",
+                //     link_str(rel_back.to_string_lossy(), name)
+                // )
+                // .ok();
 
                 let rel_to = diff_paths(&link_path, &current_dir).unwrap();
                 writeln!(
@@ -404,7 +420,7 @@ where
             writeln!(file, "  <pre>{}</pre>", event_str).ok();
         }
 
-        for (k, v) in visitor.fields {
+        for (k, v) in visitor.fields.iter() {
             writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
         }
 
@@ -416,10 +432,21 @@ where
             let rel_back = diff_paths(&current_file, &link_dir).unwrap();
             writeln!(
                 link_file,
-                "<div class = 'log-entry'><pre>{}</pre></div>",
-                link_str(rel_back.to_string_lossy(), event_str.clone())
+                "<details class = 'log-entry'><summary><pre>{}</pre></summary>",
+                event_str.clone()
             )
             .ok();
+            writeln!(link_file, "<div class = 'expanded-entry'><dl>").ok();
+            writeln!(
+                link_file,
+                "<dt>SOURCE</dt><dd>{}</dd>",
+                link_str(rel_back.to_string_lossy(), span_data.dir.to_string_lossy())
+            )
+            .ok();
+            for (field_k, field_v) in visitor.fields.iter() {
+                writeln!(link_file, "<dt>{field_k}</dt><dd>{field_v}</dd>").ok();
+            }
+            writeln!(link_file, "</dl></div></details>").ok();
 
             let rel_to = diff_paths(&link_path, &span_data.dir).unwrap();
             writeln!(
