@@ -3,54 +3,63 @@ use std::{
     fmt::Display,
     fs::{File, OpenOptions},
     io::Write,
-    ops::Deref,
     path::{Path, PathBuf},
     sync::Mutex,
     time::Instant,
 };
 
-use crate::utils::logging::{BLACK, RESET_COLOR, STD_BG};
-
 use chrono::Local;
-
+use pathdiff::diff_paths;
 use tracing::{
-    field::{Field, Value, Visit},
+    field::{Field, Visit},
     span::{self, EnteredSpan},
     Event, Level, Subscriber,
 };
-
-use tracing_subscriber::{
-    filter::FilterFn, layer::Context, registry::LookupSpan, EnvFilter, Layer,
-};
-
-use pathdiff::diff_paths;
+use tracing_subscriber::{layer::Context, registry::LookupSpan, EnvFilter, Layer};
 
 use crate::{
     comm::micromouse_message::CommandId,
     strategy::strategy_tree::AbsoluteNodeId,
-    utils::logging::{level_bg_color, level_color, MessageVisitor, MyFormatter},
+    utils::logging::{level_bg_color, level_color, MessageVisitor, BLACK, RESET_COLOR, STD_BG},
 };
 
 pub const BASE_FILE: &str = "index.html";
 pub const BASE_EXTENSION: &str = "html";
 
-struct NameVisitor {
+/// Unified Visitor to collect everything in one pass over the metadata/fields
+struct LogVisitor {
     pub name: Option<String>,
-}
-
-#[derive(Clone)]
-struct LinkVisitor {
     pub links: Vec<Link>,
-}
-
-#[derive(Clone)]
-struct Link {
-    category: String,
-    name: String,
-}
-
-struct DebugVisitor {
     pub fields: HashMap<String, String>,
+    pub message: Option<String>,
+}
+
+impl Visit for LogVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "name" {
+            self.name = Some(value.to_string());
+        } else if field.name() == "message" {
+            self.message = Some(value.to_string());
+        } else if field.name().starts_with("link_") {
+            let category = &field.name()["link_".len()..];
+            self.links.push(Link {
+                category: category.to_string(),
+                name: value.to_string(),
+            });
+        } else {
+            self.fields
+                .insert(field.name().to_string(), value.to_string());
+        }
+    }
+
+    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
+        if field.name() == "message" {
+            self.message = Some(format!("{:?}", value));
+        } else if field.name() != "name" && !field.name().starts_with("link_") {
+            self.fields
+                .insert(field.name().to_string(), format!("{:?}", value));
+        }
+    }
 }
 
 pub trait LinkFileName {
@@ -69,46 +78,15 @@ impl LinkFileName for AbsoluteNodeId {
     }
 }
 
-impl Visit for DebugVisitor {
-    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
-        self.fields
-            .insert(field.name().to_string(), format!("{:?}", value));
-    }
-}
-
-impl Visit for LinkVisitor {
-    fn record_str(&mut self, field: &Field, value: &str) {
-        const LINK_PREFIX: &str = "link_";
-        if field.name() != LINK_PREFIX && field.name().starts_with(LINK_PREFIX) {
-            let category = &field.name()[LINK_PREFIX.len()..];
-            self.links.push(Link {
-                category: category.to_string(),
-                name: value.to_string(),
-            })
-        }
-    }
-    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
-        // self.record_str(field, format!("{value:?}").as_str());
-        // panic!("Just using Debug will result in wrong file names");
-    }
-}
-
-impl Visit for NameVisitor {
-    fn record_debug(&mut self, field: &Field, value: &dyn core::fmt::Debug) {
-        // self.record_str(field, &format!("{value:?}"));
-        // panic!("Just using Debug will result in wrong file names");
-    }
-
-    fn record_str(&mut self, field: &Field, value: &str) {
-        if field.name() == "name" {
-            self.name = Some(value.to_string())
-        }
-    }
+#[derive(Clone)]
+struct Link {
+    category: String,
+    name: String,
 }
 
 struct LogSpan {
     dir: PathBuf,
-    links: LinkVisitor,
+    links: Vec<Link>,
 }
 
 pub struct RoutingLayer {
@@ -121,7 +99,6 @@ impl RoutingLayer {
     pub fn new() -> Self {
         let run_id = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
         let root = PathBuf::from("logs").join(run_id);
-
         Self {
             files: Mutex::new(HashMap::new()),
             run_root: root,
@@ -131,139 +108,73 @@ impl RoutingLayer {
 
     fn get_file(&self, path: &Path) -> File {
         let mut files = self.files.lock().unwrap();
-
         if !files.contains_key(path) {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent).unwrap();
             }
-
             let mut file = OpenOptions::new()
                 .create(true)
                 .append(true)
                 .open(path)
                 .unwrap();
 
-            writeln!(
-                file,
-                r#"<style>
-  /* 1. Global Page Style */
-  html, body {{
-    background-image: radial-gradient(circle at top right, #1a1a2e, #0a0a0c);
-    color: #e0e0e0;
-    margin: 0;
-    padding: 20px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    line-height: 1.5;
-  }}
-
-  /* 2. Log Entry Container (Replacing/Extending Div) */
-  section, .log-entry {{
-    margin-bottom: 20px;
-    padding: 15px;
-    border-radius: 8px;
-    background-color: rgba(255, 255, 255, 0.03); 
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }}
-
-  /* 3. The Fields (Description List) */
-  dl {{
-    display: grid;
-    grid-template-columns: max-content auto; /* Aligns keys and values in a neat grid */
-    gap: 5px 15px;
-    margin: 10px 0;
-    font-size: 0.9em;
-    padding: 10px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-  }}
-  dt {{
-    color: #569cd6; /* Light blue for field names */
-    font-weight: bold;
-    opacity: 0.8;
-  }}
-  dd {{
-    margin: 0;
-    color: #ce9178; /* Muted orange/ginger for values */
-  }}
-  dd code {{
-    background: rgba(255, 255, 255, 0.05);
-    padding: 2px 4px;
-    border-radius: 3px;
-  }}
-
-  /* 4. Interactive Spans (Details/Summary) */
-  details {{
-    cursor: pointer;
-  }}
-  summary {{
-    list-style: none; /* Hides default arrow in some browsers */
-    outline: none;
-    padding: 5px;
-    border-radius: 4px;
-    transition: background 0.2s;
-  }}
-  summary::-webkit-details-marker {{ display: none; }} /* Hides arrow in Safari */
-  
-  summary:hover {{
-    background: rgba(255, 255, 255, 0.05);
-  }}
-  
-  summary::before {{
-    content: "▶";
-    display: inline-block;
-    margin-right: 8px;
-    font-size: 0.8em;
-    color: #4ec9b0;
-    transition: transform 0.2s;
-  }}
-  details[open] summary::before {{
-    transform: rotate(90deg);
-  }}
-
-  /* 5. Code & Pre blocks */
-  pre {{
-    background-color: rgba(0, 0, 0, 0.3);
-    backdrop-filter: blur(8px);
-    border-radius: 8px;
-    padding: 15px;
-    overflow-x: auto;
-    border: 1px solid rgba(78, 201, 176, 0.2); /* Subtle teal border */
-  }}
-
-  /* 6. Link handling */
-  a {{
-    color: #4ec9b0;
-    text-decoration: none;
-    border-bottom: 1px dashed rgba(78, 201, 176, 0.3);
-  }}
-  a:hover {{
-    color: #fff;
-    border-bottom: 1px solid #4ec9b0;
-  }}
-  a:visited {{
-    color: #c586c0;
-  }}
-
-.inline-fields {
-    display: inline-flex;
-    gap: 10px;
-    font-size: 0.8em;
-    margin-left: 20px;
-    background: none;
-    padding: 0;
-}
-.inline-fields dt { color: #569cd6; }
-.inline-fields dd { color: #ce9178; margin-right: 10px; }
-</style>"#
-            )
-            .ok();
-
+            // Write the Header/Styles only once per file
+            writeln!(file, "{}", self.get_styles()).ok();
             files.insert(path.to_path_buf(), file);
         }
-
         files.get(path).unwrap().try_clone().unwrap()
+    }
+
+    fn get_styles(&self) -> &str {
+        r#"<style>
+            html, body {
+                background-image: radial-gradient(circle at top right, #1a1a2e, #0a0a0c);
+                color: #e0e0e0;
+                margin: 0; padding: 20px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                line-height: 1.5;
+            }
+            section.span-container {
+                margin: 20px 0;
+                padding: 15px;
+                border-radius: 8px;
+                background-color: rgba(255, 255, 255, 0.03);
+                backdrop-filter: blur(8px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            header.span-header {
+                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+                margin-bottom: 10px;
+                padding-bottom: 5px;
+                display: flex;
+                justify-content: space-between;
+            }
+            dl {
+                display: grid;
+                grid-template-columns: max-content auto;
+                gap: 5px 15px;
+                margin: 10px 0;
+                font-size: 0.9em;
+                padding: 10px;
+                background: rgba(0, 0, 0, 0.2);
+                border-radius: 4px;
+            }
+            dt { color: #569cd6; font-weight: bold; }
+            dd { margin: 0; color: #ce9178; }
+            dd code { background: rgba(255, 255, 255, 0.05); padding: 2px 4px; border-radius: 3px; }
+            details summary { cursor: pointer; color: #4ec9b0; outline: none; }
+            pre {
+                background-color: rgba(0, 0, 0, 0.2);
+                padding: 10px;
+                border-radius: 5px;
+                overflow-x: auto;
+                white-space: pre-wrap;
+                margin: 5px 0;
+                line-height: 1;
+            }
+            a { color: #4ec9b0; text-decoration: none; border-bottom: 1px dashed rgba(78, 201, 176, 0.3); }
+            a:hover { color: #fff; border-bottom: 1px solid #4ec9b0; }
+        </style>"#
     }
 }
 
@@ -271,120 +182,102 @@ impl<S> Layer<S> for RoutingLayer
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
-    fn on_new_span(
-        &self,
-        attrs: &tracing::span::Attributes<'_>,
-        id: &tracing::Id,
-        ctx: Context<'_, S>,
-    ) {
+    fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
         let span = ctx.span(id).unwrap();
 
-        // let name = span.metadata().name();
-        let mut name_visitor = NameVisitor { name: None };
-        attrs.record(&mut name_visitor);
-        let name = name_visitor
-            .name
-            .as_deref()
-            .unwrap_or(span.metadata().name());
-
-        let parent_dir = span
+        let parent_links = span
             .parent()
             .as_ref()
             .map(|p| p.extensions())
             .as_ref()
             .and_then(|e| e.get::<LogSpan>())
-            .map(|s| s.dir.clone())
+            .map(|e| e.links.clone())
+            .unwrap_or(vec![]);
+
+        let mut visitor = LogVisitor {
+            name: None,
+            links: parent_links,
+            fields: HashMap::new(),
+            message: None,
+        };
+        attrs.record(&mut visitor);
+
+        let name = visitor.name.as_deref().unwrap_or(span.metadata().name());
+
+        let parent_dir = span
+            .parent()
+            .and_then(|p| p.extensions().get::<LogSpan>().map(|s| s.dir.clone()))
             .unwrap_or_else(|| self.run_root.clone());
 
         let current_dir = parent_dir.join(name);
         let current_file = current_dir.join(BASE_FILE);
         let parent_file = parent_dir.join(BASE_FILE);
 
-        let mut links = span
-            .parent()
-            .as_ref()
-            .map(|p| p.extensions())
-            .as_ref()
-            .and_then(|e| e.get::<LogSpan>())
-            .map(|s| s.links.clone())
-            .unwrap_or(LinkVisitor { links: vec![] });
-        // let mut links = LinkVisitor { links: vec![] };
-
-        attrs.record(&mut links);
-
-        let mut attr_visitor = DebugVisitor {
-            fields: HashMap::new(),
-        };
-        attrs.record(&mut attr_visitor);
-
         span.extensions_mut().insert(LogSpan {
             dir: current_dir.clone(),
-            links,
+            links: visitor.links.clone(),
         });
 
-        // create current file
         {
             let mut file = self.get_file(&current_file);
+            let rel_up = diff_paths(&parent_file, &current_dir).unwrap();
 
-            if parent_dir != current_dir {
-                let rel = diff_paths(&parent_file, &current_dir).unwrap();
+            writeln!(file, "<section class='span-container'>").ok();
+            writeln!(file, "  <header class='span-header'>").ok();
+            writeln!(file, "    <span><strong>SPAN: {}</strong></span>", name).ok();
+            writeln!(
+                file,
+                "    <span>{}</span>",
+                link_str(rel_up.to_string_lossy(), "↑ Up to Parent")
+            )
+            .ok();
+            writeln!(file, "  </header>").ok();
+
+            if !visitor.fields.is_empty() {
                 writeln!(
                     file,
-                    "\n<div><code>{}</code>",
-                    link_str(rel.to_string_lossy(), parent_dir.to_string_lossy())
+                    "  <details open><summary>Captured Fields</summary><dl>"
                 )
                 .ok();
-                writeln!(file, "<details>").ok();
-                writeln!(file, "<summary><strong>{name}</strong></summary>\n").ok();
-                if !attr_visitor.fields.is_empty() {
-                    writeln!(file, "<dl>").ok();
+                for (k, v) in visitor.fields {
+                    writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
                 }
+                writeln!(file, "  </dl></details>").ok();
+            }
+            for link in visitor.links {
+                let link_dir = self.run_root.join(&link.category);
+                let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
+                let mut link_file = self.get_file(&link_path);
 
-                for (field_k, field_v) in attr_visitor.fields.iter() {
-                    writeln!(file, "<dt>{field_k}</dt> <dd><code>{field_v}</code></dd>").ok();
-                }
+                let rel_back = diff_paths(&current_file, &link_dir).unwrap();
+                writeln!(
+                    link_file,
+                    "<div>Linked from: {}</div>",
+                    link_str(rel_back.to_string_lossy(), name)
+                )
+                .ok();
 
-                if !attr_visitor.fields.is_empty() {
-                    writeln!(file, "</dl>").ok();
-                }
-
-                writeln!(file, "</details>").ok();
+                let rel_to = diff_paths(&link_path, &current_dir).unwrap();
+                writeln!(
+                    file,
+                    "<div>→ Related: {}</div>",
+                    link_str(rel_to.to_string_lossy(), link.name)
+                )
+                .ok();
             }
         }
 
-        // link from parent
+        // 2. Link from the parent file
         {
             let mut file = self.get_file(&parent_file);
-            let rel = diff_paths(&current_file, &parent_dir).unwrap();
+            let rel_down = diff_paths(&current_file, &parent_dir).unwrap();
             writeln!(
                 file,
-                "<code><pre>{}</pre></code>",
-                link_str(rel.to_string_lossy(), name)
+                "<div>↳ Entering Span: {}</div>",
+                link_str(rel_down.to_string_lossy(), name)
             )
             .ok();
-            // writeln!(file, "[{name}]({})", rel.display()).ok();
         }
-    }
-
-    fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
-        let span = ctx.span(&id).unwrap();
-
-        let extensions = span.extensions();
-
-        let Some(span_data) = extensions.get::<LogSpan>() else {
-            return;
-        };
-
-        let span_file = span_data.dir.join(BASE_FILE);
-        let parent_span = span_data.dir.parent().unwrap_or(self.run_root.as_path());
-
-        let mut file = self.get_file(&span_file);
-        writeln!(
-            file,
-            "<code>{}</code></div>",
-            link_str(format!("../{BASE_FILE}"), parent_span.to_string_lossy())
-        )
-        .ok();
     }
 
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
@@ -399,12 +292,22 @@ where
             None => return,
         };
 
-        let current_dir = &span_data.dir;
-        let current_file = current_dir.join(BASE_FILE);
+        let mut visitor = LogVisitor {
+            name: None,
+            links: span_data.links.clone(),
+            fields: HashMap::new(),
+            message: None,
+        };
+        event.record(&mut visitor);
 
-        let mut link_visitor = span_data.links.clone();
-        // let mut link_visitor = LinkVisitor { links: vec![] };
-        event.record(&mut link_visitor);
+        let current_file = span_data.dir.join(BASE_FILE);
+        let mut file = self.get_file(&current_file);
+
+        // Formatting the ANSI message (reuse your existing logic)
+        let time = self.start_time.elapsed().as_secs_f64();
+        let meta = event.metadata();
+        let level = meta.level();
+        let msg = visitor.message.clone().unwrap_or_default();
 
         let meta = event.metadata();
         let module = meta.module_path().unwrap_or("");
@@ -427,77 +330,70 @@ where
 
         let pad_str = " ".repeat(pad);
 
-        let mut visitor = MessageVisitor { msg: None };
-        let num_links = link_visitor.links.len();
-        event.record(&mut visitor);
-        let msg = visitor.msg.unwrap_or_default();
         let ansii_event_str =
             format!("{info}{pad_str}   {RESET_COLOR} ] {level_color} {msg}{RESET_COLOR}");
 
         println!("{ansii_event_str}");
-        let event_str = preformatted_str_start(
-            ansi_to_html::convert(&ansii_event_str).expect("unable to convert ANSI to HTML"),
-        );
+        let event_str = ansi_to_html::convert(ansii_event_str.as_str())
+            .expect("unable to convert ANSI to HTML");
 
-        // write to span file
-        {
-            let mut file = self.get_file(&current_file);
-            write!(file, "{event_str}").ok();
+        writeln!(file, "<div class='log-entry'>").ok();
+        writeln!(file, "  <pre>{}</pre>", event_str).ok();
 
-            // process links
-            if num_links > 0 {
-                write!(file, "\n<pre><code>").ok();
+        if !visitor.fields.is_empty() {
+            writeln!(file, "  <dl>").ok();
+            for (k, v) in visitor.fields {
+                writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
             }
+            writeln!(file, "  </dl>").ok();
         }
-        for link in link_visitor.links {
-            let link_dir = self.run_root.join(link.category());
-            let link_path = link_dir
-                .join(link.file_name())
-                .with_extension(BASE_EXTENSION);
 
+        if !visitor.links.is_empty() {
+            writeln!(file, "<details><summary>Related</summary><dl>").ok();
+        }
+
+        for link in visitor.links.iter() {
+            let link_dir = self.run_root.join(&link.category);
+            let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
             let mut link_file = self.get_file(&link_path);
 
-            // eprintln!("current_file = {current_file:?}");
-            // eprintln!("link_path = {link_path:?}");
-
-            let rel_from_link = diff_paths(&current_file, &link_dir).unwrap();
-            // eprintln!("rel_from_link = {rel_from_link:?}");
-
-            // writeln!(link_file, "[{}]({})", event_str, rel.display()).ok();
+            let rel_back = diff_paths(&current_file, &link_dir).unwrap();
             writeln!(
                 link_file,
-                " {}{} ",
-                link_str(rel_from_link.to_string_lossy(), &event_str),
-                preformatted_str_end()
+                "<div class = 'log-entry'>{} <pre>{}</pre></div>",
+                link_str(rel_back.to_string_lossy(), "→"),
+                event_str
             )
             .ok();
 
-            // backlink
-            let mut file = self.get_file(&current_file);
-            let rel_back = diff_paths(&link_path, current_dir).unwrap();
-            // eprintln!("rel_from_current = {rel_back:?}");
-
-            write!(
+            let rel_to = diff_paths(&link_path, &span_data.dir).unwrap();
+            writeln!(
                 file,
-                "{} ",
-                link_str(rel_back.to_string_lossy(), link.file_name())
+                "<div>→ Related: {}</div>",
+                link_str(rel_to.to_string_lossy(), &link.name)
             )
             .ok();
-            // writeln!(file, "[{}]({})", link.file_name(), rel_back.display()).ok();
         }
-        let mut file = self.get_file(&current_file);
-        if num_links > 0 {
-            write!(file, "</code></pre> ").ok();
+
+        if !visitor.links.is_empty() {
+            writeln!(file, "</dl></details>");
         }
-        writeln!(file, "{}", preformatted_str_end()).ok();
+
+        writeln!(file, "</div>").ok();
+    }
+
+    fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
+        if let Some(span) = ctx.span(&id) {
+            if let Some(span_data) = span.extensions().get::<LogSpan>() {
+                let mut file = self.get_file(&span_data.dir.join(BASE_FILE));
+                writeln!(file, "</section> ").ok();
+            }
+        }
     }
 }
 
-pub fn preformatted_str_start(from: impl Display) -> String {
-    format!("<pre>{from}")
-}
-pub fn preformatted_str_end() -> String {
-    "</pre>".into()
+fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
+    format!("<a href=\"{}\">{}</a>", to.into(), content.into())
 }
 
 impl Link {
@@ -507,10 +403,6 @@ impl Link {
     pub fn file_name(&self) -> &str {
         &self.name
     }
-}
-
-fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
-    format!("<a href = \"{}\">{}</a>", to.into(), content.into())
 }
 
 pub fn init_tree_logger() {
