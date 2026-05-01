@@ -129,16 +129,16 @@ impl<const N: usize> MicromouseManager<N> {
         }
     }
 
-    #[instrument(skip(self), name = "next_read")]
-    pub async fn next_read(&self) -> Option<Message> {
+    #[instrument(skip(self), name = "await_next_read")]
+    pub async fn await_next_read(&self) -> Option<Message> {
         self.channel.read().await
     }
 
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
     /// communication to continue (even though the channel will spin up a separate thread to keep
     /// the connection alive, it won't handle desyncs and the like)
-    #[instrument(skip(self), name = "next")]
-    pub async fn next(
+    #[instrument(skip(self), name = "process_next_read")]
+    pub async fn process_next_read(
         &self,
         read: Option<Message>,
     ) -> Result<Vec<MicromouseEvent>, MicromouseManagerError> {

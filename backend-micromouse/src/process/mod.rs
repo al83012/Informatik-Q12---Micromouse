@@ -34,11 +34,11 @@ impl<const N: usize> Process<N> {
     )]
     pub async fn run(mut self) {
         loop {
-            let micromouse_response = self.micromouse_manager.next_read();
+            let micromouse_response = self.micromouse_manager.await_next_read();
             let frontend_response = self.frontend_manager.next_read();
             tokio::select! {
                 micromouse_msg = micromouse_response => {
-                    let micromouse_event = self.micromouse_manager.next(micromouse_msg).await;
+                    let micromouse_event = self.micromouse_manager.process_next_read(micromouse_msg).await;
                     match micromouse_event {
                         Ok(events) => {
                             for event in events {

@@ -11,15 +11,18 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, WebSocketStream};
 use tokio_util::{bytes::Buf, sync::CancellationToken};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn, Instrument};
 use tungstenite::{
     protocol::{frame::coding::CloseCode, CloseFrame},
     Error, Message,
 };
 
-use crate::comm::{ChannelConnConfig, ChannelConnError};
 #[cfg(feature = "comm_stats")]
 use crate::utils::stats::StatAccumulator;
+use crate::{
+    comm::{ChannelConnConfig, ChannelConnError},
+    utils::hyperlink_logging::process_span,
+};
 
 pub struct WsChannel {
     // There is no specific read-request, as we are reading continuously
@@ -501,7 +504,7 @@ impl WsChannel {
             cancellation_token,
         };
 
-        tokio::spawn(async move {
+        tokio::spawn((async move {
             info!(target: "comm", "START WS THREAD");
             loop {
                 let stabilize_in_or_reconnect =
@@ -585,7 +588,7 @@ impl WsChannel {
                     ws_internal.mode = WsChannelMode::Stable;
                 }
             }
-        });
+        }).instrument(process_span("ws_channel_internal")));
 
         Ok(ws_external)
     }
@@ -596,7 +599,11 @@ impl WsChannel {
         self.read_recv.lock().await.recv().await
     }
 
-    #[instrument(name = "next_nonresolved_error", skip(self), fields(description = "Like read, but only records the errors"))]
+    #[instrument(
+        name = "next_nonresolved_error",
+        skip(self),
+        fields(description = "Like read, but only records the errors")
+    )]
     pub async fn next_nonresolved_error(&self) -> Option<WsChannelConnError> {
         self.e_recv.lock().await.recv().await
     }

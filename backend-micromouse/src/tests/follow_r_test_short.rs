@@ -110,13 +110,13 @@ pub fn follow_r() {
                     micromouse_manager.send_command(next_cmd).await.expect("SENDING FAILED");
                     // Need next command
                 }
-                msg = micromouse_manager.next_read() => {
+                msg = micromouse_manager.await_next_read() => {
                     let _s = enter_process("read");
                     // WARN: Have to move the code for parsing etc. here: It has to be blocking (at
                     // least relative to sending commands, as the order might get screwed up
                     // otherwise when the command sending takes precedence and cancels next() -->
                     // cannot be the condition for the select-clause
-                    let events = micromouse_manager.next(msg).await;
+                    let events = micromouse_manager.process_next_read(msg).await;
                     match events {
                         Ok(events) => {
                             for event in events.deref().iter() {
