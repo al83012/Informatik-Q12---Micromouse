@@ -1,5 +1,10 @@
+use tracing::instrument;
+
 use crate::{
-    map::{map::{Map, PartialMap, WallDiscoveryStatus}, world_data::{PartialWorldData, WorldData}},
+    map::{
+        map::{Map, PartialMap, WallDiscoveryStatus},
+        world_data::{PartialWorldData, WorldData},
+    },
     transform::position::Position,
 };
 
@@ -10,6 +15,10 @@ pub trait PotentiallyEq {
 
 impl PotentiallyEq for WallDiscoveryStatus {
     type Other = Self;
+    #[instrument(
+        name = "potentially_eq",
+        fields(description = "Check if WallDiscoveryStatus is potentially_eq")
+    )]
     fn potentially_eq(&self, other: &Self::Other) -> bool {
         match (self, other) {
             (WallDiscoveryStatus::Undiscovered, _) | (_, WallDiscoveryStatus::Undiscovered) => true,
@@ -23,10 +32,13 @@ impl PotentiallyEq for WallDiscoveryStatus {
     }
 }
 
-
 impl<const N: usize> PotentiallyEq for Map<N> {
     type Other = PartialMap<N>;
 
+    #[instrument(
+        name = "potentially_eq",
+        fields(description = "Check if Map is potentially_eq to PartialMap")
+    )]
     fn potentially_eq(&self, other: &Self::Other) -> bool {
         let inner_map = other.0;
         for x in 0..N {
@@ -70,7 +82,11 @@ impl<const N: usize> PotentiallyEq for Map<N> {
 
 impl<const N: usize> PotentiallyEq for WorldData<N> {
     type Other = PartialWorldData<N>;
-
+    #[instrument(
+        name = "potentially_eq",
+        fields(description = "Check if World is potentially_eq"),
+        skip_all
+    )]
     fn potentially_eq(&self, other: &Self::Other) -> bool {
         if !self.map.potentially_eq(&other.map()) {
             return false;

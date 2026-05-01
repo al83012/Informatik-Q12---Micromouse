@@ -19,8 +19,8 @@ use tracing_subscriber::{layer::Context, registry::LookupSpan, EnvFilter, Layer}
 
 use crate::{
     comm::micromouse_message::CommandId,
-    strategy::strategy_tree::AbsoluteNodeId,
-    utils::logging::{level_bg_color, level_color, MessageVisitor, BLACK, RESET_COLOR, STD_BG},
+    strategy::strategy_tree::{AbsoluteLayerId, AbsoluteNodeId, AbsolutePathId},
+    utils::logging::{BLACK, MessageVisitor, RESET_COLOR, STD_BG, level_bg_color, level_color},
 };
 
 pub const BASE_FILE: &str = "index.html";
@@ -75,6 +75,18 @@ impl LinkFileName for CommandId {
 impl LinkFileName for AbsoluteNodeId {
     fn link(&self) -> String {
         format!("node_L{}_N{}", self.layer_id().0, self.node_id().0)
+    }
+}
+
+impl LinkFileName for AbsoluteLayerId {
+    fn link(&self) -> String {
+        format!("layer_{}", self.0)
+    }
+}
+
+impl LinkFileName for AbsolutePathId {
+    fn link(&self) -> String {
+        format!("path_N{}_S{}_I{}", self.from_node.link(), self.branch.at_step, self.branch.from_interrupt.link())
     }
 }
 

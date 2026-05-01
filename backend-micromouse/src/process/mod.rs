@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::{
     comm::{
         micromouse_manager::{self, MicromouseEvent, MicromouseManager, MicromouseManagerError},
@@ -13,10 +15,23 @@ pub struct Process<const N: usize> {
 }
 
 impl<const N: usize> Process<N> {
+    #[instrument(
+        name = "new Process",
+        fields(
+            description = "Create the main process"
+        )
+    )]
     pub async fn new() -> Self {
         todo!("Create the connections")
     }
 
+    #[instrument(
+        skip_all,
+        name = "run",
+        fields(
+            description = "Execute the main process"
+        )
+    )]
     pub async fn run(mut self) {
         loop {
             let micromouse_response = self.micromouse_manager.next_read();
@@ -42,16 +57,37 @@ impl<const N: usize> Process<N> {
         }
     }
 
+    #[instrument(
+        skip(self),
+        name = "handle_micromouse_error",
+        fields(
+            description = "Handle micromouse error and maybe propagate it"
+        )
+    )]
     pub async fn handle_micromouse_error(&mut self, micromouse_error: MicromouseManagerError) {
         self.frontend_manager.send(FrontendMessage::MicromouseManagerError(micromouse_error)).await;
         todo!("Send the error to the frontend and maybe handle it internally");
     }
 
+    #[instrument(
+        skip(self),
+        name = "handle_micromouse_event",
+        fields(
+            description = "Handle micromouse event, apply it to the strategy tree and propagate it"
+        )
+    )]
     pub async fn handle_micromouse_event(&mut self, micromouse_event: MicromouseEvent) {
         self.frontend_manager.send(FrontendMessage::MicromouseEvent(micromouse_event)).await;
         todo!("Send the event to the frontend and if it modifies the strategy_tree, also do that and send the necessary events for that (to the frontend and to the micromouse)")
     }
 
+    #[instrument(
+        skip(self),
+        name = "handle_frontend_command",
+        fields(
+            description = "Handle a new command / strategy change etc. sent from the frontend"
+        )
+    )]
     pub async fn handle_frontend_command(&mut self, frontend_command: FrontendResponse) {
 
         todo!("Modify the strategy_tree or send the appropriate commands to the Micromouse")

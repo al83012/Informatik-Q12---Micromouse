@@ -21,7 +21,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, instrument};
 
 use crate::{
     comm::{
@@ -158,6 +158,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
     /// execution will find a way to change the filter so that it could stop at this point or not
     /// (The only exception to this is the case, in which interrupts are contradictory (like
     /// opposing `0_L_STOP-IF-BLOCKED` and `0_l_STOP-IF-OPEN`))
+    #[instrument(
+        name = "new FilteredCommandApplication",
+        fields(
+            description = "Creating new filtered command application (= a projection of how a command behaves given a certain map)"
+        ),
+        skip(with_filter)
+    )]
     pub fn new(with_filter: Option<WorldData<N>>, command: Command) -> Self {
         info!(target: "map/cmd/apl", "NEW Command Application for {command:?}");
         if let Some(f) = &with_filter {
@@ -365,6 +372,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
         self.command.max_step_count()
     }
 
+    #[instrument(
+        name = "apply_measurement_to_filter",
+        fields(
+            description = "Apply a new measurement to the filter (maybe pruning branches)"
+        ),
+        skip(self)
+    )]
     pub fn apply_measurement_to_filter(
         &mut self,
         measurement: Measurement,
@@ -379,6 +393,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
         })
     }
 
+    #[instrument(
+        name = "upgrade_filter",
+        fields(
+            description = "Upgrade the filter (maybe pruning branches), but only if the filter could be an upgrade of the current filter"
+        ),
+        skip(self)
+    )]
     pub fn upgrade_filter(
         &mut self,
         upgraded_filter: Map<N>,
@@ -538,6 +559,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
     // Will only return Ok, if the path to the given step is certain
     //
     // Will return the starting condition of that step (without any measurements applied)
+    #[instrument(
+        name = "at_start_certain_step",
+        fields(
+            description = "Will return the state of the world at the start of the given step of the command (but only if reaching that step is a certainty)"
+        ),
+        skip(self)
+    )]
     pub fn at_start_certain_step(
         &self,
         step_number: StepNum,
@@ -600,6 +628,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
         // todo!()
     }
 
+    #[instrument(
+        name = "max_substep_in_step",
+        fields(
+            description = "Get the maximum substep within a step that would be reached (e.g. the step before the interrupt or continuing)"
+        ),
+        skip(self)
+    )]
     pub fn max_substep_in_step(
         &self,
         step_number: StepNum,
@@ -709,6 +744,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
         }
     }
 
+    #[instrument(
+        name = "reach_step",
+        fields(
+            description = "Check whether a step is within bounds"
+        ),
+        skip(self)
+    )]
     pub fn reach_step(&self, step_number: StepNum) -> Result<(), CannotReachStep> {
         if step_number > self.step_with_termination() as u32 {
             error!(target: "map/cmd/apl", "{step_number} > TERMINATION_STEP = {}", self.step_with_termination());
@@ -718,6 +760,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
         }
     }
 
+    #[instrument(
+        name = "measurement_directions_at_step",
+        fields(
+            description = "Gives the measurement directions that the interrupts at a step would need to be determined"
+        ),
+        skip(self)
+    )]
     pub fn measurement_directions_at_step(
         &self,
         step_number: StepNum,
@@ -736,6 +785,13 @@ impl<const N: usize> FilteredCommandApplication<N> {
     /// form, so that we can properly terminate early if an interrupt is triggered (that behaviour
     /// isn't useful, but it is closest to what we have to do)
     /// Returns every relative direction with their associated interrupt_index in ascending order
+    #[instrument(
+        name = "ordered_measurement_directions_at_step",
+        fields(
+            description = "like measurement_directions_at_step, but forces the order of the interrupts"
+        ),
+        skip(self)
+    )]
     pub fn ordered_measurement_directions_at_step(
         &self,
         step_number: StepNum,
@@ -830,6 +886,15 @@ pub struct PathLocalOutcomeId {
 pub enum PathLocalInterruptId {
     MaxStep,
     InterruptAtIndex(usize),
+}
+
+impl PathLocalInterruptId {
+    pub fn link(&self) -> String {
+        match self {
+            Self::MaxStep => "max".to_string(),
+            Self::InterruptAtIndex(i) => format!("i{i}")
+        }
+    }
 }
 
 // TODO:

@@ -8,7 +8,7 @@ use console::Style;
 use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
-use tracing::{Instrument, Level, debug, error, info, instrument, span, warn};
+use tracing::{debug, error, info, instrument, span, warn, Instrument, Level};
 use tungstenite::Message;
 
 use crate::{
@@ -29,7 +29,7 @@ use crate::{
     },
     transform::position::MouseTransform,
     utils::{
-        hyperlink_logging::{LinkFileName, process_span},
+        hyperlink_logging::{process_span, LinkFileName},
         nonempty::{NonEmpty, PotentiallyNonEmpty},
     },
 };
@@ -153,12 +153,12 @@ impl<const N: usize> MicromouseManager<N> {
         info!(target: "comm/mng", "NEXT RESPONSE: {next_response:?}");
         match next_response {
             MicromouseResponse::Debug(msg) => {
-                let _s = process_span("MicromouseManager_process_dbg");
+                let _s = process_span("process_dbg");
                 debug!(target: "comm/mng/dbg", "READ DEBUG {msg}");
                 Ok(vec![MicromouseEvent::DebugMessage(msg)])
             }
             MicromouseResponse::Measurement(measurement_message) => {
-                let _s = process_span("MicromouseManager_process_measurement");
+                let _s = process_span("process_measurement");
                 info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
                 // Check whether command is new
                 let mut current_cmd = self.current_command.lock().await;
@@ -175,7 +175,7 @@ impl<const N: usize> MicromouseManager<N> {
                 Ok(map_update.into())
             }
             MicromouseResponse::CommandFinished(command_finished_message) => {
-                let _s = process_span("MicromouseManager_cmd_finished");
+                let _s = process_span("cmd_finished");
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
                 let mut just_finished_cmd = self.current_command.lock().await;
                 self.update_current_command_id(
@@ -232,7 +232,7 @@ impl<const N: usize> MicromouseManager<N> {
                 .collect())
             }
             MicromouseResponse::Desync(command_ids) => {
-                let _s = process_span("MicromouseManager_process_desync");
+                let _s = process_span("process_desync");
                 warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
                 for c in command_ids {
                     if !self.resend(c).await {
@@ -243,26 +243,26 @@ impl<const N: usize> MicromouseManager<N> {
                 Ok(vec![])
             }
             MicromouseResponse::Stop => {
-                let _s = process_span("MicromouseManager_process_stop");
+                let _s = process_span("process_stop");
                 info!(target: "comm/mng", "STOPPED");
                 *self.mode.lock().await = MicromouseMode::Stopped;
                 Ok(vec![MicromouseEvent::Stop])
             }
             MicromouseResponse::Restart => {
-                let _s = process_span("MicromouseManager_process_restart");
+                let _s = process_span("process_restart");
                 info!(target: "comm/mng", "RESTARTED");
                 self.restart().await;
                 *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Restart])
             }
             MicromouseResponse::Continue => {
-                let _s = process_span("MicromouseManager_process_continue");
+                let _s = process_span("process_continue");
                 info!(target: "comm/mng", "CONTINUED");
                 *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Continue])
             }
             MicromouseResponse::Battery(b_100) => {
-                let _s = process_span("MicromouseManager_process_battery");
+                let _s = process_span("process_battery");
                 debug!(target: "comm/mng/battery", "BATTERY: {b_100}/100");
                 let f_b = b_100 as f32 / 100.0;
                 *self.battery.lock().await = f_b;

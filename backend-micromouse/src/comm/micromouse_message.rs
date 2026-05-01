@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, num::ParseIntError};
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::{debug, info, instrument};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -82,6 +82,7 @@ impl<T> std::fmt::Debug for FormatError<T> {
 impl TryFrom<String> for MicromouseResponse {
     type Error = FormatError<MicromouseResponse>;
 
+    #[instrument(name = "response_try_from_string")]
     fn try_from(value: String) -> Result<Self, Self::Error> {
         match value.trim() {
             "CONTINUE" => Ok(MicromouseResponse::Continue),

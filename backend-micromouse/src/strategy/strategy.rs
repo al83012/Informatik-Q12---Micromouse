@@ -31,7 +31,7 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
 #[derive(Clone, Copy, Debug)]
 pub struct GoalPosition(pub Position);
 pub trait FromConfig {
-    type Config;
+    type Config: std::fmt::Debug;
     fn from_config(config: Self::Config) -> Self;
 }
 

@@ -4,6 +4,8 @@ use std::{
     ops::{Add, Sub},
 };
 
+use tracing::instrument;
+
 use crate::{
     comm::micromouse_message::Command,
     map::{
@@ -14,9 +16,10 @@ use crate::{
     },
     strategy::strategy::{
         ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
-    },
+    }, utils::hyperlink_logging::LinkFileName,
 };
 
+#[derive(Debug)]
 pub enum StrategyTreeError {
     WhilePruning(PruneError),
     WhileExpanding(TreeExpansionError),
@@ -66,6 +69,7 @@ pub struct RelativeLayerId(pub usize);
 //     NoSuccessor,
 // }
 
+#[derive(Debug)]
 pub struct StrategyTreeConfig<const N: usize, S: Strategy<N> + Clone> {
     pub strategy_config: S::Config,
     pub desired_depth: usize,
@@ -96,6 +100,7 @@ pub struct NodeAction<const N: usize> {
     pub potential_outcomes: HashMap<PathLocalOutcomeId, AbsoluteNodeId>,
 }
 
+#[derive(Debug)]
 pub enum NodeExpansionResult {
     NotExpandable,
     NotYetExpandable,
@@ -104,11 +109,13 @@ pub enum NodeExpansionResult {
     Expanded(usize),
 }
 
+#[derive(Debug)]
 pub struct TreeExpansionError {
     node: AbsoluteNodeId,
     expansion: NodeExpansionResult,
 }
 
+#[derive(Debug)]
 pub struct TreeExpansionSuccess {
     nodes: usize,
     layers: usize,
@@ -123,8 +130,15 @@ pub enum StrategyStart<const N: usize> {
 impl<const N: usize, S> StrategyTree<N, S>
 where
     // For use in the Strategy-Tree, we need to be able to duplicate the StrategyState to branch
-    S: Strategy<N> + Clone,
+    S: Strategy<N> + Clone + std::fmt::Debug,
 {
+    #[instrument(
+        name = "new StrategyTree",
+        fields(
+            description = "Creates new strategy tree, potentially on the basis of a number of commands that was sent and cannot be taken back"
+        ),
+        skip(starting_condition)
+    )]
     pub fn new(
         starting_condition: StrategyStart<N>,
         tree_config: StrategyTreeConfig<N, S>,
@@ -151,6 +165,13 @@ where
     }
 
     // returns the number of nodes this action creates
+    #[instrument(
+        name = "expand_fully",
+        fields(
+            description = "Expand all possible tree nodes (until hitting a limit or an unknown)"
+        ),
+        skip(self)
+    )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
         let node_budget = self.config.max_nodes.saturating_sub(self.node_count);
         let layer_budget = self
@@ -247,6 +268,14 @@ where
     }
 
     // Returns the number of children this operation created
+    #[instrument(
+        name = "try_expand_node",
+        fields(
+            description = "try expanding a single node",
+            link_node_id = node_id.link()
+        ),
+        skip(self)
+    )]
     fn try_expand_node(&mut self, node_id: AbsoluteNodeId) -> NodeExpansionResult {
         let mut nodes_created = 0;
         let goal_position = self.goal_position;
@@ -349,6 +378,14 @@ where
         NodeExpansionResult::Expanded(nodes_created)
     }
 
+    #[instrument(
+        name = "add_node",
+        fields(
+            description = "Add new node to layer",
+            link_layer_id = to_layer.link()
+        ),
+        skip(self, node)
+    )]
     fn add_node(
         &mut self,
         node: StrategyTreeNode<N, S>,
@@ -371,6 +408,14 @@ where
         }
     }
 
+    #[instrument(
+        name = "fill_layers_to_id",
+        fields(
+            description = "Create new layers until reaching that id",
+            link_layer_id = to_layer.link()
+        ),
+        skip(self)
+    )]
     fn fill_layers_to_id(&mut self, to_layer: AbsoluteLayerId) -> usize {
         let highest_layer_id = self
             .layers
@@ -444,6 +489,13 @@ where
 
     // removes the root, making its successor the new root; if the successor was not yet expanded
     // into a command, it will do so at this point, returning its NodeAction
+    #[instrument(
+        name = "finish_root",
+        fields(
+            description = "Treat the current root as finished, removing it from the tree and replacing it with its 1 (!!!) successor",
+        ),
+        skip(self)
+    )]
     pub fn finish_root(&mut self) -> Result<Option<NodeAction<N>>, FinishRootError> {
         let (_outcome_id, successor) = {
             let _root = self.root_node();
@@ -520,6 +572,13 @@ where
         Ok(None)
     }
 
+    #[instrument(
+        name = "prune_not_potentially_eq",
+        fields(
+            description = "Prunes all command-outcomes of all paths which do not match the given filter",
+        ),
+        skip(self)
+    )]
     pub fn prune_not_potentially_eq(&mut self, filter: &PartialMap<N>) -> Result<(), PruneError> {
         let node_indices = self
             .layers
@@ -549,6 +608,13 @@ where
         Ok(())
     }
 
+    #[instrument(
+        name = "prune_current_command_by_rejection",
+        fields(
+            description = "Prunes branches of the current command using rejection-events from the micromouse manager",
+        ),
+        skip(self)
+    )]
     pub fn prune_current_command_by_rejection(
         &mut self,
         rejections: &RejectedOutcomes,
@@ -586,6 +652,14 @@ where
         self.prune_branch(branch.clone())
     }
 
+    #[instrument(
+        name = "prune_branch",
+        fields(
+            description = "Remove a specific branch and all of its descendants",
+            link_branch_id = branch.link(),
+        ),
+        skip(self)
+    )]
     fn prune_branch(&mut self, branch: AbsolutePathId) -> Result<(), PruneError> {
         let branch_source_id = branch.from_node;
         let Some(branch_source) = self.node_mut(branch_source_id) else {
@@ -610,6 +684,14 @@ where
     }
 
     // Returns the nodes children
+    #[instrument(
+        name = "delete_node_no_clean",
+        fields(
+            description = "Deletes the node, but does not do any cleanup",
+            link_node_id = node.link(),
+        ),
+        skip(self)
+    )]
     unsafe fn delete_node_no_clean(
         &mut self,
         node: AbsoluteNodeId,
@@ -624,6 +706,13 @@ where
         l
     }
 
+    #[instrument(
+        name = "update_equal_layers",
+        fields(
+            description = "Update the highest eq layer id (in case there are new eq-layers)",
+        ),
+        skip(self)
+    )]
     fn update_equal_layers(&mut self) {
         let highest_full_layer = self.highest_full_layer;
         let highest_eq_layer = self.highest_eq_layer;
@@ -641,6 +730,13 @@ where
         }
     }
 
+    #[instrument(
+        name = "new_sends",
+        fields(
+            description = "Moves the send-cursor further (if possible) and returns an ordered list of newly sent commandy",
+        ),
+        skip(self)
+    )]
     fn new_sends(&mut self) -> Vec<Command> {
         if self.highest_sent_layer < self.highest_eq_layer {
             return self.layers[self.highest_sent_layer + 1..=self.highest_eq_layer]
@@ -651,12 +747,27 @@ where
         vec![]
     }
 
+    #[instrument(
+        name = "merge",
+        fields(
+            description = "MERGE",
+        ),
+        skip(self)
+    )]
     fn merge(&mut self) // -> ?
     {
         // Try merging non-eq-layers
         todo!("Nice-to-have, but really complex")
     }
 
+    #[instrument(
+        name = "transform_command",
+        fields(
+            description = "Used for merge; Tries to split a command (and its node) into 2",
+            link_node_id = from_node.link(),
+        ),
+        skip(self)
+    )]
     fn transform_command(
         &mut self,
         from_node: AbsoluteNodeId,
@@ -683,6 +794,14 @@ where
         // there (if the 2nd command is none) or move back 1
         todo!("WE NEED TO DETERMINE, WHICH OUTCOMES MATCH THE ORIGINAL OUTCOMES; WHICH IS QUITE HARD -> NEED TO MATCH UP THE PARTIAL WORLDS");
     }
+    #[instrument(
+        name = "move_node_back",
+        fields(
+            description = "Moves a node back a layer (which is unsafe as it creates a link jumping a layer)",
+            link_node_id = node_id.link()
+        ),
+        skip(self)
+    )]
     unsafe fn move_node_back(&mut self, node_id: AbsoluteNodeId)
     // --> The new node_id; the id of its
     // parent;
@@ -733,6 +852,13 @@ where
 
     // Filters the tree using the best current knowledge about the map
     // Returns any commands that have become certain by doing that
+    #[instrument(
+        name = "handle_map_update",
+        fields(
+            description = "Prune, expand, send",
+        ),
+        skip(self)
+    )]
     pub fn handle_map_update(
         &mut self,
         map: &PartialMap<N>,
@@ -756,6 +882,13 @@ where
     }
 
     // Filters the tree using the rejection-events from the currently processed command
+    #[instrument(
+        name = "handle_cmd_rejection",
+        fields(
+            description = "Prune, expand, send",
+        ),
+        skip(self)
+    )]
     pub fn handle_cmd_rejection(
         &mut self,
         rejections: &RejectedOutcomes,
@@ -766,6 +899,13 @@ where
         Ok(self.new_sends())
     }
 
+    #[instrument(
+        name = "close",
+        fields(
+            description = "Close the current strategy_tree, leaving behind the commands that were already sent and thus cannot be taken back",
+        ),
+        skip(self)
+    )]
     pub fn close(self) -> SentUnfinishedCommands<N> {
         let highest_sent_layer = self.highest_sent_layer;
         let mut layers = vec![];
@@ -808,8 +948,8 @@ impl AbsoluteNodeId {
 
 #[derive(Clone, Debug)]
 pub struct AbsolutePathId {
-    from_node: AbsoluteNodeId,
-    branch: PathLocalOutcomeId,
+    pub from_node: AbsoluteNodeId,
+    pub branch: PathLocalOutcomeId,
 }
 
 impl From<PruneError> for StrategyTreeError {

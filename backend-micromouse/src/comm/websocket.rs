@@ -11,7 +11,7 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, WebSocketStream};
 use tokio_util::{bytes::Buf, sync::CancellationToken};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 use tungstenite::{
     protocol::{frame::coding::CloseCode, CloseFrame},
     Error, Message,
@@ -102,6 +102,10 @@ pub struct WsChannelInternal {
 }
 
 impl WsChannelInternal {
+    #[instrument(
+        name = "new WsChannelInternal",
+        fields(description = "Create new internal for Ws-Channel running on separate thread")
+    )]
     pub async fn new(
         channel_listener: TcpListener,
         e_sender: Sender<WsChannelConnError>,
@@ -156,6 +160,11 @@ impl WsChannelInternal {
     }
 
     // Closes the websocket
+    #[instrument(
+        name = "handle_close",
+        fields(description = "Closes the websocket"),
+        skip(self)
+    )]
     pub async fn handle_close(self) {
         let ws_stream = self.ws_stream;
         if ws_stream.is_none() {
@@ -178,6 +187,11 @@ impl WsChannelInternal {
     }
 
     // Tries sending ping; if there is a connection error: retries
+    #[instrument(
+        name = "handle_ping",
+        fields(description = "Check whether ping was too late (and maybe attempt recovery)"),
+        skip(self)
+    )]
     pub async fn handle_ping(&mut self) {
         debug!(target: "comm", "HANDLE PING ({})", self.ping_num);
         if let Err(e) = self
@@ -200,6 +214,11 @@ impl WsChannelInternal {
     }
 
     // Retries sending the msg, doing reconnect attempts in-between
+    #[instrument(
+        name = "handle_send",
+        fields(description = "Sends the message (and maybe attempts recovery)"),
+        skip(self)
+    )]
     pub async fn handle_send(&mut self, msg: Message) {
         debug!(target: "comm", "HANDLE SEND {msg:?}");
         loop {
@@ -224,6 +243,11 @@ impl WsChannelInternal {
     }
 
     // Tries reconnecting if a recoverable error was read, otherwise processes the message
+    #[instrument(
+        name = "handle_read",
+        fields(description = "Parse message and distribute to other handle-methods"),
+        skip(self)
+    )]
     pub async fn handle_read(&mut self, read_res: Result<Message, Error>) {
         debug!(target: "comm", "HANDLE READ ({read_res:?})");
         match read_res {
@@ -310,6 +334,13 @@ impl WsChannelInternal {
         }
     }
 
+    #[instrument(
+        name = "handle_recoverable_ws_error",
+        fields(
+            description = "Check whether the tungstenite error is recoverable and maybe attempt recovery"
+        ),
+        skip(self)
+    )]
     pub async fn handle_recoverable_ws_error(
         &mut self,
         error: Error,
@@ -331,6 +362,11 @@ impl WsChannelInternal {
         Ok(())
     }
 
+    #[instrument(
+        name = "handle_recoverable_io_error",
+        fields(description = "Check whether io error is recoverable and maybe attempt recovery"),
+        skip(self)
+    )]
     async fn handle_recoverable_io_error(
         &mut self,
         error: std::io::Error,
@@ -354,6 +390,11 @@ impl WsChannelInternal {
         }
     }
 
+    #[instrument(
+        name = "reconnect",
+        fields(description = "Try to reconnect (potentially with another device)"),
+        skip(self)
+    )]
     pub async fn reconnect(&mut self) -> Result<(), WsChannelConnError> {
         if self.config.conn_config == ChannelConnConfig::Once {
             error!(target: "comm", "RECONNECT INVALID --> Channel closed, only open ONCE");
@@ -421,6 +462,10 @@ impl WsChannelInternal {
 }
 
 impl WsChannel {
+    #[instrument(
+        name = "new WsChannel",
+        fields(description = "Create new user-side struct for the WsChannel")
+    )]
     pub async fn new(config: WsChannelConfig, port: u16) -> Result<Self, WsChannelConnError> {
         info!(target: "comm", "CREATE new WsChannel (port = {port}, config = {config:?})");
 
@@ -546,14 +591,17 @@ impl WsChannel {
     }
 
     /// Returns Some(msg) if there is a message and false if the Channel has already been dropped
+    #[instrument(name = "read", skip(self), fields(description = "Read next message"))]
     pub async fn read(&self) -> Option<Message> {
         self.read_recv.lock().await.recv().await
     }
 
+    #[instrument(name = "next_nonresolved_error", skip(self), fields(description = "Like read, but only records the errors"))]
     pub async fn next_nonresolved_error(&self) -> Option<WsChannelConnError> {
         self.e_recv.lock().await.recv().await
     }
 
+    #[instrument(name = "send", skip(self), fields(description = "Send message"))]
     pub async fn send(&self, msg: Message) {
         self.send_request_sender
             .send(msg)

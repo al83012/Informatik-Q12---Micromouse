@@ -4,7 +4,7 @@ use std::{
 };
 
 use console::Style;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 use crate::{
     comm::micromouse_message::{
@@ -21,7 +21,7 @@ use crate::{
     utils::map_display::{MapDisplay, MapDisplayWrite},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct WorldData<const N: usize> {
     pub map: Map<N>,
     pub mouse: MouseTransform,
@@ -37,12 +37,22 @@ impl<const N: usize> Default for WorldData<N> {
 }
 
 impl<const N: usize> WorldData<N> {
+    #[instrument(
+        name = "apply_measurement",
+        fields(description = "Apply measurement to world")
+    )]
     pub fn apply_measurement(
         &mut self,
         measurement: &Measurement,
     ) -> Result<crate::comm::website::DiscoveryMessage, map::MapInconsistencyError> {
         self.map.apply_measurement(measurement)
     }
+    #[instrument(
+        name = "measure_one",
+        fields(
+            description = "Measure exactly 1 in the given relative direction (to determine interrupts)"
+        )
+    )]
     pub fn measure_one(&self, relative_direction: RelativeDirection) -> &WallDiscoveryStatus {
         let measure_dir = relative_direction.transform_by(&self.mouse.dir);
         if (self.mouse.pos.x == 0 && measure_dir == Direction::NegX)
@@ -57,100 +67,8 @@ impl<const N: usize> WorldData<N> {
             )
             .expect("")
     }
-    // pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
-    //     let start_transform = self.mouse;
-    //     let measure_dir = relative_direction.transform_by(&start_transform.dir);
-    //     let ray_transform = MouseTransform {
-    //         pos: start_transform.pos,
-    //         dir: measure_dir,
-    //     };
-    //     debug!(target: "map/measure", "Starting measure {start_transform:?} -> {relative_direction}");
-    //     for i in 0..=max_depth {
-    //         let current_pos = ray_transform.moved(i);
-    //         debug!(target: "map/measure", "Checking pos = {current_pos:?}");
-    //         if current_pos.is_none() {
-    //             debug!(target: "map/measure", "CHECK out of bounds --> Mark as collision");
-    //             return Measurement {
-    //                 value: measurement::MeasurementValue::Value { cells: i as u32 },
-    //                 direction: measure_dir,
-    //                 position: ray_transform.pos,
-    //             };
-    //         }
-    //         let current_pos = current_pos.unwrap();
-    //         let next_wall = self.map.wall(&current_pos.pos, &measure_dir);
-    //         // .expect("Already checked");
-    //         if next_wall.is_none() {
-    //             debug!(target: "map/measure", "HIT map wall");
-    //             return Measurement {
-    //                 value: measurement::MeasurementValue::Value { cells: i as u32 },
-    //                 direction: measure_dir,
-    //                 position: ray_transform.pos,
-    //             };
-    //         }
-    //         let next_wall = next_wall.unwrap();
-    //         if i != max_depth {
-    //             // Not yet the end --> could continue
-    //             match next_wall {
-    //                 //INFO: The ray only doesn't hit a wall if it is explicitly not there
-    //                 //Does not work, if it is the max-depth: int that case HAS to create a measurement
-    //                 WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => continue,
-    //                 WallDiscoveryStatus::Exists(true) => {
-    //                     return Measurement {
-    //                         value: measurement::MeasurementValue::Value { cells: i as u32 },
-    //                         direction: measure_dir,
-    //                         position: ray_transform.pos,
-    //                     };
-    //                 }
-    //                 WallDiscoveryStatus::Undiscovered => {
-    //                     return Measurement {
-    //                         value: measurement::MeasurementValue::OutsideRange {
-    //                             at_least_cells: i as u32,
-    //                         },
-    //                         direction: measure_dir,
-    //                         position: ray_transform.pos,
-    //                     };
-    //                 }
-    //             }
-    //         } else {
-    //             match next_wall {
-    //                 //
-    //                 WallDiscoveryStatus::Exists(false) | WallDiscoveryStatus::Visited => {
-    //                     return Measurement {
-    //                         value: measurement::MeasurementValue::OutsideRange {
-    //                             at_least_cells: i as u32,
-    //                         },
-    //                         direction: measure_dir,
-    //                         position: ray_transform.pos,
-    //                     };
-    //                 }
-    //                 WallDiscoveryStatus::Exists(true) => {
-    //                     return Measurement {
-    //                         value: measurement::MeasurementValue::Value { cells: i as u32 },
-    //                         direction: measure_dir,
-    //                         position: ray_transform.pos,
-    //                     };
-    //                 }
-    //                 WallDiscoveryStatus::Undiscovered => {
-    //                     return Measurement {
-    //                         value: measurement::MeasurementValue::OutsideRange {
-    //                             at_least_cells: i as u32,
-    //                         },
-    //                         direction: measure_dir,
-    //                         position: ray_transform.pos,
-    //                     };
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Measurement {
-    //         value: measurement::MeasurementValue::OutsideRange {
-    //             at_least_cells: max_depth as u32,
-    //         },
-    //         direction: measure_dir,
-    //         position: ray_transform.pos,
-    //     }
-    // }
 
+    #[instrument(name = "measure", fields(description = "Measure in direction"))]
     pub fn measure(&self, relative_direction: RelativeDirection, max_depth: u8) -> Measurement {
         debug!(target: "op/map", "!!! Measuring from {} & {} in rel dir {}", self.mouse.pos, self.mouse.dir, relative_direction);
         let base_pos = self.mouse.pos;
@@ -205,6 +123,10 @@ impl<const N: usize> WorldData<N> {
         }
     }
 
+    #[instrument(
+        name = "is_interrupt_triggered",
+        fields(description = "Determine whether a given interrupt would currently be triggered")
+    )]
     pub fn is_interrupt_triggered(
         &self,
         interrupt: MeasurementInterrupt,
@@ -232,7 +154,7 @@ impl<const N: usize> WorldData<N> {
 /// an incomplete look into the future (The contained map does not include all the information that
 /// should be available at the position and rotation of the mouse, as this rotation and position is
 /// yet to be reached)
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PartialWorldData<const N: usize>(WorldData<N>);
 
 impl<const N: usize> Display for PartialWorldData<N> {
@@ -269,6 +191,12 @@ impl<const N: usize> PartialWorldData<N> {
     // interrupt will trigger or not (depending on `should_trigger`) at the current transform
     // Returns None if the wall can never be set to a state which would trigger the interrupt
     // TODO: confirm
+    #[instrument(
+        name = "with_interrupt_termination_triggered",
+        fields(
+            description = "Tries to create an upgraded version of self, in which the interrupt has to exist or not (depending on should_trigger)"
+        )
+    )]
     pub fn with_interrupt_termination_triggered(
         mut self,
         should_trigger: bool,
@@ -357,6 +285,12 @@ impl<const N: usize> PartialWorldData<N> {
         Some(self)
     }
 
+    #[instrument(
+        name = "new PartialMap",
+        fields(
+            description = "Create new PartialMap"
+        )
+    )]
     pub fn new(partial_map: PartialMap<N>, mouse_transform: MouseTransform) -> Self {
         Self(WorldData {
             map: partial_map.0,
@@ -375,6 +309,8 @@ impl<const N: usize> Default for PartialWorldData<N> {
     }
 }
 
+
+#[derive(Debug)]
 pub struct CommandExecution<const N: usize> {
     pub world: WorldData<N>,
     pub command: Command,
@@ -409,6 +345,12 @@ impl<const N: usize> CommandExecution<N> {
         }
     }
 
+    #[instrument(
+        name = "next",
+        fields(
+            description = "Trying to do next step of command"
+        )
+    )]
     pub fn next(mut self) -> CommandStepResult<N> {
         let max_steps = self.command.ty.max_step_count();
         info!(target: "map", "CURRENT EXECUTION STEP {} / {}", self.next_step + 1, max_steps);
