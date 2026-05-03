@@ -20,7 +20,7 @@ use tracing_subscriber::{layer::Context, registry::LookupSpan, EnvFilter, Layer}
 use crate::{
     comm::micromouse_message::CommandId,
     strategy::strategy_tree::{AbsoluteLayerId, AbsoluteNodeId, AbsolutePathId},
-    utils::logging::{BLACK, MessageVisitor, RESET_COLOR, STD_BG, level_bg_color, level_color},
+    utils::logging::{level_bg_color, level_color, MessageVisitor, BLACK, RESET_COLOR, STD_BG},
 };
 
 pub const BASE_FILE: &str = "index.html";
@@ -86,7 +86,12 @@ impl LinkFileName for AbsoluteLayerId {
 
 impl LinkFileName for AbsolutePathId {
     fn link(&self) -> String {
-        format!("path_N{}_S{}_I{}", self.from_node.link(), self.branch.at_step, self.branch.from_interrupt.link())
+        format!(
+            "path_N{}_S{}_I{}",
+            self.from_node.link(),
+            self.branch.at_step,
+            self.branch.from_interrupt.link()
+        )
     }
 }
 
@@ -338,13 +343,13 @@ where
                 // )
                 // .ok();
 
-                let rel_to = diff_paths(&link_path, &current_dir).unwrap();
-                writeln!(
-                    file,
-                    "<div>→ Related: {}</div>",
-                    link_str(rel_to.to_string_lossy(), &link.name)
-                )
-                .ok();
+                // let rel_to = diff_paths(&link_path, &current_dir).unwrap();
+                // writeln!(
+                //     file,
+                //     "<div>→ Related: {}</div>",
+                //     link_str(rel_to.to_string_lossy(), &link.name)
+                // )
+                // .ok();
             }
             if !visitor.links.is_empty() {
                 writeln!(file, "</details>").ok();
@@ -355,12 +360,50 @@ where
         {
             let mut file = self.get_file(&parent_file);
             let rel_down = diff_paths(&current_file, &parent_dir).unwrap();
-            writeln!(
-                file,
-                "<div class = 'log-entry'>↳ Entering Span: {}</div>",
-                link_str(rel_down.to_string_lossy(), name)
-            )
-            .ok();
+            let all_empty = visitor.links.is_empty() && visitor.fields.is_empty();
+
+            if !all_empty {
+                writeln!(file, "<details class='log-entry'><summary>").ok();
+                writeln!(
+                    file,
+                    "  <pre>↳ Entering Span: {}</pre>",
+                    link_str(rel_down.to_string_lossy(), name)
+                )
+                .ok();
+                writeln!(file, "</summary><div class='expanded-entry'><dl>").ok();
+            } else {
+                writeln!(file, "<div class='log-entry'>").ok();
+                writeln!(
+                    file,
+                    "  <pre>↳ Entering Span: {}</pre>",
+                    link_str(rel_down.to_string_lossy(), name)
+                )
+                .ok();
+            }
+
+            for (k, v) in visitor.fields.iter() {
+                writeln!(file, "    <dt>{}</dt><dd><code>{}</code></dd>", k, v).ok();
+            }
+
+            for link in visitor.links.iter() {
+                let cat = &link.category;
+                let name = &link.name;
+                let link_dir = self.run_root.join(&link.category);
+                let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
+                let rel_to = diff_paths(&link_path, &current_dir).unwrap();
+                writeln!(
+                    file,
+                    "    <dt>{cat}</dt><dd>{}</dd>",
+                    link_str(rel_to.to_string_lossy(), name)
+                )
+                .ok();
+            }
+
+            if !all_empty {
+                writeln!(file, "</dl></div></details>").ok();
+            } else {
+                writeln!(file, "</div>").ok();
+            }
         }
     }
 
@@ -463,7 +506,8 @@ where
             let rel_to = diff_paths(&link_path, &span_data.dir).unwrap();
             writeln!(
                 file,
-                "<dt>→ Related: </dt><dd>{}</dd>",
+                "<dt>{}</dt><dd>{}</dd>",
+                &link.category,
                 link_str(rel_to.to_string_lossy(), &link.name)
             )
             .ok();
@@ -488,15 +532,6 @@ where
 
 fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
     format!("<a href=\"{}\">{}</a>", to.into(), content.into())
-}
-
-impl Link {
-    pub fn category(&self) -> &str {
-        &self.category
-    }
-    pub fn file_name(&self) -> &str {
-        &self.name
-    }
 }
 
 pub fn init_tree_logger() {

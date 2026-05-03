@@ -7,6 +7,7 @@ use std::{
 use console::Style;
 use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 use tracing::{debug, error, info, instrument, span, warn, Instrument, Level};
 use tungstenite::Message;
@@ -158,7 +159,12 @@ impl<const N: usize> MicromouseManager<N> {
                 Ok(vec![MicromouseEvent::DebugMessage(msg)])
             }
             MicromouseResponse::Measurement(measurement_message) => {
-                let _s = process_span("process_measurement");
+                let _s = span!(
+                    Level::DEBUG,
+                    "process_measurement",
+                    link_cmd_id = measurement_message.from_cmd.link(),
+                    message_link = %measurement_message.from_cmd
+                );
                 info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
                 // Check whether command is new
                 let mut current_cmd = self.current_command.lock().await;
@@ -175,7 +181,13 @@ impl<const N: usize> MicromouseManager<N> {
                 Ok(map_update.into())
             }
             MicromouseResponse::CommandFinished(command_finished_message) => {
-                let _s = process_span("cmd_finished");
+                let _s = span!(
+                    Level::DEBUG,
+                    "process_command_finished",
+                    link_cmd_id = command_finished_message.cmd_id.link(),
+                    finished_cmd_id = %command_finished_message.cmd_id
+                );
+                // let _s = process_span("cmd_finished");
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
                 let mut just_finished_cmd = self.current_command.lock().await;
                 self.update_current_command_id(
@@ -317,77 +329,80 @@ impl<const N: usize> MicromouseManager<N> {
         let (current_cmd_application, id) = current_cmd
             .as_mut()
             .ok_or(MicromouseManagerError::MeasurementWithoutAssociatedCmd)?;
-        if step_number > current_cmd_application.step_with_termination() as u32 {
-            error!(target: "comm/mng/map", "SHOULD ALREADY HAVE TERMINATED IN PREVIOUS STEP");
-            return Err(MicromouseManagerError::CmdTooLong(*id));
-        }
-        let world_at_step = current_cmd_application.at_start_certain_step(step_number);
-        let world_at_step = match world_at_step {
-            Ok(world_at_step) => {
-                info!(target: "comm/mng/map", "AT START OF MEASUREMENT: \n{world_at_step}");
-                world_at_step
+        async {
+            debug!(target: "comm/mng/map",link_cmd_id = id.link(), "Updating cmd for {id:?}");
+            if step_number > current_cmd_application.step_with_termination() as u32 {
+                error!(target: "comm/mng/map", "SHOULD ALREADY HAVE TERMINATED IN PREVIOUS STEP");
+                return Err(MicromouseManagerError::CmdTooLong(*id));
             }
-            Err(e) => {
-                // WARN: LIFE MUST GO ON:
-                error!(target: "comm/mng/map", "CERTAIN STEP ERROR: DID NOT PROVE THAT STEP {} OF {:?} WAS REACHABLE",
-                    step_number,
-                    current_cmd_application.command()
-                );
-                return Err(MicromouseManagerError::from(e));
-            }
-        };
-        // .map_err(MicromouseManagerError::from)?;
+            let world_at_step = current_cmd_application.at_start_certain_step(step_number);
+            let world_at_step = match world_at_step {
+                Ok(world_at_step) => {
+                    info!(target: "comm/mng/map", "AT START OF MEASUREMENT: \n{world_at_step}");
+                    world_at_step
+                }
+                Err(e) => {
+                    // WARN: LIFE MUST GO ON:
+                    error!(target: "comm/mng/map", "CERTAIN STEP ERROR: DID NOT PROVE THAT STEP {} OF {:?} WAS REACHABLE",
+                        step_number,
+                        current_cmd_application.command()
+                    );
+                    return Err(MicromouseManagerError::from(e));
+                }
+            };
+            // .map_err(MicromouseManagerError::from)?;
 
-        let new_transf = {
-            if world_at_step.mouse != self.current_world.read().await.mouse {
-                Some(world_at_step.mouse)
+            let new_transf = {
+                if world_at_step.mouse != self.current_world.read().await.mouse {
+                    Some(world_at_step.mouse)
+                } else {
+                    None
+                }
+            };
+
+            let filter_update = if let Some(m) = measurement {
+                // First get the transform to transform the measurement (first reaches the cell, then does
+                // the measurement)
+                let new_transf = world_at_step.mouse;
+                let transf_measurement = m.transform_by(&new_transf);
+
+                let filter_update =
+                    current_cmd_application.apply_measurement_to_filter(transf_measurement)?;
+                let new_map = current_cmd_application
+                    .at_start_certain_step(step_number)
+                    .map_err(MicromouseManagerError::from)?;
+
+                info!(target: "comm/mng/map", "WORLD AFTER MEASUREMENT: \n{new_map}");
+                let mut current_world = self.current_world.write().await;
+                *current_world = new_map.clone().into();
+
+                filter_update
             } else {
-                None
+                // since there is no new measurement, we can just take the world_at_step as the new
+                // world
+                *self.current_world.write().await = world_at_step.clone().into();
+                // RejectedOutcomes::empty()
+                FilterUpdate {
+                    discoveries: None,
+                    rejections: None,
+                }
+            };
+
+            if let Some(rej) = &filter_update.rejections {
+                for rej in rej.deref().rejected_outcome_ids.iter() {
+                    let style = Style::new().strikethrough();
+                    debug!(target: "comm/mng/cmd", "REJECTED = {}", style.apply_to( format!("{rej:?}")));
+                }
             }
-        };
 
-        let filter_update = if let Some(m) = measurement {
-            // First get the transform to transform the measurement (first reaches the cell, then does
-            // the measurement)
-            let new_transf = world_at_step.mouse;
-            let transf_measurement = m.transform_by(&new_transf);
+            let internal_map_update = InternalMapUpdate {
+                rejected_outcomes: filter_update.rejections,
+                discoveries: filter_update.discoveries,
+                new_transf,
+            };
 
-            let filter_update =
-                current_cmd_application.apply_measurement_to_filter(transf_measurement)?;
-            let new_map = current_cmd_application
-                .at_start_certain_step(step_number)
-                .map_err(MicromouseManagerError::from)?;
-
-            info!(target: "comm/mng/map", "WORLD AFTER MEASUREMENT: \n{new_map}");
-            let mut current_world = self.current_world.write().await;
-            *current_world = new_map.clone().into();
-
-            filter_update
-        } else {
-            // since there is no new measurement, we can just take the world_at_step as the new
-            // world
-            *self.current_world.write().await = world_at_step.clone().into();
-            // RejectedOutcomes::empty()
-            FilterUpdate {
-                discoveries: None,
-                rejections: None,
-            }
-        };
-
-        if let Some(rej) = &filter_update.rejections {
-            for rej in rej.deref().rejected_outcome_ids.iter() {
-                let style = Style::new().strikethrough();
-                debug!(target: "comm/mng/cmd", "REJECTED = {}", style.apply_to( format!("{rej:?}")));
-            }
-        }
-
-        let internal_map_update = InternalMapUpdate {
-            rejected_outcomes: filter_update.rejections,
-            discoveries: filter_update.discoveries,
-            new_transf,
-        };
-
-        Ok(internal_map_update)
+            Ok(internal_map_update)
+        }.instrument(span!(Level::DEBUG, "update_for_cmd_id", link_cmd_id = id.link(), updating_for = %id)).await
     }
 
     // WARN: LOCKS THE QUEUE RECEIVER; Also returns pending as long as the micromouse is stopped

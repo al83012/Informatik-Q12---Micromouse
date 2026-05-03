@@ -1,8 +1,10 @@
-
 use serde::{Deserialize, Serialize};
 use tracing::{trace, warn};
 
-use crate::{comm::micromouse_message::MovementType, transform::direction::{Direction, DirectionNormalizedVector}};
+use crate::{
+    comm::micromouse_message::MovementType,
+    transform::direction::{Direction, DirectionNormalizedVector},
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Position {
@@ -20,7 +22,7 @@ impl From<DirectionNormalizedVector> for PositionOffset {
     fn from(value: DirectionNormalizedVector) -> Self {
         Self {
             d_x: value.x as i32,
-            d_y: value.y as i32
+            d_y: value.y as i32,
         }
     }
 }
@@ -79,7 +81,7 @@ impl MouseTransform {
     pub fn step_once(self, movement: MovementType) -> Option<Self> {
         match movement {
             MovementType::Turn(i) => Some(self.rotated(i.signum())),
-            MovementType::Move(_) => self.moved(1)
+            MovementType::Move(_) => self.moved(1),
         }
     }
 }
@@ -87,5 +89,62 @@ impl MouseTransform {
 impl std::fmt::Display for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl Position {
+    pub fn direction_straight_line(&self, to: Self) -> Option<Direction> {
+        if self.x == to.x || self.y == to.y {
+            Some(if self.x > to.x {
+                Direction::NegX
+            } else if self.x < to.x {
+                Direction::PosX
+            } else if self.y > to.y {
+                Direction::NegY
+            } else {
+                Direction::PosY
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn distance_straight_line(&self, to: Self) -> Option<u32> {
+        if self.x == to.x || self.y == to.y {
+            Some(self.x.abs_diff(to.x) + self.y.abs_diff(to.y))
+        } else {
+            None
+        }
+    }
+}
+
+
+pub struct RayIterator<const N: usize> {
+    pub current_transf: MouseTransform,
+}
+
+
+impl<const N: usize> RayIterator<N> {
+   pub fn new(from_cell: Position, in_direction: Direction) -> Self{
+        Self {
+            current_transf: MouseTransform { pos: from_cell, dir: in_direction },
+        }
+    } 
+}
+
+
+impl<const N: usize> Iterator for RayIterator<N> {
+    type Item = MouseTransform;
+    fn next(&mut self) -> Option<Self::Item> {
+        if (self.current_transf.dir == Direction::NegX && self.current_transf.pos.x == 0)
+        || (self.current_transf.dir == Direction::NegY && self.current_transf.pos.y == 0)
+        || (self.current_transf.dir == Direction::PosX && self.current_transf.pos.x as usize + 1 >= N)
+        || (self.current_transf.dir == Direction::PosY && self.current_transf.pos.y as usize + 1 >= N)
+        {
+            None
+        } else {
+            self.current_transf = self.current_transf.moved(1).expect("Checked");
+            Some(self.current_transf)
+        }
     }
 }

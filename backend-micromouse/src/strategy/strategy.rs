@@ -1,6 +1,6 @@
 use crate::{
     comm::micromouse_message::Command,
-    map::world_data::PartialWorldData,
+    map::world_data::{PartialWorldData, WorldData},
     transform::position::Position,
     utils::nonempty::NonEmpty,
 };
@@ -30,12 +30,12 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct GoalPosition(pub Position);
-pub trait FromConfig {
+pub trait FromConfig<const N: usize> {
     type Config: std::fmt::Debug;
-    fn from_config(config: Self::Config) -> Self;
+    fn from_config(config: Self::Config, starting_state: WorldData<N>) -> Self;
 }
 
-pub trait Strategy<const N: usize>: FromConfig + Sized {
+pub trait Strategy<const N: usize>: FromConfig<N> + Sized {
     fn next_cmd(
         &self,
         world: &PartialWorldData<N>,

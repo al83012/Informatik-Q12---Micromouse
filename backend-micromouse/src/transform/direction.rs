@@ -108,8 +108,8 @@ impl Direction {
         let idx = if transformed_rot_idx >= 0 {
             transformed_rot_idx as usize % 4
         } else {
-            let from_last =  (transformed_rot_idx.abs() - 1) % 4;
-            3 - from_last as usize 
+            let from_last = (transformed_rot_idx.abs() - 1) % 4;
+            3 - from_last as usize
         };
         // let idx = if transformed_rot_idx > 0 {
         //     transformed_rot_idx as usize % 4
@@ -129,17 +129,31 @@ impl Direction {
             d_y: d_y as i32 * steps as i32,
         }
     }
+    pub fn shortest_rotate_to(&self, other: &Direction) -> i8 {
+        if self == other {
+            return 0;
+        }
+        if self.rotated(1) == *other {
+            return 1;
+        }
+        if self.rotated(-1) == *other {
+            return -1;
+        }
+        2
+    }
 }
-
-
 
 impl std::fmt::Display for Direction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Direction::PosX => "+X",
-            Direction::PosY => "+Y",
-            Direction::NegX => "-X",
-            Direction::NegY => "-Y",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Direction::PosX => "+X",
+                Direction::PosY => "+Y",
+                Direction::NegX => "-X",
+                Direction::NegY => "-Y",
+            }
+        )
     }
 }

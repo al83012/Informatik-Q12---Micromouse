@@ -1,11 +1,14 @@
 use std::{io::Write, ops::RangeInclusive};
 
 use console::Style;
-use tracing::{debug, trace};
+use tracing::{debug, error, trace};
 
 use crate::{
     map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
-    transform::{direction::Direction, position::Position},
+    transform::{
+        direction::Direction,
+        position::{Position, PositionOffset},
+    },
 };
 
 pub struct MapDisplay {
@@ -94,7 +97,13 @@ impl MapDisplay {
         position.x as usize > self.map_size + 1 || position.y as usize > self.map_size + 1
     }
     fn char_pos_invalid(&self, position: CharPos) -> bool {
-        position.row + 1 > self.lines.len() || position.col + 1 > self.lines.len()
+        position.row + 1 > self.lines.len()
+            || position.col + 1
+                > self
+                    .lines
+                    .first()
+                    .expect("Should have at least 1 row")
+                    .len()
     }
 
     pub fn inner_cell_char_range(&self, position: Position) -> Option<CharRange> {
@@ -161,12 +170,23 @@ impl MapDisplay {
 
     pub fn line<'a>(&'a mut self, start: CharPos, end: CharPos) -> Option<CharLineReference<'a>> {
         if self.char_pos_invalid(start) || self.char_pos_invalid(end) {
+            error!(target: "test/display", "Invalid char pos");
             return None;
         }
+
+        let new_start = CharPos {
+            row: start.row.min(end.row),
+            col: start.col.min(end.col),
+        };
+        let new_end = CharPos {
+            row: start.row.max(end.row),
+            col: start.col.max(end.col),
+        };
+
         Some(CharLineReference {
             map: self,
-            start,
-            end,
+            start: new_start,
+            end: new_end,
         })
     }
 }
@@ -481,6 +501,39 @@ impl<'a> CharRangeReference<'a> {
     pub fn center_point(self) -> CharPos {
         self.range.center_point()
     }
+
+    pub fn shift(self, d_c_row: isize, d_c_col: isize) -> Option<Self> {
+        let row_range = self.range.range_row.clone();
+        let col_range = self.range.range_col.clone();
+
+        debug!(target: "test/op", "shifting {:?} by {{row = {d_c_row}, col = {d_c_col}}}", self.range);
+
+        if d_c_row < 0 && *row_range.start() < d_c_row.unsigned_abs() {
+            error!(target: "test/op", "Underflow row");
+            return None;
+        }
+        // } else if *row_range.end() + d_c_row as usize + 1 > self.map.map_size() {
+        //     return None;
+        // }
+
+        if d_c_col < 0 && *col_range.start() < d_c_col.unsigned_abs() {
+            error!(target: "test/op", "Underflow col");
+            return None;
+        }
+        // } else if *col_range.end() + d_c_col as usize + 1 > self.map.map_size() {
+        //     return None;
+        // }
+
+        Some(CharRangeReference {
+            map: self.map,
+            range: CharRange {
+                range_row: (*row_range.start() as isize + d_c_row) as usize
+                    ..=(*row_range.end() as isize + d_c_row) as usize,
+                range_col: (*col_range.start() as isize + d_c_col) as usize
+                    ..=(*col_range.end() as isize + d_c_col) as usize,
+            },
+        })
+    }
 }
 
 impl CharRange {
@@ -505,7 +558,7 @@ pub struct CharLineReference<'a> {
 impl<'a> MapDisplayWrite for CharLineReference<'a> {
     fn apply_style(&mut self, style: Style) {
         for c_row in self.start.row..=self.end.row {
-            for c_col in self.start.col..=self.start.col {
+            for c_col in self.start.col..=self.end.col {
                 self.map.apply_style(c_row, c_col, style.clone());
             }
         }
@@ -513,9 +566,15 @@ impl<'a> MapDisplayWrite for CharLineReference<'a> {
 
     fn set_char(&mut self, c: char) {
         for c_row in self.start.row..=self.end.row {
-            for c_col in self.start.col..=self.start.col {
+            for c_col in self.start.col..=self.end.col {
                 self.map.set_char(c_row, c_col, c);
             }
         }
+    }
+}
+
+impl<'a> CharLineReference<'a> {
+    pub fn line_display(&self) -> String {
+        format!("{:?} -> {:?}", self.start, self.end)
     }
 }
