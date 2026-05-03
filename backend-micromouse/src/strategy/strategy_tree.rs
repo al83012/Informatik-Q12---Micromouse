@@ -4,7 +4,7 @@ use std::{
     ops::{Add, Sub},
 };
 
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::{
     comm::micromouse_message::Command,
@@ -12,11 +12,13 @@ use crate::{
         check::PotentiallyEq,
         command_world_state::{FilteredCommandApplication, PathLocalOutcomeId, RejectedOutcomes},
         map::{Map, PartialMap},
+        map_set_op::Union,
         world_data::{PartialWorldData, WorldData},
     },
     strategy::strategy::{
         ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
-    }, utils::hyperlink_logging::LinkFileName,
+    },
+    utils::hyperlink_logging::LinkFileName,
 };
 
 #[derive(Debug)]
@@ -582,15 +584,24 @@ where
     pub fn prune_not_potentially_eq(&mut self, filter: &PartialMap<N>) -> Result<(), PruneError> {
         let node_indices = self
             .layers
-            .iter()
+            .iter_mut()
             .flat_map(|l| {
-                l.nodes.iter().filter_map(|(k, v)| {
-                    if !v.on_basis_of_world.map.potentially_eq(filter) {
-                        Some(AbsoluteNodeId {
+                l.nodes.iter_mut().filter_map(|(k, v)| {
+                    let node_id = AbsoluteNodeId {
                             layer_id: l.absolute_layer_id,
                             node_id: *k,
-                        })
+                        };
+                    if !v.on_basis_of_world.map.potentially_eq(filter) {
+                        Some(node_id)
                     } else {
+                        if v.applied_strategy.is_none() {
+                            debug!(target: "strat/tree/prune", link_node_id = node_id.link(), "Expandable node union with current measurements");
+                            v.on_basis_of_world.map = v
+                                .on_basis_of_world
+                                .map
+                                .union(&filter.0)
+                                .expect("Should be potentially_eq");
+                        }
                         None
                     }
                 })
@@ -708,9 +719,7 @@ where
 
     #[instrument(
         name = "update_equal_layers",
-        fields(
-            description = "Update the highest eq layer id (in case there are new eq-layers)",
-        ),
+        fields(description = "Update the highest eq layer id (in case there are new eq-layers)",),
         skip(self)
     )]
     fn update_equal_layers(&mut self) {
@@ -747,13 +756,7 @@ where
         vec![]
     }
 
-    #[instrument(
-        name = "merge",
-        fields(
-            description = "MERGE",
-        ),
-        skip(self)
-    )]
+    #[instrument(name = "merge", fields(description = "MERGE",), skip(self))]
     fn merge(&mut self) // -> ?
     {
         // Try merging non-eq-layers
@@ -854,9 +857,7 @@ where
     // Returns any commands that have become certain by doing that
     #[instrument(
         name = "handle_map_update",
-        fields(
-            description = "Prune, expand, send",
-        ),
+        fields(description = "Prune, expand, send",),
         skip(self)
     )]
     pub fn handle_map_update(
@@ -884,9 +885,7 @@ where
     // Filters the tree using the rejection-events from the currently processed command
     #[instrument(
         name = "handle_cmd_rejection",
-        fields(
-            description = "Prune, expand, send",
-        ),
+        fields(description = "Prune, expand, send",),
         skip(self)
     )]
     pub fn handle_cmd_rejection(
