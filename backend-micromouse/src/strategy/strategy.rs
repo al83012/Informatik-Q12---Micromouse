@@ -1,6 +1,6 @@
 use crate::{
     comm::micromouse_message::Command,
-    map::world_data::{PartialWorldData, WorldData},
+    map::{map::PartialMap, world_data::{PartialWorldData, WorldData}},
     transform::position::Position,
     utils::nonempty::NonEmpty,
 };
@@ -41,6 +41,17 @@ pub trait Strategy<const N: usize>: FromConfig<N> + Sized {
         world: &PartialWorldData<N>,
         goal: &GoalPosition,
     ) -> StrategyComputationResult<N, Self>;
+
+    /// Is called before the expand-step on non-expanded nodes that have a strategy attached
+    /// --> Even if the world is not yet at the finished state of the step, this step could be used
+    /// to process a NotYetExpandable strategy state into one that is expandable (even before the
+    /// finishing of a step)
+    fn map_update(
+        &self,
+        world: &PartialMap<N>,
+    ) {
+        
+    }
 }
 
 pub trait SerializeInformationView<const N: usize>: Strategy<N> {

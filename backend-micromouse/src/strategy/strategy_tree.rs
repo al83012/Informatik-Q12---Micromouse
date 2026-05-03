@@ -594,7 +594,9 @@ where
                     if !v.on_basis_of_world.map.potentially_eq(filter) {
                         Some(node_id)
                     } else {
-                        if v.applied_strategy.is_none() {
+                        // Only apply the map-update for throse nodes, that are not yet expanded,
+                        // but can be
+                        if v.applied_strategy.is_none() && v.on_basis_of_state.is_some() {
                             debug!(target: "strat/tree/prune", link_node_id = node_id.link(), "Expandable node union with current measurements");
                             v.on_basis_of_world.map = v
                                 .on_basis_of_world

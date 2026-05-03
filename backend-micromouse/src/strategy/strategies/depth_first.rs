@@ -1,13 +1,17 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    map::world_data::WorldData,
+    comm::micromouse_message::{MovementType, TransformedMovement},
+    map::{
+        map::WallDiscoveryStatus,
+        world_data::{PartialWorldData, WorldData},
+    },
     strategy::{
         strategies::utils::value_map::ValueMap,
         strategy::{FromConfig, Strategy, StrategyComputationResult, StrategyEndState},
     },
     transform::{
-        direction::Direction,
+        direction::{Direction, RelativeDirection},
         position::{MouseTransform, Position},
     },
     utils::{nonempty::NonEmpty, path::Path},
@@ -24,6 +28,10 @@ pub struct DepthFirst<const N: usize> {
     task_directions: HashMap<Position, ClumpedDFTask>,
     current_path: Path,
     config: DepthFirstConfig,
+    // Current task only has to correspond to a move forward as all the rotations are handled with
+    // the path backtracking which is added as a blind task (as the path traversal is
+    // deterministic)
+    current_task: DFTask,
     visited_marker: ValueMap<N, bool>,
 }
 
@@ -31,6 +39,7 @@ pub struct DepthFirst<const N: usize> {
 pub struct DFTask {
     try_direction: Direction,
     cell: Position,
+    max_steps: usize,
 }
 
 /// Like DF-Task, but clumped together to represent our ability to decide, which intersection to
@@ -92,6 +101,12 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         // The goal is only important for determining, whether the mouse has reached its goal
         goal: &crate::strategy::strategy::GoalPosition,
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
+
+        let Some(intersections_of_current_step) = self.check_current_fully_measured(world) else {
+            // NOT YET ENOUGH INFORMATION / THE MOUSE HAS NOT YET REACHED THE END OF THAT STEP OR
+            // DOES NOT CERTAINLY KNOW IF THERE WILL BE MORE INTERSECTIONS
+        };
+
         let mut successor = self.clone();
 
         let Some(next_intersection) = successor.intersection_stack.last() else {
@@ -150,8 +165,102 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
             successor.intersection_stack.pop();
         }
 
-        
-
         todo!()
+    }
+}
+
+impl<const N: usize> DepthFirst<N> {
+    /// Checks whether the task that was decided upon in the last step has been fully explored
+    /// (This means, that all the walls left, right and fwd are known on the path (or at least the
+    /// path up to a premature termination)
+    ///
+    /// Returns None, if the measurements that are present for the current task are not enough for
+    /// getting all the possible intersections on the way
+    ///
+    /// Returns Some and a list of possible intersections on the way (without removing those that
+    /// have already been done)
+    ///
+    ///
+    /// To conclude: The function checks not only if the
+    pub fn check_current_fully_measured(
+        &self,
+        projected_termination_state: PartialWorldData<N>,
+    ) -> Option<Vec<MouseTransform>> {
+        let current_task = self.current_task;
+        let from_pos = current_task.cell;
+        let in_dir = current_task.try_direction;
+        let max_steps = current_task.max_steps;
+
+        let mut intersections = Vec::new();
+
+        let mut transf_move = TransformedMovement::new(
+            MovementType::Move(max_steps as u8),
+            MouseTransform {
+                pos: from_pos,
+                dir: in_dir,
+            },
+        );
+
+        let map = projected_termination_state.map;
+
+        for i in 0..=max_steps {
+            let transf_at_step = transf_move.at_step(i).expect("Inside max_step");
+            let pos_at_step = transf_at_step.pos;
+
+            let dir_right = RelativeDirection::Right.transform_by(&in_dir);
+            let dir_fwd = RelativeDirection::Forward.transform_by(&in_dir);
+            let dir_left = RelativeDirection::Left.transform_by(&in_dir);
+
+            let right = map
+                .wall(&pos_at_step, &dir_right)
+                .unwrap_or(&WallDiscoveryStatus::Exists(true));
+
+            let fwd = map
+                .wall(&pos_at_step, &dir_fwd)
+                .unwrap_or(&WallDiscoveryStatus::Exists(true));
+            let left = map
+                .wall(&pos_at_step, &dir_left)
+                .unwrap_or(&WallDiscoveryStatus::Exists(true));
+
+            let not_fully_discovered = *right == WallDiscoveryStatus::Undiscovered
+                || *fwd == WallDiscoveryStatus::Undiscovered
+                || *left == WallDiscoveryStatus::Undiscovered;
+
+            if not_fully_discovered {
+                return None;
+            }
+
+            match right {
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => intersections
+                    .push(MouseTransform {
+                        pos: pos_at_step,
+                        dir: dir_right,
+                    }),
+                _ => {}
+            }
+            match fwd {
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => intersections
+                    .push(MouseTransform {
+                        pos: pos_at_step,
+                        dir: dir_fwd,
+                    }),
+                _ => {}
+            }
+            match left {
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => intersections
+                    .push(MouseTransform {
+                        pos: pos_at_step,
+                        dir: dir_left,
+                    }),
+                _ => {}
+            }
+
+            if transf_at_step == projected_termination_state.mouse {
+                // premature exit `projected_termination_state.mouse` = step of termination
+                break;
+            }
+        }
+
+        Some(intersections)
     }
 }
