@@ -40,6 +40,34 @@ body {
     position: relative;
 }
 
+.loading-container {
+    position: absolute;
+    display: none;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    background-color: var(--bg);
+    z-index: 1000; /*to be on top of everything*/
+}
+
+.loading-animation_container {
+    display: flex;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    width: 120px;
+    height: 120px;
+    background: var(--win_bg);
+    border: darkgray 2px solid;
+    border-radius: 4px;
+    box-shadow: darkgray 0 0 4px 2px;
+}
 
 .header_container {
     display: flex;

@@ -27,6 +27,10 @@ export class Animation {
     }
 
     execute() {};
+    reset() {
+        this.finished = false;
+        this.remaining_duration = this.duration;
+    }
 }
 
 export class AnimFadeOut extends Animation {
@@ -433,7 +437,7 @@ export class AnimRotate extends Animation {
 export class AnimationHandler {
     animations = [];
     rep_animations = [];
-    rep_durations = [];
+    //rep_durations = [];
     imm_animations = [];
     constructor() {}
 
@@ -441,9 +445,19 @@ export class AnimationHandler {
         this.animations.push(animation);
     }
 
-    addRepeating(animation) {
-        this.rep_animations.push(animation);
-        this.rep_durations.push(animation.duration);
+    addRepeating(animation, id) {
+        if (!this.rep_animations.includes(id)) {
+            animation.rep_remove = false;
+            this.rep_animations[id] = animation;
+            this.rep_animations.push(id);
+        }
+        //this.rep_durations.push(animation.duration);
+    }
+
+    removeRepeating(id) {
+        if (this.rep_animations.includes(id)) {
+            this.rep_animations[id].rep_remove = true;
+        }
     }
 
     addImmediate(animation) {
@@ -451,11 +465,22 @@ export class AnimationHandler {
     }
 
     nextFrame() {
-        for (let i = 0; i < this.rep_animations.length; i++) {
+        /*for (let i = 0; i < this.rep_animations.length; i++) {
             this.rep_animations[i].execute();
             if (this.rep_animations[i].finished) {
-                this.rep_animations[i].finished = false;
-                this.rep_animations[i].remaining_duration = this.rep_durations[i];
+                this.rep_animations[i].reset();
+                /*this.rep_animations[i].finished = false;
+                this.rep_animations[i].remaining_duration = this.rep_durations[i];*/
+        //    }
+        //}
+        for (let id of this.rep_animations) {
+            this.rep_animations[id].execute();
+            if (this.rep_animations[id].finished) {
+                this.rep_animations[id].reset();
+                if (this.rep_animations[id].rep_remove) {
+                    delete this.rep_animations[id];
+                    this.rep_animations.splice(this.rep_animations.indexOf(id), 1);
+                }
             }
         }
 
@@ -490,6 +515,7 @@ export class AnimationHandler {
 
 export class AnimGroup extends Animation {
     animations = [];
+    rem_animations = [];
 
     constructor(delay) {
         super(-1, null); //ignore
@@ -501,7 +527,26 @@ export class AnimGroup extends Animation {
         this.animations.push(animation);
     }
 
+    reset() {
+        for (let anim of this.rem_animations) {
+            this.animations.push(anim);
+        }
+        this.rem_animations = [];
+
+        for (let i = 0; i < this.animations.length; i++) {
+            this.animations[i].reset();
+        }
+
+        this.current_delay = 0;
+
+        super.reset();
+    }
+
     execute() {
+        if (this.finished) {
+            return;
+        }
+
         if (this.delay === -1) {
             if (this.animations.length === 0) {
                 this.finished = true;
@@ -510,7 +555,7 @@ export class AnimGroup extends Animation {
 
             this.animations[0].execute();
             if (this.animations[0].finished) {
-                this.animations.shift();
+                this.rem_animations.push(this.animations.shift());
             }
 
             return;

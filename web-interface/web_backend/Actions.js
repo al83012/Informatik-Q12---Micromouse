@@ -7,7 +7,9 @@ export class Action {
     getData() {
         let result = "";
         this.data.forEach((item, key) => {result += `"${key}":${item},`;});
-        result += '||';
+        if (result.length > 0) {
+            result += '||';
+        }
         result = result.replace(',||', "");
         return result;
     }
@@ -153,6 +155,13 @@ export class Actions {
 
         return new Action("discover_tile", new Map([["x", x], ["y", y],
             ["directions", dir_string], ["others", others], ["other_tiles_x", other_tiles_x], ["other_tiles_y", other_tiles_y]]));
+    }
+
+    static show_loading() {
+        return new Action("show_loading", new Map([]));
+    }
+    static hide_loading() {
+        return new Action("hide_loading", new Map([]));
     }
 
     //Learned more JS, so I now use Objects for server

@@ -147,6 +147,12 @@ export class Index {
                     let card_rotate = document.getElementById("sys-mouse_card");
                     Index.animHandler.addImmediate(new AnimRotate(7, card_rotate, data["dir"], data["dir_new"]));
                     break;
+                case "show_loading":
+                    Index.show_loading_animation();
+                    break;
+                case "hide_loading":
+                    Index.hide_loading_animation();
+                    break;
             }
         });
     }
@@ -203,6 +209,29 @@ export class Index {
     static closePopAlgo() {
         let obj = document.getElementsByClassName("pop_window_algorithm_group")[0];
         Index.animHandler.add(new AnimFadeOut(20, obj, (o) => {o.style.display = "none";}));
+    }
+
+    static show_loading_animation() {
+        document.getElementById("loading-container").style.display = "block";
+
+        let main_group = new AnimGroup(5);
+
+        for (let i = 0; i < 24; i++) { //cycle through all 24 elements
+            let part = document.getElementById("loading_animation_" + i);
+            let group = new AnimGroup(-1);
+            group.add(new AnimCssChange(10, part, ["undiscovered"], "discovered"));
+            group.add(new AnimCssChange(65, part, ["repl"], "highlight"));
+            group.add(new AnimCssChange(30, part, ["highlight"], "repl"));
+            group.add(new AnimCssChange(15, part, ["discovered"], "undiscovered"));
+            main_group.add(group);
+        }
+
+        Index.animHandler.addRepeating(main_group, "loading_animation");
+    }
+
+    static hide_loading_animation() {
+        document.getElementById("loading-container").style.display = "none";
+        Index.animHandler.removeRepeating("loading_animation");
     }
 }
 

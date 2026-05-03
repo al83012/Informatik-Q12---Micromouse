@@ -29,6 +29,7 @@ export class BackendManager {
     in_console = ["[B] Connected"];
     algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
     in_algorithm = "A*";
+    in_is_loading = false;
     backend = null;
 
     f_sync = [];
@@ -118,6 +119,10 @@ export class BackendManager {
 
         actions.push(Actions.move_mouse(0, 0, this.in_mouse.pos[0], this.in_mouse.pos[1]));
         actions.push(Actions.rotate_mouse(0, this.in_mouse.rotation));
+
+        if (this.in_is_loading) {
+            actions.push(Actions.show_loading());
+        }
 
         return actions;
     }
