@@ -38,6 +38,15 @@ export class Index {
             }));
         }
 
+        //move info-link_pill to respective position
+        let info_link_pill = document.getElementsByClassName("link-info_pill")[0];
+        info_link_pill.style.top = (document.getElementsByClassName("header_container")[0].clientHeight + 10) + "px";
+        info_link_pill.onclick = function () {
+            document.location.replace(document.location.origin + "/info/info.html");
+            //document.location.reload();
+        }
+
+
         let squares = document.getElementsByClassName("maze_tile");
 
         for (let i = 0; i < squares.length; i++) {

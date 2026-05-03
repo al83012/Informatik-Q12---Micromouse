@@ -77,10 +77,10 @@ export class BackendManager {
     }
 
     f_handleError(body) {
-        console.log("--------------------------------------------------------");
+        console.log("\x1b[31m--------------------------------------------------------");
         console.log("[F] An Error occurred on the Frontend:");
         console.log("[F->Error]: " + body.error);
-        console.log("--------------------------------------------------------");
+        console.log("--------------------------------------------------------\x1b[33m");
     }
 
     b_handleUpdate(data) {

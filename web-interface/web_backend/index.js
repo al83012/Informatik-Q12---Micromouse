@@ -84,36 +84,57 @@ async function loop_worker(manager) {
  * type: type of command
  */
 //communication with backend
-console.log("[B] Requiring Websocket");
+console.log("\x1b[33m[B] Requiring Gateway");
+const { gateway4async, gateway4sync } = require('default-gateway');
+let gateway, version, int;
+function find_gateway() {
+    const {gateway_f, version_f, int_f} = gateway4sync();
+    gateway = gateway_f;
+    version = version_f;
+    int = int_f;
+};
+const {gateway_f, version_f, int_f} = gateway4sync();
+console.log("\x1b[33m[B] Found Gateway on: " + gateway_f + "; version: " + version_f + "; int: " + int_f + "");
+
+console.log("\x1b[33m[B] Requiring Websocket");
 const WebsocketClient = require('websocket').client;
 const back_port = 8090;
-const host = '127.0.0.1';
-console.log("[B] Creating Client");
+const host = '192.168.137.1';
+console.log("\x1b[33m[B] Creating Client");
 const client = new WebsocketClient();
 
-function connect_backend()
-{client.connect("ws://"+host+":"+back_port, "echo-protocol");};
+function connect_backend() {
+    console.log("\x1b[33m[B] Attempting Connection");
+    client.connect("ws://"+host+":"+back_port);
+};
 
 client.on('connectFailed', (err) => {
-    console.error('[B] Connect Error: ' + err.toString());
+    console.error('\x1b[33m[B] \x1b[31mConnect Error: ' + err.toString() + '\x1b[33m');
+    setTimeout(connect_backend, 500);
 });
+
+client.on('error', (err) => {
+    console.log('\x1b[33m[B] \x1b[31mCritical Error: ' + err.toString());
+})
 
 //loop_worker(manager); //cant run because of infinite loop in worker
 
 client.on('connect', (conn) => {
 
-    console.log('[B] WebSocket Client Connected');
+    console.log('\x1b[33m[B] WebSocket Client Connected');
     manager.set_backend(client);
     manager.f_sync.push(Actions.update_con_status(true));
 
+    conn.ping();
+
     conn.on('error', (err) => {
-        console.log("[B] Implement ERROR");
+        console.log("\x1b[33m[B] \x1b[31mImplement ERROR");
         manager.set_backend(null);
         manager.f_sync.push(Actions.update_con_status(false));
         connect_backend();
     });
     conn.on('close', () => {
-        console.log('[B] Connection Closed');
+        console.log('\x1b[33m[B] Connection Closed');
         manager.set_backend(null);
         manager.f_sync.push(Actions.update_con_status(false));
         connect_backend();
@@ -125,8 +146,8 @@ client.on('connect', (conn) => {
     });
 });
 
-console.log("[B] Connecting to Backend");
-connect_backend();
+console.log("\x1b[33m[B] Connecting to Backend");
+//connect_backend();
 
 /*old deprecated due to protocol
 const net = require('net');
@@ -153,7 +174,7 @@ client.on('data', (data) => {
 });*/
 
 //retrieving lokal ip
-console.log("[L] Retrieving IP");
+console.log("\x1b[34m[L] Retrieving IP");
 const { networkInterfaces } = require('os');
 
 const nets = networkInterfaces();
@@ -175,7 +196,7 @@ for (const name of Object.keys(nets)) {
 
 
 //communication with frontend
-console.log("[F] Requiring Express");
+console.log("\x1b[32m[F] Requiring Express");
 const express = require('express');
 const app = express();
 const front_port = 3000;
@@ -183,7 +204,7 @@ const front_port = 3000;
 
 let actions = [];
 
-console.log("[F] Creating Website host at: " + JSON.stringify(results));
+console.log("\x1b[32m[F] Creating Website host at: " + JSON.stringify(results));
 app.use(express.static("./../web_frontend"));
 app.use("/module", express.static("./../web_frontend/module"));
 app.use("/favicon.ico", express.static("./../web_frontend/favicon.ico"));
@@ -211,4 +232,4 @@ app.post('/error', (req, res) => {
     res.send("handled");
 });
 
-app.listen(front_port, () => console.log(`[F] WebInterface listening on port ${front_port}!`));
+app.listen(front_port, () => console.log(`\x1b[32m[F] WebInterface listening on port ${front_port}!`));

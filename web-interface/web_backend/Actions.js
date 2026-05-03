@@ -157,6 +157,7 @@ export class Actions {
 
     //Learned more JS, so I now use Objects for server
     // communication instead of whatever the Action System I coded was
+    //Again trying to use objects, but forgot and coded discover tile :)
     static b_error(location, error, error_data) {
         let obj = new Object(null);
         obj.location = location;
