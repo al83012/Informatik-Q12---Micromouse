@@ -78,6 +78,11 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
             .value_mut(starting_pos)
             .expect("starting pos in bounds") = true;
         Self {
+            current_task: DFTask {
+                try_direction: starting_transf.dir,
+                cell: starting_pos,
+                max_steps: N,
+            },
             intersection_stack: vec![starting_pos],
             task_directions,
             current_path: Path::new(starting_transf),
@@ -101,13 +106,16 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         // The goal is only important for determining, whether the mouse has reached its goal
         goal: &crate::strategy::strategy::GoalPosition,
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
-
         let Some(intersections_of_current_step) = self.check_current_fully_measured(world) else {
             // NOT YET ENOUGH INFORMATION / THE MOUSE HAS NOT YET REACHED THE END OF THAT STEP OR
             // DOES NOT CERTAINLY KNOW IF THERE WILL BE MORE INTERSECTIONS
+            return StrategyComputationResult::NotEnoughInformation;
         };
 
         let mut successor = self.clone();
+
+        // First add the new intersections
+        successor.add_task_directions(intersections_of_current_step);
 
         let Some(next_intersection) = successor.intersection_stack.last() else {
             return StrategyComputationResult::Computed(Err(StrategyEndState::NoPossibleAction(
@@ -184,9 +192,9 @@ impl<const N: usize> DepthFirst<N> {
     /// To conclude: The function checks not only if the
     pub fn check_current_fully_measured(
         &self,
-        projected_termination_state: PartialWorldData<N>,
+        projected_termination_state: &PartialWorldData<N>,
     ) -> Option<Vec<MouseTransform>> {
-        let current_task = self.current_task;
+        let current_task = self.current_task.clone();
         let from_pos = current_task.cell;
         let in_dir = current_task.try_direction;
         let max_steps = current_task.max_steps;
@@ -261,6 +269,24 @@ impl<const N: usize> DepthFirst<N> {
             }
         }
 
+        todo!("I acutally still need to check that there is not a visited cell behind those walls");
+
         Some(intersections)
+    }
+
+    pub fn add_task_directions(&mut self, branches: impl IntoIterator<Item = MouseTransform>) {
+        for branch in branches.into_iter() {
+            if let Some(intersection_tasks) = self.task_directions.get_mut(&branch.pos) {
+                intersection_tasks.try_directions.insert(branch.dir);
+            } else {
+                self.task_directions.insert(
+                    branch.pos,
+                    ClumpedDFTask {
+                        try_directions: HashSet::from_iter(vec![branch.dir]),
+                    },
+                );
+                self.intersection_stack.push(branch.pos);
+            }
+        }
     }
 }
