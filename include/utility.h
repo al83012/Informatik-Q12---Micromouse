@@ -12,6 +12,9 @@ public:
     static void restart();
     static void debug(string message);
     static void finishedAll();
+    static void finishedAllInterrupt(string message);
+    static void desync();
+    
 };
 
 

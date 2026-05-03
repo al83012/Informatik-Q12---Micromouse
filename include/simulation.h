@@ -13,13 +13,7 @@ const int poY = 4;
 const int neX = 8;
 const int neY = 2;
 const int emp = 0;
-enum directions {
-  posX,
-  posY,
-  negX,
-  negY
 
-};
 
 int SIM_FIELD[8][8] = {
   { neY + neX, neY, neY, neY, neY, neY, neY, neY + poX },
@@ -33,7 +27,7 @@ int SIM_FIELD[8][8] = {
 };
 
 
-enum directions dir = posX;
+
 
 
 class Simulation {
@@ -41,7 +35,7 @@ public:
     static void sim_move(int n);
     static void sim_turn(int turns);
     static int sim_measure(char scan_dir);
-    bool can_move(int X, int Y, int direction_flag);
+    static bool can_move(int X, int Y, int direction_flag);
 };
 
 

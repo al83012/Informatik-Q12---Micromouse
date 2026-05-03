@@ -3,9 +3,8 @@
 #include <Arduino.h>
 #include "WiFi.h"
 #include "HTTPClient.h"
-#include "network.cpp";
-#include "master.h";
-
+#include "network.cpp"
+#include "master.h"
 
 using namespace websockets;
 using namespace std;
@@ -36,4 +35,44 @@ void Utility::restart() {
     client.send("RESTART");
 }
     
-        
+void Utility::finishedAll() {
+string message = "CMD-FINISHED #";
+  Serial.println("# CMD DONE > SRV");
+  //Serial.println(String(X));
+  // Serial.println(String(Y));
+  //Serial.print(globalVars.dir);
+
+  message = message + to_string(globalVars.currCMD_ID);
+  printClient(message);
+}
+     
+
+void Utility::finishedAllInterrupt(string message) {
+  string content = "CMD-FINISHED #" + globalVars.currCMD_ID + ' ' + message;
+  Serial.println("# CMD DONE INTRPT > SRV");
+  printClient(content);
+}
+
+void Utility::desync() {
+ Serial.println("# DSYNC > SRV");
+  string error = "DESYNC ";
+  for (int i = globalVars.lastCMD_ID + 1; i < globalVars.currCMD_ID; i++) {
+    error = error + "#";
+    error = error + std::to_string(i);
+    error = error + " ";
+  }
+  printClient(error);
+  Serial.println("# AWAIT RESYNC...");
+  globalVars.desync_mode = true;
+}
+
+void Utility::debug(string message) {
+  Serial.println("# RSTRT > SRV");
+
+  //measurements.clear();
+  //reactions.clear();
+  globalVars.lastCMD_ID = -1;
+  globalVars.currCMD_ID = -1;
+
+  client.send("RESTART");
+}

@@ -1,7 +1,16 @@
 #ifndef MASTER
 #define MASTER
 #include <String>
+#include "simulation.h"
+
 using namespace std;
+enum directions {
+  posX,
+  posY,
+  negX,
+  negY
+
+};
 
 struct MeasurementTask {
   int subStep;
@@ -15,6 +24,7 @@ struct GlobalVars {
     int currCMD_ID = -1;
     bool interrupt = false;
     bool reset = true;
+    enum directions dir = posX;
 } globalVars;
 
 

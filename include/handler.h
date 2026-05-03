@@ -3,7 +3,10 @@
 #include <String>
 #include <vector>
 using namespace std;
-#include "master.h";
+#include "master.h"
+#include "ArduinoWebsockets.h"
+#include "WiFi.h"
+#include "HTTPClient.h"
 
 //Command config
 const int MAX_CMD_ARGS = 15;
@@ -20,9 +23,14 @@ const int CONTINUE_ID = 12;
 
 class Handler {
 public:
+    static void handleEvent(websockets::WebsocketsEvent event, String data);
+    static void handleCommand(websockets::WebsocketsMessage WSmessage);
     static int measure(char dir);
     static void movePassive(int cells);
     static void moveActive(int cells, vector<MeasurementTask>& activeTasks);
+    static void turnPassive(int turns);
+    static void turnActive(int turns, vector<MeasurementTask>& activeTasks);
+
 };
 
 
