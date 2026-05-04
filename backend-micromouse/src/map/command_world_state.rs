@@ -374,9 +374,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
     #[instrument(
         name = "apply_measurement_to_filter",
-        fields(
-            description = "Apply a new measurement to the filter (maybe pruning branches)"
-        ),
+        fields(description = "Apply a new measurement to the filter (maybe pruning branches)"),
         skip(self)
     )]
     pub fn apply_measurement_to_filter(
@@ -746,9 +744,7 @@ impl<const N: usize> FilteredCommandApplication<N> {
 
     #[instrument(
         name = "reach_step",
-        fields(
-            description = "Check whether a step is within bounds"
-        ),
+        fields(description = "Check whether a step is within bounds"),
         skip(self)
     )]
     pub fn reach_step(&self, step_number: StepNum) -> Result<(), CannotReachStep> {
@@ -821,7 +817,7 @@ pub enum MaxSubstepTermination {
     Terminated(PathLocalInterruptId),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum CertainStepError {
     CannotReachStep(CannotReachStep),
     Uncertainty(UncertainStepError),
@@ -838,16 +834,16 @@ impl From<UncertainStepError> for CertainStepError {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct UncertainStepError {
     pub tried_to_reach_step: StepNum,
     pub but_could_terminate_at: StepNum,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FilterUpgradeError;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum FilterMeasurementUpgradeError {
     NotValidUpgrade(FilterUpgradeError),
     NotValidMeasurement(MapInconsistencyError),
@@ -892,7 +888,7 @@ impl PathLocalInterruptId {
     pub fn link(&self) -> String {
         match self {
             Self::MaxStep => "max".to_string(),
-            Self::InterruptAtIndex(i) => format!("i{i}")
+            Self::InterruptAtIndex(i) => format!("i{i}"),
         }
     }
 }
@@ -903,7 +899,7 @@ pub struct CommandApplicationIterator<const N: usize> {
     application: FilteredCommandApplication<N>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RejectedOutcomes {
     pub rejected_outcome_ids: HashSet<PathLocalOutcomeId>,
 }

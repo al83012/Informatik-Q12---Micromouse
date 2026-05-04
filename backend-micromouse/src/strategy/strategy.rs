@@ -32,7 +32,7 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
 pub struct GoalPosition(pub Position);
 pub trait FromConfig<const N: usize> {
     type Config: std::fmt::Debug;
-    fn from_config(config: Self::Config, starting_state: WorldData<N>) -> Self;
+    fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self;
 }
 
 pub trait Strategy<const N: usize>: FromConfig<N> + Sized {

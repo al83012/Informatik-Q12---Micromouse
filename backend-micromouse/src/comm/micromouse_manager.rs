@@ -549,7 +549,7 @@ pub enum MicromouseMode {
     Running,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub enum MicromouseEvent {
     UpdatePosition(MouseTransform),
     UpdatedMap(NonEmpty<DiscoveryMessage>),
@@ -571,7 +571,7 @@ pub enum CommandSendError {
     StoppedExecution,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MicromouseManagerError {
     ConnectionClosedPermanently,
     UnknownResponse(FormatError<MicromouseResponse>),

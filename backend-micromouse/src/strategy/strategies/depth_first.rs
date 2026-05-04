@@ -58,7 +58,7 @@ impl ClumpedDFTask {
 impl<const N: usize> FromConfig<N> for DepthFirst<N> {
     type Config = DepthFirstConfig;
 
-    fn from_config(config: Self::Config, starting_state: WorldData<N>) -> Self {
+    fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self {
         let starting_transf = starting_state.mouse;
         let starting_pos = starting_transf.pos;
         let mut task_directions = HashMap::new();
@@ -86,7 +86,7 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
             intersection_stack: vec![starting_pos],
             task_directions,
             current_path: Path::new(starting_transf),
-            config,
+            config: config.clone(),
             visited_marker,
         }
     }

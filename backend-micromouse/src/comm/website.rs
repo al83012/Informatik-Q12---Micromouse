@@ -10,7 +10,7 @@ use tokio::{
     time::{sleep_until, Instant},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, instrument};
+use tracing::{error, info, instrument, Instrument};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
     },
     map::map::{CellDiscovery, WallDiscovery},
     strategy::strategies::strategy_type::StrategyType,
-    utils::nonempty::PotentiallyNonEmpty,
+    utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty},
 };
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -119,9 +119,12 @@ impl FrontendManager {
         };
         info!(target: "comm/webs", "Created Internal Frontend Connection Handler");
 
-        tokio::task::spawn(async move {
-            internal.handle_connection_loop().await;
-        });
+        tokio::task::spawn(
+            async move {
+                internal.handle_connection_loop().await;
+            }
+            .instrument(process_span("webs_conn_loop")),
+        );
         info!(target: "comm/webs", "Spawned frontend communication thread");
 
         let thread_connection = FrontendManager {
@@ -161,19 +164,32 @@ impl FrontendConnectionManagerInternal {
         }
     }
 
-    #[instrument(name = "next_read", fields(description = "Read new message from frontend; Not processing yet"), skip(read_source))]
+    #[instrument(
+        name = "next_read",
+        fields(description = "Read new message from frontend; Not processing yet"),
+        skip(read_source)
+    )]
     pub async fn next_read(read_source: &WsChannel) -> Option<Message> {
         read_source.read().await
         // todo!("Only one state in the future; should never interrupt execution halfway through")
     }
-    #[instrument(name = "next_send", fields(description = "Read next msg to send to frontend from queue; Not processing yet"), skip(send_queue))]
+    #[instrument(
+        name = "next_send",
+        fields(description = "Read next msg to send to frontend from queue; Not processing yet"),
+        skip(send_queue)
+    )]
     pub async fn next_send(send_queue: &mut Receiver<FrontendMessage>) -> FrontendMessage {
         send_queue
             .recv()
             .await
             .expect("Channel should always be open")
     }
-    #[instrument(name = "batch_ready", fields(description = "Check whether an element in the queue is older than the maximum desired batch-interval"))]
+    #[instrument(
+        name = "batch_ready",
+        fields(
+            description = "Check whether an element in the queue is older than the maximum desired batch-interval"
+        )
+    )]
     pub async fn batch_ready(
         first_element_send_time: Option<Instant>,
         batching_duration: Duration,
@@ -185,7 +201,11 @@ impl FrontendConnectionManagerInternal {
             future::pending().await
         }
     }
-    #[instrument(name = "propagate_read", fields(description = "Parse the message and add it to the read-queue"), skip(self))]
+    #[instrument(
+        name = "propagate_read",
+        fields(description = "Parse the message and add it to the read-queue"),
+        skip(self)
+    )]
     pub async fn propagate_read(&self, msg: Option<Message>) {
         // Parses and sends to the ConnectionHandler
         let Some(msg) = msg else {
@@ -200,17 +220,31 @@ impl FrontendConnectionManagerInternal {
             return;
         };
         // let parsed_msg = todo!("Parse command or cmd close");
-        self.read_queue.send(parsed).await.expect("Channel should always be open");
+        self.read_queue
+            .send(parsed)
+            .await
+            .expect("Channel should always be open");
     }
-    #[instrument(name = "send_batch", fields(description = "Empty the current send-queue, pack all elements to a batch and send them"), skip(self))]
+    #[instrument(
+        name = "send_batch",
+        fields(
+            description = "Empty the current send-queue, pack all elements to a batch and send them"
+        ),
+        skip(self)
+    )]
     pub async fn send_batch(&mut self) {
         let mut empty = vec![];
         std::mem::swap(&mut empty, &mut self.send_batch);
         self.websocket
             .send(BatchedFrontendMessage(empty).into())
             .await;
+        self.first_element_send_time = None;
     }
-    #[instrument(name = "register_send", fields(description = "Add message to the send-queue and record its time"), skip(self))]
+    #[instrument(
+        name = "register_send",
+        fields(description = "Add message to the send-queue and record its time"),
+        skip(self)
+    )]
     pub async fn register_send(&mut self, msg: FrontendMessage) {
         if self.first_element_send_time.is_none() {
             self.first_element_send_time = Some(Instant::now());
@@ -227,15 +261,26 @@ impl Drop for FrontendManager {
 }
 
 impl FrontendManager {
-    #[instrument(name = "next_read", fields(description = "Read next frontend response"), skip(self))]
+    #[instrument(
+        name = "next_read",
+        fields(description = "Read next frontend response"),
+        skip(self)
+    )]
     pub async fn next_read(&mut self) -> FrontendResponse {
-        self.read_queue
+        let msg = self
+            .read_queue
             .recv()
             .await
-            .expect("Channel should not be dropped during execution")
+            .expect("Channel should not be dropped during execution");
+        info!(target: "comm/webs", "{msg:?}");
+        msg
     }
 
-    #[instrument(name = "send", fields(description = "Send msg (and potentially batch it first)"), skip(self))]
+    #[instrument(
+        name = "send",
+        fields(description = "Send msg (and potentially batch it first)"),
+        skip(self)
+    )]
     pub async fn send(&mut self, msg: FrontendMessage) {
         self.send_queue
             .send(msg)

@@ -3,6 +3,7 @@ use std::{fmt::Display, ops::Deref};
 use serde::Serialize;
 
 
+#[derive(Clone)]
 pub struct NonEmpty<T: Sized>(T);
 
 

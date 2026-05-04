@@ -1,10 +1,12 @@
 use std::{
+    clone,
     collections::HashMap,
     hash::Hash,
     ops::{Add, Sub},
 };
 
 use tracing::{debug, instrument};
+use tracing_subscriber::Layer;
 
 use crate::{
     comm::micromouse_message::Command,
@@ -18,7 +20,10 @@ use crate::{
     strategy::strategy::{
         ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
     },
-    utils::hyperlink_logging::LinkFileName,
+    utils::{
+        hyperlink_logging::LinkFileName,
+        nonempty::{NonEmpty, PotentiallyNonEmpty},
+    },
 };
 
 #[derive(Debug)]
@@ -56,6 +61,7 @@ pub struct SentTreeLayer<const N: usize> {
     // is always full
     // is always merged (as it was sent)
     node_count: usize,
+    eq: Command,
 }
 
 // Always counting up
@@ -93,6 +99,7 @@ pub struct StrategyTreeNode<const N: usize, S: Strategy<N>> {
 pub struct SentCommandNode<const N: usize> {
     pub on_basis_of_world: PartialWorldData<N>,
     pub applied_strategy: NodeActionResult<N>,
+    as_branch_from_parent: Option<AbsolutePathId>,
 }
 
 type NodeActionResult<const N: usize> = Result<NodeAction<N>, StrategyEndState>;
@@ -129,6 +136,29 @@ pub enum StrategyStart<const N: usize> {
     DirectlyAtState(WorldData<N>),
 }
 
+pub enum TreeCreationError {
+    StrategyError(StrategyEndState),
+    ExpansionError(TreeExpansionError),
+    RootNotExpanded,
+}
+
+pub struct TreeCreationSuccess<const N: usize, S: Strategy<N> + Clone + std::fmt::Debug> {
+    tree: StrategyTree<N, S>,
+    origin_command: Option<Command>,
+}
+
+impl From<TreeExpansionError> for TreeCreationError {
+    fn from(value: TreeExpansionError) -> Self {
+        Self::ExpansionError(value)
+    }
+}
+
+impl From<StrategyEndState> for TreeCreationError {
+    fn from(value: StrategyEndState) -> Self {
+        Self::StrategyError(value)
+    }
+}
+
 impl<const N: usize, S> StrategyTree<N, S>
 where
     // For use in the Strategy-Tree, we need to be able to duplicate the StrategyState to branch
@@ -145,25 +175,92 @@ where
         starting_condition: StrategyStart<N>,
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
-    ) -> Self {
+    ) -> Result<TreeCreationSuccess<N, S>, TreeCreationError> {
         match starting_condition {
             StrategyStart::ContinueAfterDoing(sent_unfinished_commands) => {
                 let num_of_unfinished_cmds = sent_unfinished_commands.layers.len();
+                let node_count = sent_unfinished_commands
+                    .layers
+                    .iter()
+                    .map(|l| l.node_count)
+                    .sum::<usize>();
                 let first_layer_absolute_id = sent_unfinished_commands
                     .layers
-                    .get(0)
+                    .first()
                     .map(|l| l.absolute_layer_id)
                     .unwrap_or(AbsoluteLayerId(0));
-            }
-            StrategyStart::DirectlyAtState(starting_state) => {}
-        }
 
-        // Self {
-        //     goal_position,
-        //     config: tree_config,
-        //
-        // }
-        todo!()
+                let layers = sent_unfinished_commands.layers.into_inner().into_iter();
+                let mut transformed_layers = layers
+                    .map(StrategyTreeLayer::<N, S>::non_expandable_from_cleaned)
+                    .collect::<Vec<_>>();
+
+                let last_layer = transformed_layers.last_mut().expect("layers are nonempty");
+
+                last_layer.nodes.iter_mut().for_each(|(_n, val)| {
+                    val.applied_strategy = None;
+                    val.on_basis_of_state = Some(S::from_config(
+                        &tree_config.strategy_config,
+                        &val.on_basis_of_world,
+                    ));
+                });
+
+                // let highest_sent_layer = last_layer.absolute_layer_id;
+
+                Ok(TreeCreationSuccess {
+                    tree: Self {
+                        config: tree_config,
+                        layers: transformed_layers,
+                        highest_sent_layer: num_of_unfinished_cmds - 1,
+                        highest_eq_layer: num_of_unfinished_cmds - 1,
+                        highest_full_layer: num_of_unfinished_cmds - 1,
+                        first_layer_absolute_id,
+                        node_count,
+                        goal_position,
+                    },
+                    origin_command: None,
+                })
+            }
+            StrategyStart::DirectlyAtState(starting_state) => {
+                let first_strategy = S::from_config(&tree_config.strategy_config, &starting_state);
+
+                let mut res = Self {
+                    config: tree_config,
+                    layers: vec![StrategyTreeLayer::new(AbsoluteLayerId(0))],
+                    highest_sent_layer: 0,
+                    highest_eq_layer: 0,
+                    highest_full_layer: 0,
+                    first_layer_absolute_id: AbsoluteLayerId(0),
+                    node_count: 0,
+                    goal_position,
+                };
+
+                let first_node_id = res.add_node(
+                    StrategyTreeNode::new_orphan(
+                        PartialWorldData::from(starting_state),
+                        Some(first_strategy),
+                    ),
+                    AbsoluteLayerId(0),
+                );
+
+                res.expand_fully().map_err(TreeCreationError::from)?;
+
+                let root_send = res
+                    .node(first_node_id)
+                    .expect("Just added it")
+                    .applied_strategy
+                    .as_ref()
+                    .ok_or(TreeCreationError::RootNotExpanded);
+                let root_send = root_send?;
+                let root_send = root_send.as_ref().map_err(StrategyEndState::clone)?;
+                let first_cmd = root_send.command.command().clone();
+
+                Ok(TreeCreationSuccess {
+                    tree: res,
+                    origin_command: Some(first_cmd),
+                })
+            }
+        }
     }
 
     // returns the number of nodes this action creates
@@ -907,7 +1004,7 @@ where
         ),
         skip(self)
     )]
-    pub fn close(self) -> SentUnfinishedCommands<N> {
+    pub fn close(self) -> Option<SentUnfinishedCommands<N>> {
         let highest_sent_layer = self.highest_sent_layer;
         let mut layers = vec![];
         let mut inner_layers = self.layers;
@@ -920,7 +1017,9 @@ where
             ))
         }
 
-        SentUnfinishedCommands { layers }
+        Some(SentUnfinishedCommands {
+            layers: layers.non_empty()?,
+        })
     }
 }
 
@@ -970,7 +1069,7 @@ pub struct RelativeNodeId(pub usize);
 pub struct SentUnfinishedCommands<const N: usize> {
     // They are Strategy-Agnostic by not allowing the nodes to expand, which allows us to leave out
     // the strategy-state, which is needed for expansion
-    layers: Vec<SentTreeLayer<N>>,
+    layers: NonEmpty<Vec<SentTreeLayer<N>>>,
 }
 
 impl Sub for AbsoluteLayerId {
@@ -988,6 +1087,28 @@ impl Add<RelativeLayerId> for AbsoluteLayerId {
 }
 
 impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
+    pub fn non_expandable_from_cleaned(sent_layer: SentTreeLayer<N>) -> Self {
+        let nodes = sent_layer.nodes.into_iter();
+        let transformed_nodes = nodes
+            .map(|(id, val)| {
+                (
+                    id,
+                    StrategyTreeNode::<N, S>::non_expandable_from_cleaned(val),
+                )
+            })
+            .collect::<HashMap<_, _>>();
+        StrategyTreeLayer {
+            nodes: transformed_nodes,
+            absolute_layer_id: sent_layer.absolute_layer_id,
+            is_fully_expanded: true,
+            eq: Some(sent_layer.eq),
+            node_count: sent_layer.node_count,
+            // This is not technically correct, but it should not be used after this
+            // point, so creating a nonsense value is ok
+            node_id_counter: RelativeNodeIdCounter(0),
+            is_sent: true,
+        }
+    }
     pub fn node(&self, node_id: RelativeNodeId) -> Option<&StrategyTreeNode<N, S>> {
         self.nodes.get(&node_id)
     }
@@ -1115,6 +1236,27 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
         }
     }
 
+    pub fn new_orphan(
+        world_at_start_of_node: PartialWorldData<N>,
+        state_at_start_of_node: Option<S>,
+    ) -> Self {
+        Self {
+            on_basis_of_world: world_at_start_of_node,
+            on_basis_of_state: state_at_start_of_node,
+            applied_strategy: None,
+            as_branch_from_parent: None,
+        }
+    }
+
+    pub fn non_expandable_from_cleaned(cleaned: SentCommandNode<N>) -> Self {
+        Self {
+            on_basis_of_world: cleaned.on_basis_of_world,
+            on_basis_of_state: None,
+            applied_strategy: Some(cleaned.applied_strategy),
+            as_branch_from_parent: cleaned.as_branch_from_parent,
+        }
+    }
+
     pub fn children(&self) -> Option<&HashMap<PathLocalOutcomeId, AbsoluteNodeId>> {
         self.applied_strategy
             .as_ref()
@@ -1166,6 +1308,7 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTr
         }
 
         Ok(SentTreeLayer {
+            eq: value.eq.expect("Checked"),
             nodes,
             absolute_layer_id: value.absolute_layer_id,
             node_count: node_len,
@@ -1179,6 +1322,7 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeNode<N, S>> for SentCom
         Ok(Self {
             on_basis_of_world: value.on_basis_of_world,
             applied_strategy: value.applied_strategy.ok_or(())?,
+            as_branch_from_parent: value.as_branch_from_parent,
         })
     }
 }

@@ -27,7 +27,7 @@ pub enum MicromouseMessage {
     MicromouseResponse(MicromouseResponse),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MicromouseResponse {
     Debug(String),
     Measurement(MeasurementMessage),
@@ -39,7 +39,7 @@ pub enum MicromouseResponse {
     Battery(Battery),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct FormatError<T> {
     pub faulty_text: String,
     _ty: PhantomData<T>, //Storing the type which was expected
@@ -415,7 +415,7 @@ pub struct CommandMessage {
     pub cmd_id: CommandId,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MeasurementMessage {
     pub from_cmd: CommandId,
     pub interrupt: MeasurementOccurrence,

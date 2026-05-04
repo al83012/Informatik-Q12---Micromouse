@@ -20,6 +20,7 @@ pub mod micromouse_simulator;
 mod conn_website;
 mod spans;
 mod path;
+mod follow_r_test_short_with_fe;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
