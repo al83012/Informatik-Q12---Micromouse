@@ -9,7 +9,7 @@ export class BackendManager {
         "discovered": [[0, 0]],
         "walls": [], // e.g. [[0,0, 0,1], [1,0, 1,1]] //wall between 00 and 01 as well as 10 and 11
         "goals": [],
-        "paths": []
+        "paths": [] //TODO: Think of overlapping paths
     };
     in_mouse = {
         "pos": [0, 0],

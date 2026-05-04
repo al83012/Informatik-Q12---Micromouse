@@ -7,6 +7,7 @@ const { Worker } = require('node:worker_threads');
 const { join, dirname } = require('node:path');
 const worker_path = join(__dirname, 'worker.js');
 
+//Worker doesn't work, idk why
 function runWorker(workerData) {
     return new Promise((resolve, reject) => {
         let settled = false;
@@ -147,7 +148,7 @@ client.on('connect', (conn) => {
 });
 
 console.log("\x1b[33m[B] Connecting to Backend");
-//connect_backend();
+connect_backend();
 
 /*old deprecated due to protocol
 const net = require('net');
