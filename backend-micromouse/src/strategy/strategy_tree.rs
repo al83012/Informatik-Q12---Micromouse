@@ -18,7 +18,7 @@ use crate::{
         world_data::{PartialWorldData, WorldData},
     },
     strategy::strategy::{
-        ComputedActions, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState,
+        ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState
     },
     utils::{
         hyperlink_logging::LinkFileName,
@@ -33,7 +33,7 @@ pub enum StrategyTreeError {
     MeasureDoesNotMatchInner,
 }
 
-pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone> {
+pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> {
     config: StrategyTreeConfig<N, S>,
     /// layers[0] = layer the micromouse is currently processing
     layers: Vec<StrategyTreeLayer<N, S>>,
@@ -78,7 +78,7 @@ pub struct RelativeLayerId(pub usize);
 // }
 
 #[derive(Debug)]
-pub struct StrategyTreeConfig<const N: usize, S: Strategy<N> + Clone> {
+pub struct StrategyTreeConfig<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> {
     pub strategy_config: S::Config,
     pub desired_depth: usize,
     pub max_nodes: usize,
@@ -142,7 +142,7 @@ pub enum TreeCreationError {
     RootNotExpanded,
 }
 
-pub struct TreeCreationSuccess<const N: usize, S: Strategy<N> + Clone + std::fmt::Debug> {
+pub struct TreeCreationSuccess<const N: usize, S: Strategy<N> + Clone + std::fmt::Debug + FromConfig<N>> {
     tree: StrategyTree<N, S>,
     origin_command: Option<Command>,
 }
@@ -162,7 +162,7 @@ impl From<StrategyEndState> for TreeCreationError {
 impl<const N: usize, S> StrategyTree<N, S>
 where
     // For use in the Strategy-Tree, we need to be able to duplicate the StrategyState to branch
-    S: Strategy<N> + Clone + std::fmt::Debug,
+    S: Strategy<N> + Clone + std::fmt::Debug + FromConfig<N>,
 {
     #[instrument(
         name = "new StrategyTree",

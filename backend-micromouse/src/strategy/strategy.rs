@@ -35,7 +35,7 @@ pub trait FromConfig<const N: usize> {
     fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self;
 }
 
-pub trait Strategy<const N: usize>: FromConfig<N> + Sized {
+pub trait Strategy<const N: usize>: Sized {
     fn next_cmd(
         &self,
         world: &PartialWorldData<N>,

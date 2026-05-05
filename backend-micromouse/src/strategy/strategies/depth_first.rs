@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     comm::micromouse_message::{MovementType, TransformedMovement},
     map::{
-        map::WallDiscoveryStatus,
+        map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus},
         world_data::{PartialWorldData, WorldData},
     },
     strategy::{
@@ -11,7 +11,7 @@ use crate::{
         strategy::{FromConfig, Strategy, StrategyComputationResult, StrategyEndState},
     },
     transform::{
-        direction::{Direction, RelativeDirection},
+        direction::{Direction, DirectionNormalizedVector, RelativeDirection},
         position::{MouseTransform, Position},
     },
     utils::{nonempty::NonEmpty, path::Path},
@@ -239,27 +239,36 @@ impl<const N: usize> DepthFirst<N> {
             }
 
             match right {
-                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => intersections
-                    .push(MouseTransform {
-                        pos: pos_at_step,
-                        dir: dir_right,
-                    }),
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => {
+                    if Self::is_visitable(map, pos_at_step, dir_right) {
+                        intersections.push(MouseTransform {
+                            pos: pos_at_step,
+                            dir: dir_right,
+                        });
+                    }
+                }
                 _ => {}
             }
             match fwd {
-                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => intersections
-                    .push(MouseTransform {
-                        pos: pos_at_step,
-                        dir: dir_fwd,
-                    }),
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => {
+                    if Self::is_visitable(map, pos_at_step, dir_fwd) {
+                        intersections.push(MouseTransform {
+                            pos: pos_at_step,
+                            dir: dir_fwd,
+                        });
+                    }
+                }
                 _ => {}
             }
             match left {
-                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => intersections
-                    .push(MouseTransform {
-                        pos: pos_at_step,
-                        dir: dir_left,
-                    }),
+                WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(false) => {
+                    if Self::is_visitable(map, pos_at_step, dir_left) {
+                        intersections.push(MouseTransform {
+                            pos: pos_at_step,
+                            dir: dir_left,
+                        });
+                    }
+                }
                 _ => {}
             }
 
@@ -288,5 +297,25 @@ impl<const N: usize> DepthFirst<N> {
                 self.intersection_stack.push(branch.pos);
             }
         }
+    }
+
+    pub fn is_visitable(map: Map<N>, from_cell: Position, direction: Direction) -> bool {
+        let d_offset = DirectionNormalizedVector::from(direction);
+
+        let x: i32 = from_cell.x as i32 + d_offset.x as i32;
+        let y: i32 = from_cell.y as i32 + d_offset.y as i32;
+
+        if x < 0 || y < 0 {
+            return false;
+        }
+
+        let Some(cell) = map.cell(&Position {
+            x: x as u32,
+            y: y as u32,
+        }) else {
+            return false;
+        };
+
+        *cell != CellDiscoveryStatus::Visited
     }
 }
