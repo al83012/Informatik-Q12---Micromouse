@@ -69,6 +69,16 @@ async function loop_worker(manager) {
     new Worker(worker_path, {manager,});
 }
 
+
+
+class Options {
+    static recon = true;
+    static input = true;
+}
+
+
+
+
 /**
  * Communication build with Backend
  * Sending:
@@ -111,7 +121,9 @@ function connect_backend() {
 
 client.on('connectFailed', (err) => {
     console.error('\x1b[33m[B] \x1b[31mConnect Error: ' + err.toString() + '\x1b[33m');
-    setTimeout(connect_backend, 500);
+    if (Options.recon) {
+        setTimeout(connect_backend, 500);
+    }
 });
 
 client.on('error', (err) => {
@@ -142,7 +154,8 @@ client.on('connect', (conn) => {
     });
     conn.on('message', (message) => {
         if (message.type === 'utf8') {
-            manager.b_handleUpdate(JSON.parse(message.utf8Data));
+            manager.b_handlePost(JSON.parse(message.utf8Data));
+            //console.log(message.utf8Data);
         }
     });
 });
@@ -234,3 +247,59 @@ app.post('/error', (req, res) => {
 });
 
 app.listen(front_port, () => console.log(`\x1b[32m[F] WebInterface listening on port ${front_port}!`));
+
+
+const readline = require("node:readline")
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+function input(string) {
+    let parts = string.split(":");
+    switch (parts[0]) {
+        case "norecon":
+            Options.recon = false;
+            break;
+        case "b":
+            if (parts.length >= 2) {
+                switch (parts[1]) {
+                    case "recon":
+                        Options.recon = !Options.recon;
+                        if (Options.recon) {
+                            connect_backend();
+                        }
+                        break;
+                }
+            }
+            break;
+        case "f":
+            if (parts.length >= 2) {
+                switch (parts[1]) {
+                    case "load":
+                        if (parts.length === 3) {
+                            if (parts[2] === "show") {
+                                manager.f_sync.push(Actions.show_loading());
+                            } else if (parts[2] === "hide") {
+                                manager.f_sync.push(Actions.hide_loading());
+                            }
+                        }
+                        break;
+                    case "console":
+                        if (parts.length === 3) {
+                            manager.f_sync.push(Actions.add_message(parts[2]));
+                        }
+                        break;
+                }
+            }
+            break;
+    }
+
+    setTimeout(con_in, 1);
+}
+
+async function con_in() {
+    rl.question("->", cmd => input(cmd));
+}
+
+con_in()

@@ -26,7 +26,7 @@ export class BackendManager {
             "right_2": 0,
         }
     };
-    in_console = ["[B] Connected"];
+    in_console = ["[B] Connected", "DANNIIIIIIIIIIIII", "AHHHHHHHHHHHHHHHHHHHH HHHHHHH"];
     algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
     in_algorithm = "A*";
     in_is_loading = false;
@@ -84,8 +84,10 @@ export class BackendManager {
         console.log("--------------------------------------------------------\x1b[33m");
     }
 
-    b_handleUpdate(data) {
-        console.log(data);
+    b_handlePost(data) {
+        console.log("--------------------------------------------------------------------");
+        console.log(data, data[0]["MicromouseEvent"]);
+        console.log("--------------------------------------------------------------------");
         switch (data.type) {
             case "":
                 break;
