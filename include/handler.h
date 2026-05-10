@@ -8,6 +8,7 @@ using namespace std;
 #include "WiFi.h"
 #include "HTTPClient.h"
 
+ struct HandleVars {
 //Command config
 const int MAX_CMD_ARGS = 15;
 const int MAX_SUB_STEPS = 256;
@@ -19,7 +20,8 @@ const int SENSORLIMIT = 5;
 const int STOP_IF_OPEN_ID = 10;
 const int STOP_IF_BLOCKED_ID = 11;
 const int CONTINUE_ID = 12;
-
+};
+extern HandleVars handleVars;
 
 class Handler {
 public:

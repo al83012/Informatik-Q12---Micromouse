@@ -1,17 +1,18 @@
-#include "handler.h"
 #include <ArduinoWebsockets.h>
 #include <Arduino.h>
 #include "WiFi.h"
 #include "HTTPClient.h"
-#include "utility.h"
+
 #include "master.h"
-#include "handler.h"
 #include "utility.h"
 #include "network.h"
 #include "simulation.h"
+#include "handler.h"
+
 using namespace websockets;
 using namespace std;
 
+HandleVars handleVars;
 
 void Handler::handleEvent(WebsocketsEvent event, String data) {
       if (event == WebsocketsEvent::ConnectionOpened) {
@@ -35,7 +36,20 @@ void Handler::movePassive(int cells) {
 }
 
 int Handler::measure(char dir) {
+  if (dir == 'F') {
+    //read processed value of sensor -> return distance in walls
+  }
 
+  if (dir == 'R') {
+    //read processed value of sensor -> return distance in walls
+  }
+
+  if (dir == 'L') {
+    //read processed value of sensor -> return distance in walls
+  }
+
+
+  return Simulation::sim_measure(dir);
 }
 
 
@@ -52,7 +66,7 @@ void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
       Serial.println(task.direction);
       Serial.println(task.reaction);
 
-      if (task.subStep == sub_step || MAX_SUB_STEPS) {
+      if (task.subStep == sub_step || handleVars.MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         Serial.print("Distance: ");
         Serial.println(distance);
@@ -60,12 +74,12 @@ void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
         string content;
         content = "MEASUREMENT #" + to_string(globalVars.currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " " + to_string(distance);
 
-        if (distance >= SENSORLIMIT) { content = content + " SENSORLIMIT"; }
+        if (distance >= handleVars.SENSORLIMIT) { content = content + " SENSORLIMIT"; }
         Serial.println("#MSR > SRV");
         Utility::printClient(content);
 
-        if (distance > DISTANCE_THRESHOLD) {
-          if (task.reaction == STOP_IF_OPEN_ID) {
+        if (distance > handleVars.DISTANCE_THRESHOLD) {
+          if (task.reaction == handleVars.STOP_IF_OPEN_ID) {
             string content = to_string(sub_step) + "_" + task.direction + "_STOP-IF-OPEN";
             Serial.println("#STOPPED: STOP-IF-OPEN");
             Utility::debug("Interrupt at substep " + sub_step);
@@ -79,7 +93,7 @@ void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
         } else {
 
 
-          if (task.direction == STOP_IF_BLOCKED_ID) {
+          if (task.direction == handleVars.STOP_IF_BLOCKED_ID) {
             string content = to_string(sub_step) + "_" + task.direction + "_STOP-IF-BLOCKED";
             Serial.println("#STOPPED: STOP_IF_BLOCKED");
             Utility::debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
@@ -128,18 +142,18 @@ void Handler::turnActive(int turns, vector<MeasurementTask>& activeTasks) {
   for (int i = 0; i <= turns; i++) {
     int sub_step = i;
     for (auto task : activeTasks) {
-      if (task.subStep == sub_step || MAX_SUB_STEPS) {
+      if (task.subStep == sub_step || handleVars.MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         string content;
         content = "MEASUREMENT #" + to_string(globalVars.currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " "  + to_string(distance);
 
-        if (distance >= SENSORLIMIT) { content = content + string(" SENSORLIMIT"); }
+        if (distance >= handleVars.SENSORLIMIT) { content = content + string(" SENSORLIMIT"); }
         Serial.println("#MSR > SRV");
         Utility::printClient(content);
 
 
-        if (distance > DISTANCE_THRESHOLD) {
-          if (task.reaction == STOP_IF_OPEN_ID) {
+        if (distance > handleVars.DISTANCE_THRESHOLD) {
+          if (task.reaction == handleVars.STOP_IF_OPEN_ID) {
             string content = to_string(sub_step) + "_" + task.direction + "_STOP-IF-OPEN";
             Utility::debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
             globalVars.interrupt = true;
@@ -152,7 +166,7 @@ void Handler::turnActive(int turns, vector<MeasurementTask>& activeTasks) {
         } else {
 
 
-          if (task.reaction == STOP_IF_BLOCKED_ID) {
+          if (task.reaction == handleVars.STOP_IF_BLOCKED_ID) {
             string content = to_string(sub_step) + "_" + to_string(task.direction) + "_STOP-IF-BLOCKED";
             Utility::debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
             globalVars.interrupt = true;
@@ -182,17 +196,17 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
 
-  String message = WSmessage.data();
-  Serial.println(">> " + message);
-  String arguments[MAX_CMD_ARGS];
+  string message = WSmessage.data().c_str();
+  Serial.println(message.c_str());
+  string arguments[handleVars.MAX_CMD_ARGS];
   int words = 0;
   vector<MeasurementTask> activeTasks;
   //Collect words
   int lastIndex = 0;
   for (int i = 0; i <= message.length(); i++) {
     if (to_string(message[i]) == " " || i == message.length()) {
-      if (words < MAX_CMD_ARGS) {
-        arguments[words] = message.substring(lastIndex, i);
+      if (words < handleVars.MAX_CMD_ARGS) {
+        arguments[words] = message.substr(lastIndex, i);
         words++;
       }
 
@@ -202,18 +216,18 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
   //DEBUG: Print arguments with id:
   for (int i = 0; i < words; i++) {
-    String content = String(i) + " -> \"" + String(arguments[i] + "\"");
-    Serial.println(content);
+    string content = to_string(i) + " -> \"" + arguments[i] + "\"";
+    Serial.println(content.c_str());
   }
 
 
   if (!globalVars.desync_mode) {
     //Scanning for command type
-    if (arguments[1].indexOf("#") != -1) {
+    if (arguments[1].find("#") != string::npos) {
       Serial.println("# CMD RCV");
-      arguments[1].remove(0, 1);
+      arguments[1].erase(0, 1);
       globalVars.lastCMD_ID = globalVars.currCMD_ID;
-      globalVars.currCMD_ID = arguments[1].toInt();
+      globalVars.currCMD_ID = stoi(arguments[1]);
 
       if (globalVars.lastCMD_ID == globalVars.currCMD_ID - 1) {
         Serial.print("# CMD_ID VALID:");
@@ -223,11 +237,11 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
         //Passive movement start
         if (words == 3 || arguments[3] == "") {
           if (arguments[0] == "MOVE") {
-            movePassive(arguments[2].toInt());
+            movePassive(stoi(arguments[2]));
             Utility::finishedAll();
 
           } else if (arguments[0] == "TURN") {
-            turnPassive(arguments[2].toInt());
+            turnPassive(stoi(arguments[2]));
             Utility::finishedAll();
           }
           //Passive movement end
@@ -236,10 +250,10 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
         } else {  // if not passive -> must be active
           MeasurementTask task;
 
-          int cells = arguments[2].toInt();
+          int cells = stoi(arguments[2]);
           if (arguments[3] == "MEASURE") {
             for (int j = 4; j < words; j++) {
-              String word = arguments[j];
+              string word = arguments[j];
 
               int sub_step;
               if (to_string(word[0]) != "X") {
@@ -254,7 +268,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
                 if (dirIndex != -1) {
 
-                  task.subStep = word.substring(0, dirIndex).toInt();
+                  task.subStep = stoi(word.substr(0, dirIndex));
                   task.direction = word[dirIndex + 1];
 
                 } else {
@@ -263,22 +277,22 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
                 }
 
               } else {
-                task.subStep = MAX_SUB_STEPS;
+                task.subStep = handleVars.MAX_SUB_STEPS;
                 task.direction = word[2];
               }
               char dir = word[2];
               task.direction = dir;
 
 
-              if (word.indexOf("STOP-IF-OPEN") != -1) {
-                task.reaction = STOP_IF_OPEN_ID;
-              } else if (word.indexOf("STOP-IF-BLOCKED") != -1) {
-                task.reaction = STOP_IF_BLOCKED_ID;
+              if (word.find("STOP-IF-OPEN") != string::npos) {
+                task.reaction = handleVars.STOP_IF_OPEN_ID;
+              } else if (word.find("STOP-IF-BLOCKED") != string::npos) {
+                task.reaction = handleVars.STOP_IF_BLOCKED_ID;
 
-              } else if (word.indexOf("TURN-IF-BLOCKED") != -1) {
+              } else if (word.find("TURN-IF-BLOCKED") != string::npos) {
                 //reactions[sub_step] = String(word[word.length() - 1]).toInt();
-              } else if (word.indexOf("CONTINUE") != -1) {
-                task.reaction = CONTINUE_ID;
+              } else if (word.find("CONTINUE") != string::npos) {
+                task.reaction = handleVars.CONTINUE_ID;
               }
               activeTasks.push_back(task);
               Serial.println(activeTasks.size());

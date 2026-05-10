@@ -1,27 +1,28 @@
-#include "network.h"
 #include <ArduinoWebsockets.h>
 #include <Arduino.h>
 #include "WiFi.h"
 #include "HTTPClient.h"
-#include "network.cpp"
+
 #include "master.h"
+#include "utility.h"
+#include "network.h"
 
 using namespace websockets;
 using namespace std;
 
 
 void Utility::printClient(string message) {
-    client.send(message.c_str());
+    networkVars.client.send(message.c_str());
 }
 
 void Utility::stop() {
     printClient("STOP");
-    client.send("STOP");
+    networkVars.client.send("STOP");
 }
 
 void Utility::battery() {
     printClient("BTRY > SRV");
-    client.send("BATTERY 0");
+    networkVars.client.send("BATTERY 0");
 }
 
 void Utility::restart() {
@@ -32,7 +33,7 @@ void Utility::restart() {
     globalVars.lastCMD_ID = -1;
     globalVars.currCMD_ID = -1;
 
-    client.send("RESTART");
+    networkVars.client.send("RESTART");
 }
     
 void Utility::finishedAll() {
@@ -74,5 +75,5 @@ void Utility::debug(string message) {
   globalVars.lastCMD_ID = -1;
   globalVars.currCMD_ID = -1;
 
-  client.send("RESTART");
+  networkVars.client.send("RESTART");
 }

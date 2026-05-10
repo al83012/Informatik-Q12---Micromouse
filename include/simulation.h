@@ -3,6 +3,7 @@
 #include <String>
 using namespace std;
 
+ struct SimulationVars {
 const int SIM_SIZE = 8;
 int cellSize = 18;
 int stepFreq = 1;
@@ -26,6 +27,8 @@ int SIM_FIELD[8][8] = {
   { neX + poY, poY, poY, poY, poY, poY, poY, poX + poY }
 };
 
+};
+extern SimulationVars simulationVars;
 
 
 

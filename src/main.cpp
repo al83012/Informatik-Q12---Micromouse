@@ -1,11 +1,12 @@
 #include "Arduino.h"
 #include "WiFi.h"
+#include "ArduinoWebsockets.h"
+#include "HTTPClient.h"
+
+#include "utility.h"
 #include "master.h"
 #include "network.h"
 #include "handler.h"
-#include "ArduinoWebsockets.h"
-#include "HTTPClient.h"
-#include "utility.h"
 
 void setup() {
      Serial.begin(115200);
@@ -17,10 +18,10 @@ void setup() {
   Network::scanNetworks();
   Network::initNetwork();
 
-  network::client = websockets::WebsocketsClient();
+  networkVars.client = websockets::WebsocketsClient();
 
-  network::client.onMessage(Handler::handleCommand);
-  network::client.onEvent(Handler::handleEvent);
+  networkVars.client.onMessage(Handler::handleCommand);
+  networkVars.client.onEvent(Handler::handleEvent);
   Network::connectWS();
 
   Serial.println("# Setup done!");
@@ -28,13 +29,13 @@ void setup() {
 
 void loop() {
     
-  if (client.available()) {
-    client.poll();
+  if (networkVars.client.available()) {
+    networkVars.client.poll();
   } else {
     Serial.println("# CN LOST!");
     Serial.println("# RE-CN...");
     Network::connectWS();
-    if (client.available()) {
+    if (networkVars.client.available()) {
     Serial.println("# RE-CN SUCC!");
     Utility::printClient("CONTINUE");
 

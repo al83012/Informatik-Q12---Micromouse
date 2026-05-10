@@ -1,12 +1,14 @@
+#include "Arduino.h"
+
 #include "simulation.h"
 #include "utility.h"
-#include "Arduino.h"
 #include "master.h"
 #include "handler.h"
 
+SimulationVars simulationVars;  
 
 bool Simulation::can_move(int x, int y, int direction_flag) {
-if (SIM_FIELD[y][x] & direction_flag) {
+if (simulationVars.SIM_FIELD[y][x] & direction_flag) {
     return false;
   }
   return true;
@@ -14,8 +16,8 @@ if (SIM_FIELD[y][x] & direction_flag) {
 
 
 void Simulation::sim_move(int n) {
-  int newX = X;
-  int newY = Y;
+  int newX = simulationVars.X;
+  int newY = simulationVars.Y;
   int dir_flag = 0;
   if (globalVars.dir == posX) {
     newX += 1;
@@ -33,9 +35,9 @@ void Simulation::sim_move(int n) {
    
   
 
-  if (can_move(newX, newY, dir_flag) && newX < SIM_SIZE && newY < SIM_SIZE) {
-    X = newX;
-    Y = newY;
+  if (can_move(newX, newY, dir_flag) && newX < simulationVars.SIM_SIZE && newY < simulationVars.SIM_SIZE) {
+    simulationVars.X = newX;
+    simulationVars.Y = newY;
   } else {
     Serial.println("# CANNOT MOVE");
   }
@@ -73,8 +75,8 @@ if (turns < 0) {
 
 int Simulation::sim_measure(char scan_dir) {
   int distance = 0;
-  int check_X = X;
-  int check_Y = Y;
+  int check_X = simulationVars.X;
+  int check_Y = simulationVars.Y;
   directions lookDir = globalVars.dir;
 
 
@@ -96,13 +98,13 @@ int Simulation::sim_measure(char scan_dir) {
   int wall_flag = 0;
 
   if (lookDir == posX) {
-    wall_flag = poX;
+    wall_flag = simulationVars.poX;
   } else if (lookDir == posY) {
-    wall_flag = poY;
+    wall_flag = simulationVars.poY;
   } else if (lookDir == negX) {
-    wall_flag = neX;
+    wall_flag = simulationVars.neX;
   } else if (lookDir == negY) {
-    wall_flag = neY;
+    wall_flag = simulationVars.neY;
   }
 
   while (true) {
@@ -111,8 +113,8 @@ int Simulation::sim_measure(char scan_dir) {
     int next_Y = check_Y;
 
 
-    if (distance >= SIM_SIZE) break;
-    if (SIM_FIELD[check_Y][check_X] & wall_flag) { break; }
+    if (distance >= simulationVars.SIM_SIZE) break;
+    if (simulationVars.SIM_FIELD[check_Y][check_X] & wall_flag) { break; }
 
     if (lookDir == posX) {
       next_X++;
@@ -124,7 +126,7 @@ int Simulation::sim_measure(char scan_dir) {
       next_Y--;
     }
 
-    if (next_X < 0 || next_X >= SIM_SIZE || next_Y < 0 || next_Y >= SIM_SIZE) { break; }
+    if (next_X < 0 || next_X >= simulationVars.SIM_SIZE || next_Y < 0 || next_Y >= simulationVars.SIM_SIZE) { break; }
 
     check_X = next_X;
     check_Y = next_Y;
