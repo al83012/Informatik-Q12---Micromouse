@@ -219,10 +219,8 @@ where
                         &val.on_basis_of_world
                     };
                     val.applied_strategy = None;
-                    val.on_basis_of_state = Some(S::from_config(
-                        &tree_config.strategy_config,
-                        world
-                    ));
+                    val.on_basis_of_state =
+                        Some(S::from_config(&tree_config.strategy_config, world));
                 });
 
                 // let highest_sent_layer = last_layer.absolute_layer_id;
@@ -294,6 +292,7 @@ where
         skip(self)
     )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
+        const MIN_LAYER: usize = 2;
         let node_budget = self.config.max_nodes.saturating_sub(self.node_count);
         let layer_budget = self
             .config
@@ -301,7 +300,7 @@ where
             .saturating_sub(self.fully_expanded_layer_count());
 
         let mut nodes_created = 0;
-        let layers_fully_expanded = 0;
+        let mut layers_fully_expanded = 0;
 
         let highest_full_layer = self.highest_full_layer();
 
@@ -310,7 +309,11 @@ where
         let mut skipped_layer = false;
         // Iterating through all the layers that are still to be expanded
         'expansion: for i in 0..layer_budget {
-            if node_budget <= nodes_created || layer_budget <= layers_fully_expanded {
+            // INFO: Can only break via node-budget if there are enough layers; otherwise, it will
+            // keep trying to create new layers
+            if (node_budget <= nodes_created && self.highest_full_layer >= MIN_LAYER)
+                || layer_budget <= layers_fully_expanded
+            {
                 // Out of budget
                 break;
             }
@@ -367,7 +370,7 @@ where
                     }
                 }
 
-                if node_budget <= nodes_created {
+                if node_budget <= nodes_created && self.highest_full_layer >= MIN_LAYER {
                     break 'expansion;
                 }
             }
@@ -376,6 +379,7 @@ where
                 // INFO: it will still try to expand the already existing layers up to that depth,
                 // but it will not incr the expanden-layer-counter
             } else {
+                layers_fully_expanded += 1;
                 self.highest_full_layer += 1;
                 self.layer_mut(layer_to_expand)
                     .expect("ID should be in bounds")
