@@ -31,6 +31,7 @@ use crate::{
 pub enum StrategyTreeError {
     WhilePruning(PruneError),
     WhileExpanding(TreeExpansionError),
+    WhileCreating(TreeCreationError),
     MeasureDoesNotMatchInner,
 }
 
@@ -110,7 +111,7 @@ pub struct NodeAction<const N: usize> {
     pub potential_outcomes: HashMap<PathLocalOutcomeId, AbsoluteNodeId>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeExpansionResult {
     NotExpandable,
     NotYetExpandable,
@@ -119,7 +120,7 @@ pub enum NodeExpansionResult {
     Expanded(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TreeExpansionError {
     node: AbsoluteNodeId,
     expansion: NodeExpansionResult,
@@ -140,6 +141,7 @@ pub enum StrategyStart<const N: usize> {
     DirectlyAtState(WorldData<N>),
 }
 
+#[derive(Debug, Clone)]
 pub enum TreeCreationError {
     StrategyError(StrategyEndState),
     ExpansionError(TreeExpansionError),
@@ -183,7 +185,7 @@ where
         starting_condition: StrategyStart<N>,
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
-    ) -> Result<TreeCreationSuccess<N, S>, TreeCreationError> {
+    ) -> Result<TreeCreationSuccess<N, S>, StrategyTreeError> {
         match starting_condition {
             StrategyStart::ContinueAfterDoing {
                 after_cmds: sent_unfinished_commands,
@@ -272,7 +274,10 @@ where
                     .as_ref()
                     .ok_or(TreeCreationError::RootNotExpanded);
                 let root_send = root_send?;
-                let root_send = root_send.as_ref().map_err(StrategyEndState::clone)?;
+                let root_send = root_send
+                    .as_ref()
+                    .map_err(StrategyEndState::clone)
+                    .map_err(TreeCreationError::from)?;
                 let first_cmd = root_send.command.command().clone();
 
                 Ok(TreeCreationSuccess {
@@ -1109,6 +1114,12 @@ impl From<PruneError> for StrategyTreeError {
 impl From<TreeExpansionError> for StrategyTreeError {
     fn from(value: TreeExpansionError) -> Self {
         Self::WhileExpanding(value)
+    }
+}
+
+impl From<TreeCreationError> for StrategyTreeError {
+    fn from(value: TreeCreationError) -> Self {
+        Self::WhileCreating(value)
     }
 }
 

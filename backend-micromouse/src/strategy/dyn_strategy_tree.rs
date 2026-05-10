@@ -3,7 +3,9 @@ use std::sync::mpsc;
 use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::{
-    comm::micromouse_message::Command, map::world_data::WorldData, strategy::{
+    comm::micromouse_message::Command,
+    map::world_data::WorldData,
+    strategy::{
         strategies::{
             breadth_first::BreadthFirst, dbg_known_path::DbgKnownPath, depth_first::DepthFirst,
             flood_fill::FloodFill, follow_wall::FollowWall, random_move::RandomMove,
@@ -11,9 +13,10 @@ use crate::{
         strategy::{FromConfig, GoalPosition, Strategy},
         strategy_tree::{
             SentUnfinishedCommands, StrategyStart, StrategyTree, StrategyTreeConfig,
-            TreeCreationError, TreeCreationSuccess,
+            StrategyTreeError, TreeCreationError, TreeCreationSuccess,
         },
-    }, transform::position::Position
+    },
+    transform::position::Position,
 };
 
 pub enum DynStrategyTree<const N: usize> {
@@ -100,7 +103,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
-    ) -> Result<(), TreeCreationError> {
+    ) -> Result<(), StrategyTreeError> {
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
                 match tree_config {
@@ -118,16 +121,14 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             };
         }
 
-        let (new_tree, cmd) = new_tree!(
-            [
-                DepthFirst,
-                BreadthFirst,
-                FollowWall,
-                FloodFill,
-                RandomMove,
-                DbgKnownPath
-            ]
-        );
+        let (new_tree, cmd) = new_tree!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ]);
 
         self.strategy_tree = new_tree;
 
@@ -138,9 +139,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         Ok(())
     }
 
-
     fn send_cmd(&mut self, cmd: Command) {
-        self.command_sender.send(cmd).expect("Channel should not be closed");
+        self.command_sender
+            .send(cmd)
+            .expect("Channel should not be closed");
     }
 
     pub fn modify(&mut self, change: StrategyChangeCommand<N>) {
