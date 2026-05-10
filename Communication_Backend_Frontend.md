@@ -62,3 +62,77 @@ A Restart was triggered; It should have been manually ensured, that the micromou
 `{"FinishedCommand": {"cmd_id": <COMMAND_ID>, "require_new": <REQUIRE_NEW>}}`
   Just received the feedback from the micromouse that a command with the given command id was finished, if require_new is `true`, it indicates that the internal command queue of the micromouse is empty and it will need a new command before it can do anything
 
+
+# Messages from frontend
+## StrategyChange
+
+```json
+{
+    "StrategyChange": <StrategyChange>
+}
+```
+`<StrategyChange>` = 
+```json
+{
+    "set_position" : <POSITION>, //OPTIONAL, overwrites the current position (in cases of reset etc.)
+    "reset_map" : boolean, //If true, resets the map (Making the micromouse forget what it has seen, but not its position)
+    "set_strategy" : <STRATEGY_CONFIG>, //OPTIONAL, the new strategy to start
+    "set_goal" : <GOAL_POSITION> //OPTIONAL, overwrites the goal position
+}
+```
+
+`<POSITION>` =
+```json
+{
+    "x": u32,
+    "y": u32
+}
+```
+
+### Strategy Config
+`<STRATEGY_CONFIG>` = 
+```json
+    { "<CONFIG_NAME" : <CONFIG> }
+```
+
+#### DepthFirst
+`<CONFIG_NAME> = "DepthFirstConfig"`
+`<CONFIG>` =
+```json
+{
+    "forward_first" : boolean // Whether the path without turns should be preferred (instead of random order)
+}
+```
+
+#### BreadthFirst
+...
+#### DbgKnownPath
+Usecase: Is reliant on a path from the current pos to the goal already existing; Use for returning to the starting square for instance; Beware to not reset the map
+`<CONFIG_NAME> = "DbgKnownPathConfig"`
+...
+
+#### FloodFill
+...
+
+#### FollowWall
+...
+
+#### RandomMove
+...
+
+## Pause
+```json
+"Pause"
+```
+
+Pause execution, but do not stop the strategy tree
+
+## Continue
+```json
+"Continue"
+```
+
+Unpause execution, but also maintain the previous state
+
+## Cancel
+THERE IS NO CANCEL; IT SHOULD BE DONE VIA A STRATEGY CHANGE
