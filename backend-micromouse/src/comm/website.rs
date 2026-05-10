@@ -17,10 +17,7 @@ use crate::{
     comm::{
         micromouse_manager::{MicromouseEvent, MicromouseManagerError},
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
-    },
-    map::map::{CellDiscovery, WallDiscovery},
-    strategy::strategies::strategy_type::StrategyType,
-    utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty},
+    }, map::map::{CellDiscovery, WallDiscovery}, strategy::{dyn_strategy_tree::StrategyChangeCommand, strategy_tree::StrategyTreeError}, utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty}
 };
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -32,25 +29,26 @@ pub struct DiscoveryMessage {
 #[derive(Serialize, Debug)]
 pub enum FrontendMessage {
     MicromouseEvent(MicromouseEvent),
-    MicromouseManagerError(MicromouseManagerError),
+    StrategyTreeError(StrategyTreeError),
     Debug(String),
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub enum FrontendResponse {
-    NewStrategy { strategy_type: StrategyType },
-    // New Strategy will set the next strategy to be used after the execution finishes
-    // It will not be applied until the whole execution (to goal + back to 0,0) is finished or
-    // cancel is sent (which will create a new strategy tree with this strategy after the old tree
-    // finished execution)
-    ResetAll, // Resetting Position, the strategy tree (from the point highest point that was
-    // not already sent)
-    Pause,  // Stop sending commands, but be prepared to continue
-    Cancel, // Cancel current execution (from the first non-sent branches onward, then apply the
-    // current strategy from there on) --> Delete all the non-sent layers of the strategy tree;
-    // After processing the last layer of the tree (the last sent commands) --> Take the world at
-    // that step as the basis of a new strategy tree and start from there on
-    Continue, // Continue the current strategy
+pub enum FrontendResponse<const N: usize> {
+    StrategyChange(StrategyChangeCommand<N>),
+    // NewStrategy { strategy_type: StrategyType },
+    // // New Strategy will set the next strategy to be used after the execution finishes
+    // // It will not be applied until the whole execution (to goal + back to 0,0) is finished or
+    // // cancel is sent (which will create a new strategy tree with this strategy after the old tree
+    // // finished execution)
+    // ResetAll, // Resetting Position, the strategy tree (from the point highest point that was
+    // // not already sent)
+    // Pause,  // Stop sending commands, but be prepared to continue
+    // Cancel, // Cancel current execution (from the first non-sent branches onward, then apply the
+    // // current strategy from there on) --> Delete all the non-sent layers of the strategy tree;
+    // // After processing the last layer of the tree (the last sent commands) --> Take the world at
+    // // that step as the basis of a new strategy tree and start from there on
+    // Continue, // Continue the current strategy
 }
 
 #[derive(Serialize)]

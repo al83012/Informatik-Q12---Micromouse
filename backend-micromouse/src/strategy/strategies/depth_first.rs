@@ -1,5 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     comm::micromouse_message::{MovementType, TransformedMovement},
     map::{
@@ -17,7 +19,7 @@ use crate::{
     utils::{nonempty::NonEmpty, path::Path},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct DepthFirstConfig {
     pub forward_first: bool,
 }

@@ -1,5 +1,6 @@
 use std::sync::mpsc;
 
+use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::{
@@ -42,6 +43,7 @@ pub struct DynStrategyTreeManager<const N: usize> {
     current_world: WorldData<N>,
 }
 
+#[derive(Deserialize, Clone, Debug)]
 pub enum DynStrategyConfig<const N: usize> {
     DepthFirst(<DepthFirst<N> as FromConfig<N>>::Config),
     BreadthFirst(<BreadthFirst<N> as FromConfig<N>>::Config),
@@ -51,6 +53,7 @@ pub enum DynStrategyConfig<const N: usize> {
     DbgKnownPath(<DbgKnownPath<N> as FromConfig<N>>::Config),
 }
 
+#[derive(Deserialize, Clone, Debug)]
 pub struct StrategyChangeCommand<const N: usize> {
     set_postion: Option<Position>,
     reset_map: bool,
@@ -96,7 +99,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         ])
     }
 
-    fn set_starting_cond<S: Strategy<N>>(
+    fn set_starting_cond(
         &mut self,
         starting_condition: StrategyStart<N>,
         tree_config: DynStrategyConfig<N>,

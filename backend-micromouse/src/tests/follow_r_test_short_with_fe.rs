@@ -139,7 +139,7 @@ pub fn follow_r() {
                             }
                         }
                         Err(e) => {
-                            frontend_manager.send(FrontendMessage::MicromouseManagerError(e.clone())).await;
+                            frontend_manager.send(FrontendMessage::MicromouseEvent(MicromouseEvent::Error(e.clone()))).await;
                             panic!("ERROR: {e:?}")
                         }
                     }

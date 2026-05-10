@@ -5,6 +5,7 @@ use std::{
     ops::{Add, Sub},
 };
 
+use serde::Serialize;
 use tracing::{debug, instrument};
 use tracing_subscriber::Layer;
 
@@ -27,7 +28,7 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize)]
 pub enum StrategyTreeError {
     WhilePruning(PruneError),
     WhileExpanding(TreeExpansionError),
@@ -67,11 +68,11 @@ pub struct SentTreeLayer<const N: usize> {
 }
 
 // Always counting up
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
 pub struct AbsoluteLayerId(pub usize);
 
 // The lowest layer of a tree has id 0
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
 pub struct RelativeLayerId(pub usize);
 //
 // pub enum StrategyTreeError {
@@ -111,7 +112,7 @@ pub struct NodeAction<const N: usize> {
     pub potential_outcomes: HashMap<PathLocalOutcomeId, AbsoluteNodeId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum NodeExpansionResult {
     NotExpandable,
     NotYetExpandable,
@@ -120,7 +121,7 @@ pub enum NodeExpansionResult {
     Expanded(usize),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TreeExpansionError {
     node: AbsoluteNodeId,
     expansion: NodeExpansionResult,
@@ -141,7 +142,7 @@ pub enum StrategyStart<const N: usize> {
     DirectlyAtState(WorldData<N>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum TreeCreationError {
     StrategyError(StrategyEndState),
     ExpansionError(TreeExpansionError),
@@ -1077,7 +1078,7 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum PruneError {
     UnknownNode(AbsoluteNodeId),
     CannotDeleteRoot(AbsoluteNodeId),
@@ -1085,7 +1086,7 @@ pub enum PruneError {
     SourceDoesNotHaveThisChild(AbsolutePathId),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct AbsoluteNodeId {
     layer_id: AbsoluteLayerId,
     node_id: RelativeNodeId,
@@ -1100,7 +1101,7 @@ impl AbsoluteNodeId {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct AbsolutePathId {
     pub from_node: AbsoluteNodeId,
     pub branch: PathLocalOutcomeId,
@@ -1123,7 +1124,7 @@ impl From<TreeCreationError> for StrategyTreeError {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize)]
 pub struct RelativeNodeId(pub usize);
 
 pub struct SentUnfinishedCommands<const N: usize> {
@@ -1253,6 +1254,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
 #[derive(Default)]
 pub struct RelativeNodeIdCounter(pub usize);
 
+#[derive(Debug, Clone, Serialize)]
 pub enum FinishRootError {
     NoSuccessor,
     MultipleSuccessors(HashMap<PathLocalOutcomeId, AbsoluteNodeId>),

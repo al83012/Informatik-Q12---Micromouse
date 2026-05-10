@@ -1,10 +1,12 @@
 
+use serde::{Deserialize, Serialize};
+
 use crate::strategy::strategy::{FromConfig, Strategy};
 
 #[derive(Clone, Debug)]
 pub struct FloodFill<const N: usize>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FloodFillConfig;
 
 impl<const N: usize> FromConfig<N> for FloodFill<N> {

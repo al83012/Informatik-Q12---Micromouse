@@ -1,10 +1,12 @@
 
+use serde::{Deserialize, Serialize};
+
 use crate::strategy::strategy::{FromConfig, Strategy};
 
 #[derive(Clone, Debug)]
 pub struct FollowWall<const N: usize>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FollowWallConfig;
 
 impl<const N: usize> FromConfig<N> for FollowWall<N> {

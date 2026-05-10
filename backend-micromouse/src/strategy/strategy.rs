@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{
     comm::micromouse_message::Command,
     map::{map::PartialMap, world_data::{PartialWorldData, WorldData}},
@@ -5,7 +7,7 @@ use crate::{
     utils::nonempty::NonEmpty,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub enum StrategyEndState {
     NoPossibleAction(String),
     ReachedGoal
@@ -28,8 +30,11 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
     pub after_command: Command,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize)]
 pub struct GoalPosition(pub Position);
+
+
+
 pub trait FromConfig<const N: usize> {
     type Config: std::fmt::Debug;
     fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self;

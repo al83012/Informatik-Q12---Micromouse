@@ -1,9 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 use crate::strategy::strategy::{FromConfig, Strategy};
 
 #[derive(Clone, Debug)]
 pub struct BreadthFirst<const N: usize>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct BreadthFirstConfig;
 
 impl<const N: usize> FromConfig<N> for BreadthFirst<N> {

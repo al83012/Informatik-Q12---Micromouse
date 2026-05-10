@@ -15,12 +15,7 @@ pub struct Process<const N: usize> {
 }
 
 impl<const N: usize> Process<N> {
-    #[instrument(
-        name = "new Process",
-        fields(
-            description = "Create the main process"
-        )
-    )]
+    #[instrument(name = "new Process", fields(description = "Create the main process"))]
     pub async fn new() -> Self {
         todo!("Create the connections")
     }
@@ -28,9 +23,7 @@ impl<const N: usize> Process<N> {
     #[instrument(
         skip_all,
         name = "run",
-        fields(
-            description = "Execute the main process"
-        )
+        fields(description = "Execute the main process")
     )]
     pub async fn run(mut self) {
         loop {
@@ -60,12 +53,14 @@ impl<const N: usize> Process<N> {
     #[instrument(
         skip(self),
         name = "handle_micromouse_error",
-        fields(
-            description = "Handle micromouse error and maybe propagate it"
-        )
+        fields(description = "Handle micromouse error and maybe propagate it")
     )]
     pub async fn handle_micromouse_error(&mut self, micromouse_error: MicromouseManagerError) {
-        self.frontend_manager.send(FrontendMessage::MicromouseManagerError(micromouse_error)).await;
+        self.frontend_manager
+            .send(FrontendMessage::MicromouseEvent(MicromouseEvent::Error(
+                micromouse_error,
+            )))
+            .await;
         todo!("Send the error to the frontend and maybe handle it internally");
     }
 
@@ -77,19 +72,18 @@ impl<const N: usize> Process<N> {
         )
     )]
     pub async fn handle_micromouse_event(&mut self, micromouse_event: MicromouseEvent) {
-        self.frontend_manager.send(FrontendMessage::MicromouseEvent(micromouse_event)).await;
+        self.frontend_manager
+            .send(FrontendMessage::MicromouseEvent(micromouse_event))
+            .await;
         todo!("Send the event to the frontend and if it modifies the strategy_tree, also do that and send the necessary events for that (to the frontend and to the micromouse)")
     }
 
     #[instrument(
         skip(self),
         name = "handle_frontend_command",
-        fields(
-            description = "Handle a new command / strategy change etc. sent from the frontend"
-        )
+        fields(description = "Handle a new command / strategy change etc. sent from the frontend")
     )]
-    pub async fn handle_frontend_command(&mut self, frontend_command: FrontendResponse) {
-
+    pub async fn handle_frontend_command(&mut self, frontend_command: FrontendResponse<N>) {
         todo!("Modify the strategy_tree or send the appropriate commands to the Micromouse")
     }
 }
