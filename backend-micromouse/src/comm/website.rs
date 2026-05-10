@@ -17,7 +17,10 @@ use crate::{
     comm::{
         micromouse_manager::{MicromouseEvent, MicromouseManagerError},
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
-    }, map::map::{CellDiscovery, WallDiscovery}, strategy::{dyn_strategy_tree::StrategyChangeCommand, strategy_tree::StrategyTreeError}, utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty}
+    },
+    map::map::{CellDiscovery, WallDiscovery},
+    strategy::{dyn_strategy_tree::StrategyChangeCommand, strategy_tree::StrategyTreeError},
+    utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty},
 };
 
 #[derive(Clone, Hash, PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -36,19 +39,9 @@ pub enum FrontendMessage {
 #[derive(Clone, Debug, Deserialize)]
 pub enum FrontendResponse<const N: usize> {
     StrategyChange(StrategyChangeCommand<N>),
-    // NewStrategy { strategy_type: StrategyType },
-    // // New Strategy will set the next strategy to be used after the execution finishes
-    // // It will not be applied until the whole execution (to goal + back to 0,0) is finished or
-    // // cancel is sent (which will create a new strategy tree with this strategy after the old tree
-    // // finished execution)
-    // ResetAll, // Resetting Position, the strategy tree (from the point highest point that was
-    // // not already sent)
-    // Pause,  // Stop sending commands, but be prepared to continue
-    // Cancel, // Cancel current execution (from the first non-sent branches onward, then apply the
-    // // current strategy from there on) --> Delete all the non-sent layers of the strategy tree;
-    // // After processing the last layer of the tree (the last sent commands) --> Take the world at
-    // // that step as the basis of a new strategy tree and start from there on
-    // Continue, // Continue the current strategy
+    Pause,
+    Cancel,
+    Continue, 
 }
 
 #[derive(Serialize)]
@@ -67,9 +60,9 @@ impl PotentiallyNonEmpty for DiscoveryMessage {
     }
 }
 
-pub struct FrontendConnectionManagerInternal {
+pub struct FrontendConnectionManagerInternal<const N: usize> {
     send_queue: Receiver<FrontendMessage>,
-    read_queue: Sender<FrontendResponse>,
+    read_queue: Sender<FrontendResponse<N>>,
     first_element_send_time: Option<Instant>,
     batching_duration: Duration,
     cancellation_token: CancellationToken,
@@ -77,10 +70,10 @@ pub struct FrontendConnectionManagerInternal {
     send_batch: Vec<FrontendMessage>,
 }
 
-pub struct FrontendManager {
+pub struct FrontendManager<const N: usize> {
     cancellation_token: CancellationToken,
     send_queue: Sender<FrontendMessage>,
-    read_queue: Receiver<FrontendResponse>,
+    read_queue: Receiver<FrontendResponse<N>>,
 }
 
 #[derive(Default, Debug)]
@@ -91,7 +84,7 @@ pub struct FrontendConnectionConfig {
 
 // pub struct
 
-impl FrontendManager {
+impl<const N: usize> FrontendManager<N> {
     #[instrument(name = "new FrontendManager")]
     pub async fn new(
         port: u16,
@@ -135,7 +128,7 @@ impl FrontendManager {
     }
 }
 
-impl FrontendConnectionManagerInternal {
+impl<const N: usize> FrontendConnectionManagerInternal<N> {
     #[instrument(name = "frontend_handle_conn_loop", skip(self))]
     pub async fn handle_connection_loop(&mut self) {
         loop {
@@ -251,20 +244,20 @@ impl FrontendConnectionManagerInternal {
     }
 }
 
-impl Drop for FrontendManager {
+impl<const N: usize> Drop for FrontendManager<N> {
     fn drop(&mut self) {
         info!(target: "comm/webs", "DROPPED FRONTEND MANAGER");
         self.cancellation_token.cancel();
     }
 }
 
-impl FrontendManager {
+impl<const N: usize> FrontendManager<N> {
     #[instrument(
         name = "next_read",
         fields(description = "Read next frontend response"),
         skip(self)
     )]
-    pub async fn next_read(&mut self) -> FrontendResponse {
+    pub async fn next_read(&mut self) -> FrontendResponse<N> {
         let msg = self
             .read_queue
             .recv()

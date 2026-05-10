@@ -10,7 +10,7 @@ use crate::{
 
 pub struct Process<const N: usize> {
     micromouse_manager: MicromouseManager<N>,
-    frontend_manager: FrontendManager,
+    frontend_manager: FrontendManager<N>,
     // strategy_tree: DynamicStrategyTree<N>
 }
 

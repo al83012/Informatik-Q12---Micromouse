@@ -56,7 +56,7 @@ pub fn follow_r() {
             .await
             .expect("MICROMOUSE CONN ERR");
 
-        let mut frontend_manager = FrontendManager::new(8090, FrontendConnectionConfig{
+        let mut frontend_manager = FrontendManager::<TEST_MAP_SIZE>::new(8090, FrontendConnectionConfig{
             batching_duration: Duration::from_millis(50),
             ws_channel_config: WsChannelConfig::default(),
         }).await.expect("FRONTEND CONN ERR");

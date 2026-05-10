@@ -13,7 +13,7 @@ fn test_simple_conn() {
     info!(target: "test/webs", "Attempting simple connection");
     rt.block_on(async {
         info!(target: "test/webs", "Pre Manager Creation");
-        let mut frontend_manager = FrontendManager::new(8090, FrontendConnectionConfig::default())
+        let mut frontend_manager = FrontendManager::<10>::new(8090, FrontendConnectionConfig::default())
             .await
             .expect("Error on create");
         info!(target: "test/webs", "Post Manager Creation");
