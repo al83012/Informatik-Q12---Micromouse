@@ -286,6 +286,23 @@ impl<const N: usize> PartialWorldData<N> {
     }
 
     #[instrument(
+        name = "only_pos",
+        fields(
+            description = "Strips the map of all information (besides the pos being visited)"
+        )
+    )]
+    pub fn only_pos(
+        &self
+    ) -> Self {
+
+        let mut default_map = Map::default();
+
+        *default_map.cell_mut(&self.mouse.pos).expect("Pos should be valid") = map::CellDiscoveryStatus::Visited;
+
+        Self(WorldData { map: default_map, mouse: self.mouse })
+    }
+
+    #[instrument(
         name = "new PartialMap",
         fields(
             description = "Create new PartialMap"

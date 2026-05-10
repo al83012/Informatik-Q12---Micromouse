@@ -18,7 +18,8 @@ use crate::{
         world_data::{PartialWorldData, WorldData},
     },
     strategy::strategy::{
-        ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult, StrategyEndState
+        ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult,
+        StrategyEndState,
     },
     utils::{
         hyperlink_logging::LinkFileName,
@@ -131,7 +132,10 @@ pub struct TreeExpansionSuccess {
 }
 
 pub enum StrategyStart<const N: usize> {
-    ContinueAfterDoing(SentUnfinishedCommands<N>),
+    ContinueAfterDoing {
+        after_cmds: SentUnfinishedCommands<N>,
+        reset_world: bool,
+    },
     // Will create a root node from this world and the strategy-initializer
     DirectlyAtState(WorldData<N>),
 }
@@ -142,9 +146,12 @@ pub enum TreeCreationError {
     RootNotExpanded,
 }
 
-pub struct TreeCreationSuccess<const N: usize, S: Strategy<N> + Clone + std::fmt::Debug + FromConfig<N>> {
-    tree: StrategyTree<N, S>,
-    origin_command: Option<Command>,
+pub struct TreeCreationSuccess<
+    const N: usize,
+    S: Strategy<N> + Clone + std::fmt::Debug + FromConfig<N>,
+> {
+    pub tree: StrategyTree<N, S>,
+    pub origin_command: Option<Command>,
 }
 
 impl From<TreeExpansionError> for TreeCreationError {
@@ -171,13 +178,17 @@ where
         ),
         skip(starting_condition)
     )]
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(
         starting_condition: StrategyStart<N>,
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
     ) -> Result<TreeCreationSuccess<N, S>, TreeCreationError> {
         match starting_condition {
-            StrategyStart::ContinueAfterDoing(sent_unfinished_commands) => {
+            StrategyStart::ContinueAfterDoing {
+                after_cmds: sent_unfinished_commands,
+                reset_world,
+            } => {
                 let num_of_unfinished_cmds = sent_unfinished_commands.layers.len();
                 let node_count = sent_unfinished_commands
                     .layers
@@ -197,27 +208,38 @@ where
 
                 let last_layer = transformed_layers.last_mut().expect("layers are nonempty");
 
+                // WARN:
+                // The last layer contained in the sent unfinished commands is a layer, which was
+                // not yet sent, but is the expansion of the last sent layer; This means, that this
+                // is the grafting point
                 last_layer.nodes.iter_mut().for_each(|(_n, val)| {
+                    let world = if reset_world {
+                        &val.on_basis_of_world.only_pos()
+                    } else {
+                        &val.on_basis_of_world
+                    };
                     val.applied_strategy = None;
                     val.on_basis_of_state = Some(S::from_config(
                         &tree_config.strategy_config,
-                        &val.on_basis_of_world,
+                        world
                     ));
                 });
 
                 // let highest_sent_layer = last_layer.absolute_layer_id;
 
+                let tree = Self {
+                    config: tree_config,
+                    layers: transformed_layers,
+                    highest_sent_layer: num_of_unfinished_cmds - 1,
+                    highest_eq_layer: num_of_unfinished_cmds - 1,
+                    highest_full_layer: num_of_unfinished_cmds - 1,
+                    first_layer_absolute_id,
+                    node_count,
+                    goal_position,
+                };
+
                 Ok(TreeCreationSuccess {
-                    tree: Self {
-                        config: tree_config,
-                        layers: transformed_layers,
-                        highest_sent_layer: num_of_unfinished_cmds - 1,
-                        highest_eq_layer: num_of_unfinished_cmds - 1,
-                        highest_full_layer: num_of_unfinished_cmds - 1,
-                        first_layer_absolute_id,
-                        node_count,
-                        goal_position,
-                    },
+                    tree,
                     origin_command: None,
                 })
             }
@@ -450,6 +472,8 @@ where
                         from_node: parent_node,
                         branch: child_path_id,
                     };
+                    // let child_world = if
+                    // TODO: maybe reset child_world
                     let child_node = StrategyTreeNode::new_leaf(
                         child_world.clone(),
                         strategy_state_after.clone(),
@@ -846,11 +870,27 @@ where
         skip(self)
     )]
     fn new_sends(&mut self) -> Vec<Command> {
-        if self.highest_sent_layer < self.highest_eq_layer {
-            return self.layers[self.highest_sent_layer + 1..=self.highest_eq_layer]
+        let highest_full_layer = self.highest_full_layer;
+        if highest_full_layer == 0 {
+            //INFO: Cannot send layer --> Though the command of layer 0 could be known,
+            return vec![];
+        }
+
+        // INFO:
+        // The next layer needs to be full:
+        // This is because the tree may close down, in which case the grafting points are the
+        // branches going out from the last sent layer; after removing the strategy (or in
+        // generally), we have no way of expanding them just in time, which means, that we must
+        // constrain the send here
+        let highest_sendable_layer = self.highest_eq_layer.min(highest_full_layer - 1);
+
+        if self.highest_sent_layer < highest_sendable_layer {
+            let l = self.layers[self.highest_sent_layer + 1..=highest_sendable_layer]
                 .iter()
                 .map(|l| l.eq.as_ref().expect("Explicitly should exist").clone())
                 .collect();
+            self.highest_sent_layer = highest_sendable_layer;
+            return l;
         }
         vec![]
     }
@@ -1006,9 +1046,14 @@ where
     )]
     pub fn close(self) -> Option<SentUnfinishedCommands<N>> {
         let highest_sent_layer = self.highest_sent_layer;
+
+        //INFO: We also need to include the last layer which was not yet sent, but was expanded
+        //from the last sent layer; it is our grafting-point
+        let highest_sent_layer_and_exp = highest_sent_layer + 1;
+
         let mut layers = vec![];
         let mut inner_layers = self.layers;
-        for _i in 0..=highest_sent_layer {
+        for _i in 0..=highest_sent_layer_and_exp {
             // Remove the lowest layer
             let layer = inner_layers.remove(0);
 
@@ -1179,11 +1224,12 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         if self.eq.is_some() {
             return true;
         }
-        if self.is_fully_expanded {
-            self.eq = self.equal_command();
-            if self.eq.is_some() {
-                return true;
-            }
+        if !self.is_fully_expanded {
+            return false;
+        }
+        self.eq = self.equal_command();
+        if self.eq.is_some() {
+            return true;
         }
         false
     }

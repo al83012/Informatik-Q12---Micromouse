@@ -22,7 +22,7 @@ pub struct DepthFirstConfig {
     pub forward_first: bool,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DepthFirst<const N: usize> {
     intersection_stack: Vec<Position>,
     task_directions: HashMap<Position, ClumpedDFTask>,

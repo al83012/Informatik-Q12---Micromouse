@@ -1,12 +1,19 @@
-use crate::strategy::{
-    strategies::{
-        breadth_first::BreadthFirst, depth_first::DepthFirst, flood_fill::FloodFill,
-        follow_wall::FollowWall, random_move::RandomMove,
-    },
-    strategy::{FromConfig, GoalPosition, Strategy},
-    strategy_tree::{
-        StrategyStart, StrategyTree, StrategyTreeConfig, TreeCreationError, TreeCreationSuccess,
-    },
+use std::sync::mpsc;
+
+use tokio::sync::broadcast::{Receiver, Sender};
+
+use crate::{
+    comm::micromouse_message::Command, map::world_data::WorldData, strategy::{
+        strategies::{
+            breadth_first::BreadthFirst, dbg_known_path::DbgKnownPath, depth_first::DepthFirst,
+            flood_fill::FloodFill, follow_wall::FollowWall, random_move::RandomMove,
+        },
+        strategy::{FromConfig, GoalPosition, Strategy},
+        strategy_tree::{
+            SentUnfinishedCommands, StrategyStart, StrategyTree, StrategyTreeConfig,
+            TreeCreationError, TreeCreationSuccess,
+        },
+    }, transform::position::Position
 };
 
 pub enum DynStrategyTree<const N: usize> {
@@ -15,22 +22,142 @@ pub enum DynStrategyTree<const N: usize> {
     FollowWall(StrategyTree<N, FollowWall<N>>),
     FloodFill(StrategyTree<N, FloodFill<N>>),
     RandomMove(StrategyTree<N, RandomMove<N>>),
+    DbgKnownPath(StrategyTree<N, DbgKnownPath<N>>),
+    /// Value used to move out of self temporarily; Immediately panic if it ever comes up in
+    /// "common" use
+    Closed,
 }
 
-pub enum DynStrategyTreeConfig<const N: usize> {
+pub struct DynStrategyTreeManager<const N: usize> {
+    strategy_tree: DynStrategyTree<N>,
+    command_sender: Sender<Command>,
+    command_receiver: Receiver<Command>,
+
+    // We are separately storing the current world in order to be able to plug it into the
+    // StartingState if necessary; The strategy tree itself only stores the world where interrupts
+    // could interact with execution
+    current_world: WorldData<N>,
+}
+
+pub enum DynStrategyConfig<const N: usize> {
     DepthFirst(<DepthFirst<N> as FromConfig<N>>::Config),
     BreadthFirst(<BreadthFirst<N> as FromConfig<N>>::Config),
     FollowWall(<FollowWall<N> as FromConfig<N>>::Config),
     FloodFill(<FloodFill<N> as FromConfig<N>>::Config),
     RandomMove(<RandomMove<N> as FromConfig<N>>::Config),
+    DbgKnownPath(<DbgKnownPath<N> as FromConfig<N>>::Config),
 }
 
+pub struct StrategyChangeCommand<const N: usize> {
+    set_postion: Option<Position>,
+    reset_map: bool,
+    set_strategy: Option<DynStrategyConfig<N>>,
+    set_goal: Option<GoalPosition>,
+}
 
-impl<const N: usize> DynStrategyTree<N> {
+impl<const N: usize> DynStrategyTreeManager<N> {
     pub fn new(
         starting_condition: StrategyStart<N>,
-        tree_config: DynStrategyTreeConfig<N>,
-        goal_position: GoalPosition) -> Self {
+        strategy_config: DynStrategyConfig<N>,
+        goal_position: GoalPosition,
+    ) -> Self {
+        todo!()
+    }
+
+    /// Is unsafe as it leaves self in the improper "Closed"-State
+    unsafe fn erase_strat(&mut self) -> Option<SentUnfinishedCommands<N>> {
+        macro_rules! erase_strat {
+            ([$($variant:ident),+]) => {
+                {
+                    let mut current_val = DynStrategyTree::<N>::Closed;
+                    std::mem::swap(&mut self.strategy_tree, &mut current_val);
+                    match current_val {
+                        $(
+                            DynStrategyTree::<N>::$variant(val) => {
+                                val.close()
+                            }
+                        )*
+                        DynStrategyTree::<N>::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable")
+                    }
+                }
+            };
+        }
+
+        erase_strat!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ])
+    }
+
+    fn set_starting_cond<S: Strategy<N>>(
+        &mut self,
+        starting_condition: StrategyStart<N>,
+        tree_config: DynStrategyConfig<N>,
+        goal_position: GoalPosition,
+        desired_depth: usize,
+        max_nodes: usize,
+    ) -> Result<(), TreeCreationError> {
+        macro_rules! new_tree {
+            ([$($variant:ident),+]) => {
+                match tree_config {
+                    $(DynStrategyConfig::$variant(val) => {
+                        let strat_conf = StrategyTreeConfig{
+                            strategy_config: val,
+                            desired_depth,
+                            max_nodes
+                        };
+                        let tree = StrategyTree::new(starting_condition, strat_conf, goal_position)?;
+                        let TreeCreationSuccess{tree, origin_command} = tree;
+                        (DynStrategyTree::<N>::$variant(tree), origin_command)
+                    })+
+                }
+            };
+        }
+
+        let (new_tree, cmd) = new_tree!(
+            [
+                DepthFirst,
+                BreadthFirst,
+                FollowWall,
+                FloodFill,
+                RandomMove,
+                DbgKnownPath
+            ]
+        );
+
+        self.strategy_tree = new_tree;
+
+        if let Some(cmd) = cmd {
+            self.send_cmd(cmd);
+        }
+
+        Ok(())
+    }
+
+
+    fn send_cmd(&mut self, cmd: Command) {
+        self.command_sender.send(cmd).expect("Channel should not be closed");
+    }
+
+    pub fn modify(&mut self, change: StrategyChangeCommand<N>) {
+        let StrategyChangeCommand {
+            set_postion,
+            reset_map,
+            set_strategy,
+            set_goal,
+        } = change;
+
+        if reset_map {
+            // Still need to take over the sent cmds and the end world of those is the new pos
+        } else {
+            // Just need to generate a new strategy tree
+            // let goal = set_goal.unwrap_or(self.strategy_tree.goal());
+        }
+
         todo!()
     }
 }
