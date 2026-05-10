@@ -92,7 +92,7 @@ A Restart was triggered; It should have been manually ensured, that the micromou
 ### Strategy Config
 `<STRATEGY_CONFIG>` = 
 ```json
-    { "<CONFIG_NAME" : <CONFIG> }
+    { <CONFIG_NAME> : <CONFIG> }
 ```
 
 #### DepthFirst
