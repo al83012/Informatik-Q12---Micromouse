@@ -34,6 +34,7 @@ pub enum FrontendMessage {
     MicromouseEvent(MicromouseEvent),
     StrategyTreeError(StrategyTreeError),
     Debug(String),
+    ConfirmLastChange,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
