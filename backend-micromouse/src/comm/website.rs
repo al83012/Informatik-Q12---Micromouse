@@ -36,12 +36,11 @@ pub enum FrontendMessage {
     Debug(String),
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub enum FrontendResponse<const N: usize> {
     StrategyChange(StrategyChangeCommand<N>),
     Pause,
-    Cancel,
-    Continue, 
+    Continue,
 }
 
 #[derive(Serialize)]
@@ -192,6 +191,10 @@ impl<const N: usize> FrontendConnectionManagerInternal<N> {
             future::pending().await
         }
     }
+    pub fn parse_msg(msg: &str) -> serde_json::Result<FrontendResponse<N>> {
+        serde_json::de::from_str(msg)
+    }
+
     #[instrument(
         name = "propagate_read",
         fields(description = "Parse the message and add it to the read-queue"),
@@ -200,13 +203,15 @@ impl<const N: usize> FrontendConnectionManagerInternal<N> {
     pub async fn propagate_read(&self, msg: Option<Message>) {
         // Parses and sends to the ConnectionHandler
         let Some(msg) = msg else {
+            error!(target: "comm/webs", "Propagating empty msg");
             return;
         };
         let Message::Text(msg) = msg else {
+            info!(target: "comm/webs", "Non-Text-Msg");
             return;
         };
 
-        let Ok(parsed) = serde_json::de::from_str(msg.to_string().as_str()) else {
+        let Ok(parsed) = Self::parse_msg(msg.to_string().as_str()) else {
             error!(target: "comm/webs", "Invalid message: {msg}");
             return;
         };

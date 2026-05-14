@@ -19,7 +19,7 @@ use crate::{
     utils::{nonempty::NonEmpty, path::Path},
 };
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct DepthFirstConfig {
     pub forward_first: bool,
 }

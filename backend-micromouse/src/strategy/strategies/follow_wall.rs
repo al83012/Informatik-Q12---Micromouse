@@ -6,7 +6,7 @@ use crate::strategy::strategy::{FromConfig, Strategy};
 #[derive(Clone, Debug)]
 pub struct FollowWall<const N: usize>;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct FollowWallConfig;
 
 impl<const N: usize> FromConfig<N> for FollowWall<N> {

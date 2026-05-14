@@ -30,7 +30,7 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
     pub after_command: Command,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 pub struct GoalPosition(pub Position);
 
 

@@ -41,6 +41,18 @@ impl<const N: usize> WorldData<N> {
         name = "apply_measurement",
         fields(description = "Apply measurement to world")
     )]
+    pub fn only_pos(&self) -> Self {
+        let mut default_map = Map::default();
+
+        *default_map
+            .cell_mut(&self.mouse.pos)
+            .expect("Pos should be valid") = map::CellDiscoveryStatus::Visited;
+
+        WorldData {
+            map: default_map,
+            mouse: self.mouse,
+        }
+    }
     pub fn apply_measurement(
         &mut self,
         measurement: &Measurement,
@@ -287,27 +299,22 @@ impl<const N: usize> PartialWorldData<N> {
 
     #[instrument(
         name = "only_pos",
-        fields(
-            description = "Strips the map of all information (besides the pos being visited)"
-        )
+        fields(description = "Strips the map of all information (besides the pos being visited)")
     )]
-    pub fn only_pos(
-        &self
-    ) -> Self {
-
+    pub fn only_pos(&self) -> Self {
         let mut default_map = Map::default();
 
-        *default_map.cell_mut(&self.mouse.pos).expect("Pos should be valid") = map::CellDiscoveryStatus::Visited;
+        *default_map
+            .cell_mut(&self.mouse.pos)
+            .expect("Pos should be valid") = map::CellDiscoveryStatus::Visited;
 
-        Self(WorldData { map: default_map, mouse: self.mouse })
+        Self(WorldData {
+            map: default_map,
+            mouse: self.mouse,
+        })
     }
 
-    #[instrument(
-        name = "new PartialMap",
-        fields(
-            description = "Create new PartialMap"
-        )
-    )]
+    #[instrument(name = "new PartialMap", fields(description = "Create new PartialMap"))]
     pub fn new(partial_map: PartialMap<N>, mouse_transform: MouseTransform) -> Self {
         Self(WorldData {
             map: partial_map.0,
@@ -325,7 +332,6 @@ impl<const N: usize> Default for PartialWorldData<N> {
         Self(WorldData::default())
     }
 }
-
 
 #[derive(Debug)]
 pub struct CommandExecution<const N: usize> {
@@ -364,9 +370,7 @@ impl<const N: usize> CommandExecution<N> {
 
     #[instrument(
         name = "next",
-        fields(
-            description = "Trying to do next step of command"
-        )
+        fields(description = "Trying to do next step of command")
     )]
     pub fn next(mut self) -> CommandStepResult<N> {
         let max_steps = self.command.ty.max_step_count();

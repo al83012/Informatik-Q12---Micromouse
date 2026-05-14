@@ -12,13 +12,14 @@ use crate::{
     },
     tests::TEST_MAP_SIZE,
     transform::direction::RelativeDirection,
-    utils::logging::{init_logging, run_test},
+    utils::{hyperlink_logging::init_tree_logger, logging::{init_logging, run_test}},
 };
 
 #[ignore]
 #[test]
 pub fn follow_r_and_conn() {
-    let guards = init_logging();
+    // let guards = init_logging();
+    init_tree_logger();
     info!(target: "comm/msg_log", "****************************************************************************************");
     // run_test("trace", || {
     let rt = tokio::runtime::Runtime::new().unwrap();

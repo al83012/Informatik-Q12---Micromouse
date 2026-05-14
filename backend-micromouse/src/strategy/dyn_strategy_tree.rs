@@ -17,7 +17,7 @@ use crate::{
             StrategyTreeError, TreeCreationError, TreeCreationSuccess,
         },
     },
-    transform::position::Position,
+    transform::position::{MouseTransform, Position},
 };
 
 pub enum DynStrategyTree<const N: usize> {
@@ -41,9 +41,15 @@ pub struct DynStrategyTreeManager<const N: usize> {
     // StartingState if necessary; The strategy tree itself only stores the world where interrupts
     // could interact with execution
     current_world: WorldData<N>,
+
+    goal_pos: GoalPosition,
+    strat_config: DynStrategyConfig<N>,
+
+    desired_depth: usize,
+    max_nodes: usize,
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub enum DynStrategyConfig<const N: usize> {
     DepthFirst(<DepthFirst<N> as FromConfig<N>>::Config),
     BreadthFirst(<BreadthFirst<N> as FromConfig<N>>::Config),
@@ -53,12 +59,12 @@ pub enum DynStrategyConfig<const N: usize> {
     DbgKnownPath(<DbgKnownPath<N> as FromConfig<N>>::Config),
 }
 
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Deserialize, Clone, Debug, PartialEq)]
 pub struct StrategyChangeCommand<const N: usize> {
-    set_postion: Option<Position>,
-    reset_map: bool,
-    set_strategy: Option<DynStrategyConfig<N>>,
-    set_goal: Option<GoalPosition>,
+    pub set_postion: Option<MouseTransform>,
+    pub reset_map: bool,
+    pub set_strategy: Option<DynStrategyConfig<N>>,
+    pub set_goal: Option<GoalPosition>,
 }
 
 impl<const N: usize> DynStrategyTreeManager<N> {
@@ -148,7 +154,9 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             .expect("Channel should not be closed");
     }
 
-    pub fn modify(&mut self, change: StrategyChangeCommand<N>) {
+    // pub fn apply_measurement(&mut self)
+
+    pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<(), StrategyTreeError> {
         let StrategyChangeCommand {
             set_postion,
             reset_map,
@@ -156,13 +164,36 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             set_goal,
         } = change;
 
+        let current_mouse = set_postion.unwrap_or(self.current_world.mouse);
+
+        self.goal_pos = set_goal.unwrap_or(self.goal_pos);
+
+        let erased = unsafe { self.erase_strat() };
+
         if reset_map {
+            self.current_world.mouse = current_mouse;
+            self.current_world = self.current_world.only_pos();
             // Still need to take over the sent cmds and the end world of those is the new pos
         } else {
-            // Just need to generate a new strategy tree
-            // let goal = set_goal.unwrap_or(self.strategy_tree.goal());
+            // self.current_world = self.current_world;
         }
+        let strategy_start = if let Some(erased) = erased {
+            StrategyStart::ContinueAfterDoing {
+                after_cmds: erased,
+                reset_world: reset_map,
+            }
+        } else {
+            StrategyStart::DirectlyAtState(self.current_world.clone())
+        };
 
-        todo!()
+        self.strat_config = set_strategy.clone().unwrap_or(self.strat_config.clone());
+
+        self.set_starting_cond(
+            strategy_start,
+            self.strat_config.clone(),
+            self.goal_pos,
+            self.desired_depth,
+            self.max_nodes,
+        )
     }
 }

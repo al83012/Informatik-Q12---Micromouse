@@ -5,7 +5,7 @@ use crate::strategy::strategy::{FromConfig, Strategy};
 #[derive(Clone, Debug)]
 pub struct BreadthFirst<const N: usize>;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct BreadthFirstConfig;
 
 impl<const N: usize> FromConfig<N> for BreadthFirst<N> {

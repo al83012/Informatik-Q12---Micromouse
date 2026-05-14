@@ -17,6 +17,7 @@ mod shortcircuit_discovery;
 pub mod follow_r_test;
 pub mod follow_r_test_short;
 pub mod micromouse_simulator;
+mod frontend_msg_parsing;
 mod conn_website;
 mod spans;
 mod path;

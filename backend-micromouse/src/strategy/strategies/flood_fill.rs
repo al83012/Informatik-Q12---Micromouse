@@ -6,7 +6,7 @@ use crate::strategy::strategy::{FromConfig, Strategy};
 #[derive(Clone, Debug)]
 pub struct FloodFill<const N: usize>;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct FloodFillConfig;
 
 impl<const N: usize> FromConfig<N> for FloodFill<N> {
