@@ -79,7 +79,7 @@ class Options {
 
 
 
-/**
+/**Comment is deprecated -> moved to ".md"
  * Communication build with Backend
  * Sending:
  * type: type of command
@@ -135,7 +135,8 @@ client.on('error', (err) => {
 client.on('connect', (conn) => {
 
     console.log('\x1b[33m[B] WebSocket Client Connected');
-    manager.set_backend(client);
+    manager.set_backend(conn);
+    manager.backend_client = client;
     manager.f_sync.push(Actions.update_con_status(true));
 
     conn.ping();
@@ -268,6 +269,19 @@ function input(string) {
                         Options.recon = !Options.recon;
                         if (Options.recon) {
                             connect_backend();
+                        }
+                        break;
+                    case "send":
+                        if (parts.length >= 3) {
+                            try {
+                                if (parts.length === 4) {
+                                    manager.b_sync(Actions[parts[2]](...parts[3].split(",")));
+                                } else {
+                                    manager.b_sync(Actions[parts[2]]());
+                                }
+                            } catch (e) {
+                                console.log(e);
+                            }
                         }
                         break;
                 }

@@ -26,14 +26,23 @@ export class BackendManager {
             "right_2": 0,
         }
     };
-    in_console = ["[B] Connected", "DANNIIIIIIIIIIIII", "AHHHHHHHHHHHHHHHHHHHH HHHHHHH"];
-    algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
+    in_console = ["[B] Connected"];
+    algorithms = [
+        {name: "A*", id: "AStar", config: {}},
+        {name: "Dijkstra", id: "Dijkstra", config: {}},
+        {name: "A* + Dijkstra", id: "AStarDijkstra", config: {}},
+        {name: "Depth First Search", id: "DepthFirst", config: {"forward_first": true}}
+    ];
+
     in_algorithm = "A*";
     in_is_loading = false;
     backend = null;
 
     f_sync = [];
-    b_sync = [];
+    b_sync(action) {
+        if (this.backend === null) return;
+        this.backend.sendUTF(JSON.stringify(action));
+    }
 
 
     constructor() {}
@@ -73,6 +82,13 @@ export class BackendManager {
                 //TODO: send the algorithm to the backend
                 this.in_algorithm = data.algorithm;
                 this.f_sync.push(Actions.update_algorithm(data.algorithm));
+                for (var algo in this.algorithms) {
+                    if (algo.name === data.algorithm) {
+                        this.b_sync(Actions.b_strategy_change({is: false}, false,
+                            {is: true, config: {name: algo.id, config: algo.config}}));
+                        break;
+                    }
+                }
                 break;
         }
     }
@@ -93,7 +109,7 @@ export class BackendManager {
                 break;
 
             default:
-                this.b_sync.push(Actions.b_error("recv", "incorrect_data", ["type"]));
+                this.b_sync(Actions.b_error("recv", "incorrect_data", ["type"]));
                 break;
         }
     } //backend

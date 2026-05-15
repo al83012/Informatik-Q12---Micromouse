@@ -54,7 +54,7 @@ export class Actions {
     }
 
     static add_algorithm(algorithm) {
-        return new Action("add_algorithm", new Map([["algorithm", '"' + algorithm + '"']]));
+        return new Action("add_algorithm", new Map([["algorithm", '"' + algorithm.name + '"']]));
     }
 
     static update_algorithm(algorithm) {
@@ -177,4 +177,93 @@ export class Actions {
         }
         return obj;
     }
+
+    //TODO: change rotation for setposition
+    static b_strategy_change(SetPosition = {is: false, x:0, y: 0, direction: "n"}, ResetMap = false, SetStrategy = {is: false, config: {name: "", config: {}}}, SetGoal = {is: false, x: 0, y: 0}) {
+        let obj = new Object(null);
+        obj.StrategyChange = new Object(null);
+        if (SetPosition.is) {
+            obj.StrategyChange.set_position = new Object(null);
+            obj.StrategyChange.set_position.pos = new Object(null);
+            obj.StrategyChange.set_position.pos.x = SetPosition.x;
+            obj.StrategyChange.set_position.pos.y = SetPosition.y;
+            switch (SetPosition.rotation) {
+                case "n":
+                    obj.StrategyChange.set_position.dir = "NegY";
+                    break;
+                case "s":
+                    obj.StrategyChange.set_position.dir = "PosY";
+                    break;
+                case "w":
+                    obj.StrategyChange.set_position.dir = "NegX";
+                    break;
+                case "o":
+                    obj.StrategyChange.set_position.dir = "PosX";
+                    break;
+            }
+        } else {
+            obj.StrategyChange.set_position = null;
+        }
+        obj.StrategyChange.reset_map = ResetMap;
+
+        if (SetStrategy.is) {
+            obj.StrategyChange.set_strategy = new Object(null);
+            obj.StrategyChange.set_strategy[SetStrategy.config.name] = new Object(null);
+            for (var key in SetStrategy.config.config) {
+                obj.StrategyChange.set_strategy[SetStrategy.config.name][key] = SetStrategy.config.config[key];
+            }
+        } else {
+            obj.StrategyChange.set_strategy = null;
+        }
+
+        if (SetGoal.is) {
+            obj.StrategyChange.set_goal = new Object(null);
+            obj.StrategyChange.set_goal.x = SetGoal.x;
+            obj.StrategyChange.set_goal.y = SetGoal.y;
+        } else {
+            obj.StrategyChange.set_goal = null;
+        }
+
+        return obj;
+    }
+
+    static b_pause() {
+        let obj = new Object(null);
+        obj = "Pause";
+
+        return obj;
+    }
+
+    static b_continue() {
+        let obj = new Object(null);
+        obj = "Continue";
+
+        return obj;
+    }
+
+    static b_test_strategychange() {
+        let obj = new Object(null);
+        obj.StrategyChange = new Object(null);
+        obj.StrategyChange.reset_map = false;
+
+        return obj;
+    }
+
+    static b_test() {
+        let obj = new Object(null);
+        obj.StrategyChange = new Object(null);
+
+        obj.StrategyChange.set_position = new Object(null);
+        obj.StrategyChange.set_position.pos = new Object(null);
+        obj.StrategyChange.set_position.pos.x = 0;
+        obj.StrategyChange.set_position.pos.y = 0;
+        obj.StrategyChange.set_position.dir = "PosX";
+        obj.StrategyChange.set_strategy = null;
+        obj.StrategyChange.set_goal = null;
+        obj.StrategyChange.reset_map = true;
+
+        return obj;
+    }
+
+
 }
