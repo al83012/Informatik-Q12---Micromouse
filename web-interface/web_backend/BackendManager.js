@@ -6,7 +6,7 @@ export class BackendManager {
     in_selected_squares = []; // e.g. [[2,4],[3,1]]
     in_maze = {
         "visited": [],
-        "discovered": [[0, 0]],
+        "discovered": [[0, 0], [0, 1], [0, 2], [1,0], [2,0], [3,0]],
         "walls": [], // e.g. [[0,0, 0,1], [1,0, 1,1]] //wall between 00 and 01 as well as 10 and 11
         "goals": [],
         "paths": [] //TODO: Think of overlapping paths
@@ -26,14 +26,23 @@ export class BackendManager {
             "right_2": 0,
         }
     };
-    in_console = ["[B] Connected", "DANNIIIIIIIIIIIII", "AHHHHHHHHHHHHHHHHHHHH HHHHHHH"];
-    algorithms = ["A*", "Dijkstra", "A* + Dijkstra"];
+    in_console = ["[B] Connected"];
+    algorithms = [
+        {name: "A*", id: "AStar", config: {}},
+        {name: "Dijkstra", id: "Dijkstra", config: {}},
+        {name: "A* + Dijkstra", id: "AStarDijkstra", config: {}},
+        {name: "Depth First Search", id: "DepthFirst", config: {"forward_first": true}}
+    ];
+
     in_algorithm = "A*";
     in_is_loading = false;
     backend = null;
 
     f_sync = [];
-    b_sync = [];
+    b_sync(action) {
+        if (this.backend === null) return;
+        this.backend.sendUTF(JSON.stringify(action));
+    }
 
 
     constructor() {}
@@ -73,6 +82,14 @@ export class BackendManager {
                 //TODO: send the algorithm to the backend
                 this.in_algorithm = data.algorithm;
                 this.f_sync.push(Actions.update_algorithm(data.algorithm));
+                for (var algo in this.algorithms) {
+                    if (algo.name === data.algorithm) {
+                        this.f_sync.push(Actions.show_loading()); //TODO: add a "wait for complete" to hide the loading screen
+                        this.b_sync(Actions.b_strategy_change({is: false}, false,
+                            {is: true, config: {name: algo.id, config: algo.config}}));
+                        break;
+                    }
+                }
                 break;
         }
     }
@@ -84,19 +101,124 @@ export class BackendManager {
         console.log("--------------------------------------------------------\x1b[33m");
     }
 
-    b_handlePost(data) {
-        console.log("--------------------------------------------------------------------");
+    b_handlePost(message) {
+        /*console.log("--------------------------------------------------------------------");
         console.log(data, data[0]["MicromouseEvent"]);
-        console.log("--------------------------------------------------------------------");
-        switch (data.type) {
-            case "":
-                break;
-
-            default:
-                this.b_sync.push(Actions.b_error("recv", "incorrect_data", ["type"]));
-                break;
+        console.log("--------------------------------------------------------------------");*/
+        for (let data in message) {
+            if (data["MicromouseEvent"] !== undefined) {
+                let event = data["MicromouseEvent"];
+                if (event["UpdatePosition"] !== undefined) {
+                    this.b_updateMousePosition(event["UpdatePosition"]);
+                    return;
+                } else if (event["UpdateMap"] !== undefined) {
+                    this.b_updateMap(event["UpdateMap"]);
+                    return;
+                }
+            } else {
+                this.b_sync(Actions.b_error("recv", "incorrect_data", ["type"]));
+            }
         }
     } //backend
+
+    b_updateMap(data) {
+        let cell_disc = data["cell_discoveries"];
+        let wall_disc = data["wall_discoveries"];
+
+        if (cell_disc.length !== 0) {
+            for (let i = 0; i < cell_disc.length; i++) {
+                let disc = cell_disc[i];
+                switch (disc["new_status"]) {
+                    case "Discovered":
+                        this.f_sync.push(Actions.discover_tile(disc["at_cell"]["x"], disc["at_cell"]["y"], this.in_maze.discovered, false));
+                        this.in_maze.discovered.push([disc["at_cell"]["x"], disc["at_cell"]["y"]]);
+                        break;
+                    case "Visited":
+                        this.in_maze.visited.push([disc["at_cell"]["x"], disc["at_cell"]["y"]]);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        if (wall_disc.length !== 0) {
+            for (let i = 0; i < wall_disc.length; i++) {
+                let disc = wall_disc[i];
+                if (disc["new_status"] === "Visited") {
+                    this.b_add_wall(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"]);
+                } else if (disc["new_status"]["Exists"] !== undefined) {
+                    if (disc["new_status"]["Exists"]) {
+                        if (!this.b_wall_exists(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"])) {
+                            this.b_add_wall(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    b_updateMousePosition(data) {
+        let x_old = this.in_mouse.pos[0];
+        let y_old = this.in_mouse.pos[1];
+        this.in_mouse.pos[0] = data["pos"]["x"];
+        this.in_mouse.pos[1] = data["pos"]["y"];
+        let rot_old = this.in_mouse.rotation;
+        switch (data["dir"]) {
+            case "PosX":
+                this.in_mouse.direction = "e";
+                this.in_mouse.rotation = 1;
+                break;
+            case "NegX":
+                this.in_mouse.direction = "w";
+                this.in_mouse.rotation = 3;
+                break;
+            case "PosY":
+                this.in_mouse.direction = "s";
+                this.in_mouse.rotation = 2;
+                break;
+            case "NegY":
+                this.in_mouse.direction = "n";
+                this.in_mouse.rotation = 0;
+                break;
+        }
+        if (x_old !== this.in_mouse.pos[0] || y_old !== this.in_mouse.pos[1]) {
+            this.f_sync.push(Actions.move_mouse(
+                x_old,
+                y_old,
+                this.in_mouse.pos[0],
+                this.in_mouse.pos[1]
+            ));
+        }
+        if (rot_old !== this.in_mouse.rotation) {
+            this.f_sync.push(Actions.rotate_mouse(
+                x_old,
+                this.in_mouse.rotation
+            ));
+        }
+    }
+
+    b_add_wall(x, y, dir) {
+        switch (dir) {
+            case "PosX":
+                this.in_maze.walls.push([x, y, x+1, y]);
+                this.f_sync.push(Actions.discover_wall);
+                break;
+            case "NegX":
+                this.in_maze.walls.push([x, y, x-1, y]);
+                break;
+            case "PosY":
+                this.in_maze.walls.push([x, y, x, y+1]);
+                break;
+            case "NegY":
+                this.in_maze.walls.push([x, y, x, y-1]);
+                break;
+        }
+    }
+
+    b_wall_exists(x, y, dir) {
+
+    }
 
     get_full() {
         let actions = [];
