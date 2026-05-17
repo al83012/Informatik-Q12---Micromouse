@@ -1,12 +1,15 @@
-use std::{io::Error, net::{IpAddr, SocketAddr}, string::FromUtf8Error};
+use std::{
+    io::Error,
+    net::{IpAddr, SocketAddr},
+    string::FromUtf8Error,
+};
 
+use serde::Serialize;
 
-
-pub mod websocket;
-pub mod website;
-pub mod micromouse_message;
 pub mod micromouse_manager;
-
+pub mod micromouse_message;
+pub mod website;
+pub mod websocket;
 
 #[deprecated = "Use the websocket channel, it is more reliable"]
 pub mod wifi_channel;
@@ -14,18 +17,13 @@ pub mod wifi_channel;
 #[deprecated = "Use the websocket channel, it is more reliable and already includes a heartbeat/ping"]
 pub mod heartbeat_channel;
 
-
-
-
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum ChannelConnError {
     ChannelClosed,
     RejectedConnection(SocketAddr),
-    IoError(Error),
-    MalformedUtf8(FromUtf8Error),
+    IoError(#[serde(skip)] Error),
+    MalformedUtf8(#[serde(skip)] FromUtf8Error),
 }
-
-
 
 #[derive(Debug, PartialEq)]
 pub enum ChannelConnConfig {
@@ -34,8 +32,6 @@ pub enum ChannelConnConfig {
     Any,
     Once,
 }
-
-
 
 impl From<Error> for ChannelConnError {
     fn from(value: Error) -> Self {

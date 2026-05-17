@@ -1,9 +1,12 @@
+use std::time::Duration;
+
+use thiserror::Error;
 use tracing::instrument;
 
 use crate::{
     comm::{
         micromouse_manager::{self, MicromouseEvent, MicromouseManager, MicromouseManagerError},
-        website::{FrontendManager, FrontendMessage, FrontendResponse},
+        website::{FrontendConnectionConfig, FrontendManager, FrontendMessage, FrontendResponse}, websocket::{WsChannelConfig, WsChannelConnError},
     },
     strategy::{strategy::Strategy, strategy_tree::StrategyTree},
 };
@@ -14,10 +17,43 @@ pub struct Process<const N: usize> {
     // strategy_tree: DynamicStrategyTree<N>
 }
 
+
+#[derive(Error, Debug)]
+pub enum ProcessError {
+    #[error("Connection Error with Frontend")]
+    FrontendConnError(WsChannelConnError),
+
+    #[error("Connection Error with Micromouse")]
+    MicromouseConnError(WsChannelConnError),
+}
+
+impl ProcessError {
+    pub fn frontend_conn(from: WsChannelConnError) -> Self {
+        ProcessError::FrontendConnError(from)
+    }
+    pub fn micromouse_conn(from: WsChannelConnError) -> Self {
+        ProcessError::MicromouseConnError(from)
+    }
+}
+
 impl<const N: usize> Process<N> {
     #[instrument(name = "new Process", fields(description = "Create the main process"))]
-    pub async fn new() -> Self {
-        todo!("Create the connections")
+    pub async fn new() -> Result<Self, ProcessError> {
+        let frontend_manager = FrontendManager::new(9001, FrontendConnectionConfig {
+            batching_duration: Duration::from_millis(50),
+            ws_channel_config: WsChannelConfig::default()
+        }).await.map_err(ProcessError::frontend_conn)?;
+
+        let micromouse_manager = MicromouseManager::new().await.map_err(ProcessError::micromouse_conn)?;
+
+
+
+        Ok(
+            Self {
+                frontend_manager,
+                micromouse_manager
+            }
+        )
     }
 
     #[instrument(

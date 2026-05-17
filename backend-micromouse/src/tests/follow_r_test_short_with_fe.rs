@@ -128,14 +128,15 @@ pub fn follow_r() {
                     match events {
                         Ok(events) => {
                             
-                            for event in events.deref().iter() {
-                                frontend_manager.send(FrontendMessage::MicromouseEvent(event.clone())).await;
+                            for event in events.into_iter() {
                                 info!(target: "comm/mng/event", "RECEIVED EVENT:\n{event:#?}");
                                 if let MicromouseEvent::UpdatedMap(_) = event {
                                     info!(target: "comm/mng/event", "MAP UPDATE:\n{}", micromouse_manager.current_world_lock().await);
                                 } else if let MicromouseEvent::UpdatePosition(_) = event {
                                     info!(target: "comm/mng/event", "POS UPDATE:\n{}", micromouse_manager.current_world_lock().await);
                                 }
+                                frontend_manager.send(FrontendMessage::MicromouseEvent(event)).await;
+
                             }
                         }
                         Err(e) => {

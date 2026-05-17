@@ -19,7 +19,7 @@ use crate::{
             MicromouseResponse, StepNum,
         },
         website::DiscoveryMessage,
-        websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
+        websocket::{WsChannel, WsChannelConfig, WsChannelConnError, WsChannelConnInfo},
     },
     map::{
         command_world_state::{
@@ -30,7 +30,7 @@ use crate::{
     },
     transform::position::MouseTransform,
     utils::{
-        hyperlink_logging::{process_span, LinkFileName},
+        hyperlink_logging::{LinkFileName, process_span},
         nonempty::{NonEmpty, PotentiallyNonEmpty},
     },
 };
@@ -133,6 +133,11 @@ impl<const N: usize> MicromouseManager<N> {
     #[instrument(skip(self), name = "await_next_read")]
     pub async fn await_next_read(&self) -> Option<Message> {
         self.channel.read().await
+    }
+
+    #[instrument(skip(self), name = "await_next_conn_event")]
+    pub async fn await_next_conn_event(&self) -> Option<WsChannelConnInfo> {
+        self.channel.next_connection_event().await
     }
 
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
@@ -252,7 +257,7 @@ impl<const N: usize> MicromouseManager<N> {
                         return Err(MicromouseManagerError::CmdConfirmThenReqested(c));
                     }
                 }
-                Ok(vec![])
+                Ok(vec![MicromouseEvent::Desync])
             }
             MicromouseResponse::Stop => {
                 let _s = process_span("process_stop");
@@ -549,7 +554,7 @@ pub enum MicromouseMode {
     Running,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize)]
 pub enum MicromouseEvent {
     UpdatePosition(MouseTransform),
     UpdatedMap(NonEmpty<DiscoveryMessage>),
@@ -563,6 +568,8 @@ pub enum MicromouseEvent {
     Error(MicromouseManagerError),
     DebugMessage(String),
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),
+    Desync,
+    WsConnectionEvent(WsChannelConnInfo),
 }
 
 #[derive(Debug)]

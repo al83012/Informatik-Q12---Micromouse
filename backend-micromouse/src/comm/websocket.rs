@@ -1,6 +1,8 @@
 use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
+use serde::{Serialize, Serializer};
+use thiserror::Error;
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::{
@@ -27,7 +29,7 @@ use crate::{
 pub struct WsChannel {
     // There is no specific read-request, as we are reading continuously
     read_recv: Mutex<Receiver<Message>>,
-    e_recv: Mutex<Receiver<WsChannelConnError>>,
+    conn_info_recv: Mutex<Receiver<WsChannelConnInfo>>,
     send_request_sender: Sender<Message>,
 
     cancellation_token: CancellationToken,
@@ -39,10 +41,38 @@ pub enum WsChannelMode {
     Stable,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
+pub enum WsChannelConnInfo {
+    Error(WsChannelConnError),
+    Connect,
+    Disconnect,
+    Destabilized,
+    Stabilized,
+    Closing,
+    CloseRequestedByPeer,
+    InternalErrorCorrection,
+    Reconnect,
+}
+
+impl From<WsChannelConnError> for WsChannelConnInfo {
+    fn from(value: WsChannelConnError) -> Self {
+        Self::Error(value)
+    }
+}
+
+#[derive(Debug, Error, Serialize)]
 pub enum WsChannelConnError {
+    #[error("Failed to meet connection guidelines ")]
     ChannelConnError(ChannelConnError),
-    WsConnError(tungstenite::Error),
+    #[error("Websocket failed")]
+    WsConnError(#[serde(skip)]  tungstenite::Error),
+}
+
+fn ser_t_err<S>(val: tungstenite::Error, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer {
+    todo!()
+
 }
 
 impl From<tungstenite::Error> for WsChannelConnError {
@@ -85,7 +115,7 @@ impl Default for WsChannelConfig {
 pub struct WsChannelInternal {
     remote_peer_addr: SocketAddr,
     ws_stream: Option<WebSocketStream<TcpStream>>,
-    e_sender: Sender<WsChannelConnError>,
+    conn_info_sender: Sender<WsChannelConnInfo>,
     read_sender: Sender<Message>,
     last_ping: Instant,
     last_pong: Instant,
@@ -111,7 +141,7 @@ impl WsChannelInternal {
     )]
     pub async fn new(
         channel_listener: TcpListener,
-        e_sender: Sender<WsChannelConnError>,
+        conn_info_sender: Sender<WsChannelConnInfo>,
         read_sender: Sender<Message>,
         config: WsChannelConfig,
         cancellation_token_recv: CancellationToken,
@@ -142,7 +172,7 @@ impl WsChannelInternal {
         Ok(WsChannelInternal {
             remote_peer_addr,
             ws_stream,
-            e_sender,
+            conn_info_sender,
             read_sender,
             last_pong,
             last_ping,
@@ -175,6 +205,10 @@ impl WsChannelInternal {
         }
         let mut ws_stream = ws_stream.unwrap();
         info!(target: "comm", "HANDLE CLOSE");
+        self.conn_info_sender
+            .send(WsChannelConnInfo::Closing)
+            .await
+            .expect("Error while writing to mpsc channel");
         if let Err(e) = ws_stream
             .close(Some(CloseFrame {
                 code: CloseCode::Away,
@@ -182,8 +216,8 @@ impl WsChannelInternal {
             }))
             .await
         {
-            self.e_sender
-                .send(e.into())
+            self.conn_info_sender
+                .send(WsChannelConnInfo::from(WsChannelConnError::from(e)))
                 .await
                 .expect("Error while writing to mpsc channel");
         }
@@ -205,8 +239,8 @@ impl WsChannelInternal {
             .await
         {
             if let Err(e) = self.handle_recoverable_ws_error(e).await {
-                self.e_sender
-                    .send(e)
+                self.conn_info_sender
+                    .send(e.into())
                     .await
                     .expect("Error while writing to mpsc channel");
             }
@@ -233,8 +267,8 @@ impl WsChannelInternal {
                 .await;
             if let Err(e) = send_res {
                 if let Err(e) = self.handle_recoverable_ws_error(e).await {
-                    self.e_sender
-                        .send(e)
+                    self.conn_info_sender
+                        .send(e.into())
                         .await
                         .expect("Error while writing to mpsc channel");
                     break;
@@ -317,9 +351,13 @@ impl WsChannelInternal {
                 }
                 Message::Ping(_bytes) => self.handle_ping().await,
                 Message::Close(_c) => {
+                    self.conn_info_sender
+                        .send(WsChannelConnInfo::CloseRequestedByPeer)
+                        .await
+                        .expect("Channel should be open");
                     if let Err(e) = self.reconnect().await {
-                        self.e_sender
-                            .send(e)
+                        self.conn_info_sender
+                            .send(e.into())
                             .await
                             .expect("Error while writing to mpsc channel");
                     }
@@ -328,8 +366,8 @@ impl WsChannelInternal {
             },
             Err(e) => {
                 if let Err(e) = self.handle_recoverable_ws_error(e).await {
-                    self.e_sender
-                        .send(e)
+                    self.conn_info_sender
+                        .send(e.into())
                         .await
                         .expect("Error while writing to mpsc channel");
                 }
@@ -348,6 +386,10 @@ impl WsChannelInternal {
         &mut self,
         error: Error,
     ) -> Result<(), WsChannelConnError> {
+        self.conn_info_sender
+            .send(WsChannelConnInfo::InternalErrorCorrection)
+            .await
+            .expect("Channel closed");
         info!(target: "comm", "HANDLE RECOVERABLE? ATTEMPT");
         match error {
             Error::ConnectionClosed | Error::AlreadyClosed => {
@@ -399,6 +441,10 @@ impl WsChannelInternal {
         skip(self)
     )]
     pub async fn reconnect(&mut self) -> Result<(), WsChannelConnError> {
+        self.conn_info_sender
+            .send(WsChannelConnInfo::Reconnect)
+            .await
+            .expect("Channel closed");
         if self.config.conn_config == ChannelConnConfig::Once {
             error!(target: "comm", "RECONNECT INVALID --> Channel closed, only open ONCE");
             return Err(ChannelConnError::ChannelClosed.into());
@@ -480,7 +526,12 @@ impl WsChannel {
         let (send_request_sender, send_request_recv) =
             tokio::sync::mpsc::channel::<Message>(config.buffer_size);
 
-        let (e_sender, e_recv) = tokio::sync::mpsc::channel(config.buffer_size);
+        let (conn_info_sender, conn_info_recv) = tokio::sync::mpsc::channel(config.buffer_size);
+
+        conn_info_sender
+            .send(WsChannelConnInfo::Connect)
+            .await
+            .expect("Channel should still be open");
 
         let cancellation_token = CancellationToken::new();
 
@@ -488,7 +539,7 @@ impl WsChannel {
 
         let mut ws_internal = WsChannelInternal::new(
             listener,
-            e_sender,
+            conn_info_sender,
             read_sender,
             config,
             cancellation_token_recv,
@@ -499,7 +550,7 @@ impl WsChannel {
 
         let ws_external = Self {
             read_recv: Mutex::from(read_recv),
-            e_recv: Mutex::from(e_recv),
+            conn_info_recv: Mutex::from(conn_info_recv),
             send_request_sender,
             cancellation_token,
         };
@@ -583,8 +634,14 @@ impl WsChannel {
                     > ws_internal.config.valid_pong_duration + ws_internal.config.ping_interval
                 {
                     error!(target: "comm", "PONG TOO LATE: {elapsed:?}");
+                    if ws_internal.mode != WsChannelMode::Stabilize {
+                        ws_internal.conn_info_sender.send(WsChannelConnInfo::Destabilized).await.expect("Channel closed");
+                    }
                     ws_internal.mode = WsChannelMode::Stabilize;
                 } else {
+                    if ws_internal.mode != WsChannelMode::Stable {
+                        ws_internal.conn_info_sender.send(WsChannelConnInfo::Stabilized).await.expect("Channel closed");
+                    }
                     ws_internal.mode = WsChannelMode::Stable;
                 }
             }
@@ -604,8 +661,10 @@ impl WsChannel {
         skip(self),
         fields(description = "Like read, but only records the errors")
     )]
-    pub async fn next_nonresolved_error(&self) -> Option<WsChannelConnError> {
-        self.e_recv.lock().await.recv().await
+    pub async fn next_connection_event(&self) -> Option<WsChannelConnInfo> {
+        let conn_event = self.conn_info_recv.lock().await.recv().await;
+        info!(target: "conn", "Connection Event: {conn_event:?}");
+        conn_event
     }
 
     #[instrument(name = "send", skip(self), fields(description = "Send message"))]
