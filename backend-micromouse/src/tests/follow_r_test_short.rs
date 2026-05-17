@@ -2,7 +2,7 @@ use std::{ops::Deref, os::windows::process, time::Duration};
 
 use tokio::time::{self, Instant, Interval};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 use tracing::{Instrument, Span};
 
 use crate::comm::website::{FrontendConnectionConfig, FrontendManager};
@@ -28,6 +28,7 @@ use crate::{
 
 #[ignore]
 #[test]
+#[instrument(name = "follow_r_test_short")]
 pub fn follow_r() {
     let world = super::test_map(0.5);
     init_tree_logger();

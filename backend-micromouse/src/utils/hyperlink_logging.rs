@@ -428,7 +428,6 @@ where
         event.record(&mut visitor);
 
         let current_file = span_data.dir.join(BASE_FILE);
-        let mut file = self.get_file(&current_file);
 
         // Formatting the ANSI message (reuse your existing logic)
         let time = self.start_time.elapsed().as_secs_f64();
@@ -463,6 +462,19 @@ where
         println!("{ansii_event_str}");
         let event_str = ansi_to_html::convert(ansii_event_str.as_str())
             .expect("unable to convert ANSI to HTML");
+
+        {
+            let mut main_log_file = self.get_file(&self.run_root.join("out.html"));
+
+            let link_to_file = diff_paths(&current_file, &self.run_root).expect("No link to file");
+
+            writeln!(main_log_file, "<details class='log-entry'><summary>").ok();
+            writeln!(main_log_file, "  <pre>{}</pre>", event_str).ok();
+            writeln!(main_log_file, "</summary><div class='expanded-entry'><dl>").ok();
+            writeln!(main_log_file, "    <dt>SOURCE</dt><dd><code>{}</code></dd>", link_str(link_to_file.to_string_lossy(), current_file.to_string_lossy())).ok();
+            writeln!(main_log_file, "</dl></div></details>").ok();
+        }
+        let mut file = self.get_file(&current_file);
 
         let all_empty = visitor.links.is_empty() && visitor.fields.is_empty();
 

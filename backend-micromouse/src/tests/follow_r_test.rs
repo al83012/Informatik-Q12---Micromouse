@@ -1,7 +1,7 @@
 use std::{ops::Deref, time::Duration};
 
 use tokio::time::{self, Instant, Interval};
-use tracing::{error, info};
+use tracing::{error, info, instrument};
 
 use crate::{
     comm::{
@@ -12,11 +12,15 @@ use crate::{
     },
     tests::TEST_MAP_SIZE,
     transform::direction::RelativeDirection,
-    utils::{hyperlink_logging::init_tree_logger, logging::{init_logging, run_test}},
+    utils::{
+        hyperlink_logging::init_tree_logger,
+        logging::{init_logging, run_test},
+    },
 };
 
 #[ignore]
 #[test]
+#[instrument(name = "follow_r_test_short")]
 pub fn follow_r_and_conn() {
     // let guards = init_logging();
     init_tree_logger();

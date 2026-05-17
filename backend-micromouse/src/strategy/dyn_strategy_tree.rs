@@ -69,11 +69,19 @@ pub struct StrategyChangeCommand<const N: usize> {
 
 impl<const N: usize> DynStrategyTreeManager<N> {
     pub fn new(
-        starting_condition: StrategyStart<N>,
+        starting_condition: WorldData<N>,
         strategy_config: DynStrategyConfig<N>,
         goal_position: GoalPosition,
-    ) -> Self {
-        todo!()
+        desired_depth: usize,
+        max_nodes: usize,
+    ) -> Result<Self, StrategyTreeError> {
+        Self::new_starting_cond(
+            starting_condition,
+            strategy_config,
+            goal_position,
+            desired_depth,
+            max_nodes,
+        )
     }
 
     /// Is unsafe as it leaves self in the improper "Closed"-State
@@ -108,14 +116,14 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     fn set_starting_cond(
         &mut self,
         starting_condition: StrategyStart<N>,
-        tree_config: DynStrategyConfig<N>,
+        strategy_config: DynStrategyConfig<N>,
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
     ) -> Result<(), StrategyTreeError> {
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
-                match tree_config {
+                match strategy_config {
                     $(DynStrategyConfig::$variant(val) => {
                         let strat_conf = StrategyTreeConfig{
                             strategy_config: val,
@@ -148,10 +156,70 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         Ok(())
     }
 
+    fn new_starting_cond(
+        starting_condition: WorldData<N>,
+        strategy_config: DynStrategyConfig<N>,
+        goal_position: GoalPosition,
+        desired_depth: usize,
+        max_nodes: usize,
+    ) -> Result<Self, StrategyTreeError> {
+        macro_rules! new_tree {
+            ([$($variant:ident),+]) => {
+                match strategy_config.clone() {
+                    $(DynStrategyConfig::$variant(val) => {
+                        let strat_conf = StrategyTreeConfig{
+                            strategy_config: val,
+                            desired_depth,
+                            max_nodes
+                        };
+                        let tree = StrategyTree::new(StrategyStart::DirectlyAtState(starting_condition.clone()), strat_conf, goal_position)?;
+                        let TreeCreationSuccess{tree, origin_command} = tree;
+                        (DynStrategyTree::<N>::$variant(tree), origin_command)
+                    })+
+                }
+            };
+        }
+
+        let (new_tree, cmd) = new_tree!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ]);
+
+        let (command_sender, command_receiver) = tokio::sync::broadcast::channel(16);
+
+        let mut res = Self {
+            strategy_tree: new_tree,
+            command_sender,
+            command_receiver,
+            current_world: starting_condition,
+            goal_pos: goal_position,
+            strat_config: strategy_config,
+            desired_depth,
+            max_nodes,
+        };
+
+        if let Some(cmd) = cmd {
+            res.send_cmd(cmd);
+        }
+
+        Ok(res)
+    }
+
     fn send_cmd(&mut self, cmd: Command) {
         self.command_sender
             .send(cmd)
             .expect("Channel should not be closed");
+    }
+
+    async fn await_cmd(&mut self) -> Command {
+        self.command_receiver
+            .recv()
+            .await
+            .expect("Channel should not be closed")
     }
 
     // pub fn apply_measurement(&mut self)

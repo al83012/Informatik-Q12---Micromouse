@@ -264,7 +264,7 @@ impl<const N: usize> MicromouseManager<N> {
                 let _s = process_span("process_restart");
                 info!(target: "comm/mng", "RESTARTED");
                 self.restart().await;
-                *self.mode.lock().await = MicromouseMode::Running;
+                // *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Restart])
             }
             MicromouseResponse::Continue => {
@@ -287,7 +287,7 @@ impl<const N: usize> MicromouseManager<N> {
         debug!(target: "comm/mng", "Doing Restart...");
         self.next_cmd_send_id
             .store(0, std::sync::atomic::Ordering::SeqCst);
-        *self.mode.lock().await = MicromouseMode::Running;
+        *self.mode.lock().await = MicromouseMode::Stopped;
         *self.current_command.lock().await = None;
         *self.current_world.write().await = WorldData::default();
         *self.unconfirmed_cmd.lock().await = HashMap::new();
