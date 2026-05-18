@@ -5,7 +5,7 @@ use tokio::sync::broadcast::{Receiver, Sender};
 
 use crate::{
     comm::micromouse_message::Command,
-    map::world_data::WorldData,
+    map::{map::Map, measurement::Measurement, world_data::WorldData},
     strategy::{
         strategies::{
             breadth_first::BreadthFirst, dbg_known_path::DbgKnownPath, depth_first::DepthFirst,
@@ -215,11 +215,27 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             .expect("Channel should not be closed");
     }
 
-    async fn await_cmd(&mut self) -> Command {
+    pub async fn await_cmd(&mut self) -> Command {
         self.command_receiver
             .recv()
             .await
             .expect("Channel should not be closed")
+    }
+
+    /// Called upon an update_map-Event being sent
+    pub fn update_filter(&mut self, map: Map<N>) /* -> ? */
+    {
+        todo!("Call prune_potentially_not_eq; Also: update the own map");
+    }
+
+    pub fn update_pos(&mut self, transform: MouseTransform) /* --> ? */
+    {
+        todo!("Update the own world")
+    }
+
+    pub fn finish_current_cmd(&mut self) /* -> ? */
+    {
+        todo!("Call finish_root; Also interpret the result (e.g. Splitting a StrategyEndState into Success (found goal) and Failure (no possible action))");
     }
 
     // pub fn apply_measurement(&mut self)
@@ -238,19 +254,17 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
         let erased = unsafe { self.erase_strat() };
 
-        if reset_map {
-            self.current_world.mouse = current_mouse;
-            self.current_world = self.current_world.only_pos();
-            // Still need to take over the sent cmds and the end world of those is the new pos
-        } else {
-            // self.current_world = self.current_world;
-        }
         let strategy_start = if let Some(erased) = erased {
             StrategyStart::ContinueAfterDoing {
                 after_cmds: erased,
                 reset_world: reset_map,
             }
         } else {
+            if reset_map {
+                self.current_world.mouse = current_mouse;
+                self.current_world = self.current_world.only_pos();
+                // Still need to take over the sent cmds and the end world of those is the new pos
+            }
             StrategyStart::DirectlyAtState(self.current_world.clone())
         };
 

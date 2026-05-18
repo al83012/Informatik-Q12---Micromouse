@@ -46,7 +46,7 @@ impl<const N: usize> FromConfig<N> for FollowWall<N> {
 
     fn from_config(
         config: &Self::Config,
-        starting_state: &crate::map::world_data::WorldData<N>,
+        _starting_state: &crate::map::world_data::WorldData<N>,
     ) -> Self {
         Self {
             next_move_id: 0,

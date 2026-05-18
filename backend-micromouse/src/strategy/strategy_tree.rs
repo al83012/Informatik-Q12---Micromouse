@@ -632,6 +632,8 @@ where
     pub fn finish_root(&mut self) -> Result<Option<NodeAction<N>>, FinishRootError> {
         let (_outcome_id, successor) = {
             let _root = self.root_node();
+            // WARN: Will not expand the root before getting its successor; Any successor should
+            // already have been determined by the preceding measurements
             let root = self.node_mut(self.root_node()).expect("Checked");
 
             let Some(strategy_res) = &root.applied_strategy else {
@@ -708,7 +710,7 @@ where
     #[instrument(
         name = "prune_not_potentially_eq",
         fields(
-            description = "Prunes all command-outcomes of all paths which do not match the given filter",
+            description = "Prunes all command-outcomes of all paths which do not match the given filter; ALSO: Apply the full filter if it could lead a node to becoming expandable",
         ),
         skip(self)
     )]
@@ -725,7 +727,7 @@ where
                     if !v.on_basis_of_world.map.potentially_eq(filter) {
                         Some(node_id)
                     } else {
-                        // Only apply the map-update for throse nodes, that are not yet expanded,
+                        // Only apply the map-update for those nodes, that are not yet expanded,
                         // but can be
                         if v.applied_strategy.is_none() && v.on_basis_of_state.is_some() {
                             debug!(target: "strat/tree/prune", link_node_id = node_id.link(), "Expandable node union with current measurements");
@@ -1054,12 +1056,32 @@ where
         ),
         skip(self)
     )]
-    pub fn close(self) -> Option<SentUnfinishedCommands<N>> {
+    pub fn close(self) -> SentUnfinishedCommands<N> {
         let highest_sent_layer = self.highest_sent_layer;
 
         //INFO: We also need to include the last layer which was not yet sent, but was expanded
         //from the last sent layer; it is our grafting-point
         let highest_sent_layer_and_exp = highest_sent_layer + 1;
+
+        if highest_sent_layer == 0
+            && self
+                .node(self.root_node())
+                .expect("HAS TO EXIST")
+                .applied_strategy
+            .as_ref()
+                .is_some_and(|a| a.is_err())
+        {
+            //INFO: The current root is blocking; it appears to be sent, but  it is not / cannot be
+            //(A blocking root is the only root that is not sendable)
+
+            return SentUnfinishedCommands::HasBlockingRoot {
+                world: self
+                    .node(self.root_node())
+                    .expect("Checked")
+                    .on_basis_of_world
+                    .clone(),
+            };
+        }
 
         let mut layers = vec![];
         let mut inner_layers = self.layers;
@@ -1072,9 +1094,9 @@ where
             ))
         }
 
-        Some(SentUnfinishedCommands {
-            layers: layers.non_empty()?,
-        })
+        SentUnfinishedCommands::HasQueue {
+            layers: layers.non_empty().expect("Root layer has to have been sent; meaning that it and its children can form highest_sent + exp"),
+        }
     }
 }
 
@@ -1127,10 +1149,20 @@ impl From<TreeCreationError> for StrategyTreeError {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize)]
 pub struct RelativeNodeId(pub usize);
 
-pub struct SentUnfinishedCommands<const N: usize> {
-    // They are Strategy-Agnostic by not allowing the nodes to expand, which allows us to leave out
-    // the strategy-state, which is needed for expansion
-    layers: NonEmpty<Vec<SentTreeLayer<N>>>,
+pub enum SentUnfinishedCommands<const N: usize> {
+    HasQueue {
+        // They are Strategy-Agnostic by not allowing the nodes to expand, which allows us to leave out
+        // the strategy-state, which is needed for expansion
+        layers: NonEmpty<Vec<SentTreeLayer<N>>>,
+    },
+    // WARN: If there is no queue here, it would mean that the tree is not entirely empty (it
+    // cannot be), but there is a root which is blocking (i.e. it marks a StrategyEndState)
+    //
+    // This means, that we can still pull the "current_state" from this root, although it will not
+    // lead to any expansion on its own (and cannot be sent)
+    HasBlockingRoot {
+        world: PartialWorldData<N>,
+    },
 }
 
 impl Sub for AbsoluteLayerId {
