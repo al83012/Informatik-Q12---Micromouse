@@ -189,22 +189,17 @@ where
     ) -> Result<TreeCreationSuccess<N, S>, StrategyTreeError> {
         match starting_condition {
             StrategyStart::ContinueAfterDoing {
-                after_cmds: sent_unfinished_commands,
+                after_cmds: SentUnfinishedCommands::HasQueue { layers },
                 reset_world,
             } => {
-                let num_of_unfinished_cmds = sent_unfinished_commands.layers.len();
-                let node_count = sent_unfinished_commands
-                    .layers
-                    .iter()
-                    .map(|l| l.node_count)
-                    .sum::<usize>();
-                let first_layer_absolute_id = sent_unfinished_commands
-                    .layers
+                let num_of_unfinished_cmds = layers.len();
+                let node_count = layers.iter().map(|l| l.node_count).sum::<usize>();
+                let first_layer_absolute_id = layers
                     .first()
                     .map(|l| l.absolute_layer_id)
                     .unwrap_or(AbsoluteLayerId(0));
 
-                let layers = sent_unfinished_commands.layers.into_inner().into_iter();
+                let layers = layers.into_inner().into_iter();
                 let mut transformed_layers = layers
                     .map(StrategyTreeLayer::<N, S>::non_expandable_from_cleaned)
                     .collect::<Vec<_>>();
@@ -244,7 +239,22 @@ where
                     origin_command: None,
                 })
             }
-            StrategyStart::DirectlyAtState(starting_state) => {
+            x => {
+                let starting_state = match x {
+                    StrategyStart::ContinueAfterDoing {
+                        after_cmds: SentUnfinishedCommands::HasBlockingRoot { world },
+                        reset_world,
+                    } => {
+                        if reset_world {
+                            world.only_pos()
+                        } else {
+                            world
+                        }
+                    }
+                    StrategyStart::DirectlyAtState(world) => world,
+                    _ => panic!("Covered previously"),
+                };
+
                 let first_strategy = S::from_config(&tree_config.strategy_config, &starting_state);
 
                 let mut res = Self {
@@ -1068,7 +1078,7 @@ where
                 .node(self.root_node())
                 .expect("HAS TO EXIST")
                 .applied_strategy
-            .as_ref()
+                .as_ref()
                 .is_some_and(|a| a.is_err())
         {
             //INFO: The current root is blocking; it appears to be sent, but  it is not / cannot be
@@ -1079,7 +1089,8 @@ where
                     .node(self.root_node())
                     .expect("Checked")
                     .on_basis_of_world
-                    .clone(),
+                    .clone()
+                    .into(),
             };
         }
 
@@ -1161,7 +1172,7 @@ pub enum SentUnfinishedCommands<const N: usize> {
     // This means, that we can still pull the "current_state" from this root, although it will not
     // lead to any expansion on its own (and cannot be sent)
     HasBlockingRoot {
-        world: PartialWorldData<N>,
+        world: WorldData<N>,
     },
 }
 

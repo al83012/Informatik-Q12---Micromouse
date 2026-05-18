@@ -85,7 +85,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     }
 
     /// Is unsafe as it leaves self in the improper "Closed"-State
-    unsafe fn erase_strat(&mut self) -> Option<SentUnfinishedCommands<N>> {
+    unsafe fn erase_strat(&mut self) -> SentUnfinishedCommands<N> {
         macro_rules! erase_strat {
             ([$($variant:ident),+]) => {
                 {
@@ -254,18 +254,23 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
         let erased = unsafe { self.erase_strat() };
 
-        let strategy_start = if let Some(erased) = erased {
-            StrategyStart::ContinueAfterDoing {
-                after_cmds: erased,
-                reset_world: reset_map,
-            }
-        } else {
-            if reset_map {
-                self.current_world.mouse = current_mouse;
-                self.current_world = self.current_world.only_pos();
-                // Still need to take over the sent cmds and the end world of those is the new pos
-            }
-            StrategyStart::DirectlyAtState(self.current_world.clone())
+        // let strategy_start = if let Some(erased) = erased {
+        //     StrategyStart::ContinueAfterDoing {
+        //         after_cmds: erased,
+        //         reset_world: reset_map,
+        //     }
+        // } else {
+        //     if reset_map {
+        //         self.current_world.mouse = current_mouse;
+        //         self.current_world = self.current_world.only_pos();
+        //         // Still need to take over the sent cmds and the end world of those is the new pos
+        //     }
+        //     StrategyStart::DirectlyAtState(self.current_world.clone())
+        // };
+
+        let strategy_start = StrategyStart::ContinueAfterDoing {
+            after_cmds: erased,
+            reset_world: reset_map,
         };
 
         self.strat_config = set_strategy.clone().unwrap_or(self.strat_config.clone());
