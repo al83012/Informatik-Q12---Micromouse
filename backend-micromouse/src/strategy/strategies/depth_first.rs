@@ -1,22 +1,34 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    usize,
+};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    comm::micromouse_message::{MovementType, TransformedMovement},
+    comm::micromouse_message::{
+        Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
+        TransformedMovement,
+    },
     map::{
         map::{CellDiscoveryStatus, Map, PartialMap, WallDiscoveryStatus},
         world_data::{PartialWorldData, WorldData},
     },
     strategy::{
         strategies::utils::value_map::ValueMap,
-        strategy::{FromConfig, Strategy, StrategyComputationResult, StrategyEndState},
+        strategy::{
+            ComputedAction, ComputedActions, FromConfig, Strategy, StrategyComputationResult,
+            StrategyEndState,
+        },
     },
     transform::{
         direction::{Direction, DirectionNormalizedVector, RelativeDirection},
-        position::{MouseTransform, Position},
+        position::{MouseTransform, Position, RayIterator},
     },
-    utils::{nonempty::NonEmpty, path::Path},
+    utils::{
+        nonempty::{NonEmpty, PotentiallyNonEmpty},
+        path::Path,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
@@ -34,7 +46,6 @@ pub struct DepthFirst<const N: usize> {
     // the path backtracking which is added as a blind task (as the path traversal is
     // deterministic)
     current_task: DFTask,
-    visited_marker: ValueMap<N, bool>,
 }
 
 #[derive(PartialEq, Eq, Hash, Debug, Clone)]
@@ -89,7 +100,6 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
             task_directions,
             current_path: Path::new(starting_transf),
             config: config.clone(),
-            visited_marker,
         }
     }
 }
@@ -105,77 +115,215 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         &self,
         world: &crate::map::world_data::PartialWorldData<N>,
 
-        // The goal is only important for determining, whether the mouse has reached its goal
+        // The goal is only important for determining, whether the mouse has reached its goal (in
+        // this strategy)
         goal: &crate::strategy::strategy::GoalPosition,
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
+        if world.mouse.pos == goal.0 {
+            return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
+        }
         let Some(intersections_of_current_step) = self.check_current_fully_measured(world) else {
-            // NOT YET ENOUGH INFORMATION / THE MOUSE HAS NOT YET REACHED THE END OF THAT STEP OR
+            // INFO: NOT YET ENOUGH INFORMATION / THE MOUSE HAS NOT YET REACHED THE END OF THAT STEP OR
             // DOES NOT CERTAINLY KNOW IF THERE WILL BE MORE INTERSECTIONS
             return StrategyComputationResult::NotEnoughInformation;
         };
 
         let mut successor = self.clone();
+        // The change made from the command leading to this result has not yet been applied
+        successor.current_path.end_with(world.mouse);
+        loop {
+            let mut commands_emitted = vec![];
 
-        // First add the new intersections
-        successor.add_task_directions(intersections_of_current_step);
+            // INFO: Termination state is fully known and measured
 
-        let Some(next_intersection) = successor.intersection_stack.last() else {
-            return StrategyComputationResult::Computed(Err(StrategyEndState::NoPossibleAction(
-                "There is no more intersection to check".to_string(),
-            )));
-        };
+            // First add the new intersections
+            successor.add_task_directions(&intersections_of_current_step);
 
-        let potential_paths = successor
-            .task_directions
-            .get_mut(next_intersection)
-            .expect("Should be in here");
+            let next_intersection = {
+                let Some(next_intersection) = successor.intersection_stack.last() else {
+                    return StrategyComputationResult::Computed(Err(
+                        StrategyEndState::NoPossibleAction(
+                            "There is no more intersection to check".to_string(),
+                        ),
+                    ));
+                };
+                next_intersection.clone()
+            };
 
-        let (do_moves, in_direction, new_path) = if successor.config.forward_first {
-            potential_paths
+            let potential_paths_next_intersection = successor
+                .task_directions
+                .get_mut(&next_intersection)
+                .expect("Should be in here");
+
+            let (do_moves, in_direction, new_path) = if successor.config.forward_first {
+                // INFO: Planning the paths back to all the different directions of the next
+                // intersection and then choosing the one with the lowest move-count
+                potential_paths_next_intersection
+                    .try_directions
+                    .iter()
+                    .map(|d| MouseTransform {
+                        pos: next_intersection,
+                        dir: *d,
+                    })
+                    .map(|t| {
+                        let mut new_path = successor.current_path.clone();
+                        (
+                            new_path
+                                .return_to(t)
+                                .expect("Should be accessible (Since the path was visited)"),
+                            t.dir,
+                            new_path,
+                        )
+                    })
+                    .min_by_key(|(v, _, _)| v.len())
+                    .expect("Should have at least 1 element")
+            } else {
+                let rand_dir = potential_paths_next_intersection
+                    .try_directions
+                    .iter()
+                    .next()
+                    .expect("Should have at least 1 element");
+                let mut new_path = successor.current_path.clone();
+                let moves = new_path
+                    .return_to(MouseTransform {
+                        pos: next_intersection,
+                        dir: *rand_dir,
+                    })
+                    .expect("Should be accessible");
+
+                (moves, *rand_dir, new_path)
+            };
+
+            // Mark the direction as handled
+            potential_paths_next_intersection
                 .try_directions
-                .iter()
-                .map(|d| MouseTransform {
-                    pos: *next_intersection,
-                    dir: *d,
+                .remove(&in_direction);
+
+            if potential_paths_next_intersection.try_directions.is_empty() {
+                // This intersection is finished after this step
+                successor.task_directions.remove(&next_intersection);
+                successor.intersection_stack.pop();
+            }
+
+            // TODO: Plan the move straight forward;
+
+            let movement_ray = RayIterator::<N>::new(next_intersection, in_direction);
+
+            let max_dist_till_wall = movement_ray.clone().count();
+
+            let max_dist_till_visited = movement_ray
+                .clone()
+                .enumerate()
+                .skip_while(|(_i, c)| {
+                    *world.map.cell(&c.pos).expect("Should be there")
+                        == CellDiscoveryStatus::Visited
                 })
-                .map(|t| {
-                    let mut new_path = successor.current_path.clone();
-                    (
-                        new_path
-                            .return_to(t)
-                            .expect("Should be accessible (Since the path was visited)"),
-                        t.dir,
-                        new_path,
-                    )
-                })
-                .min_by_key(|(v, _, _)| v.len())
-                .expect("Should have at least 1 element")
-        } else {
-            let rand_dir = potential_paths
-                .try_directions
-                .iter()
                 .next()
-                .expect("Should have at least 1 element");
-            let mut new_path = self.current_path.clone();
-            let moves = new_path
+                .map(|(i, _c)| i)
+                .unwrap_or(usize::MAX);
+
+            let max_dist_till_goal = movement_ray
+                .enumerate()
+                .skip_while(|(_i, c)| c.pos != goal.0)
+                .next()
+                .map(|(i, _c)| i)
+                .unwrap_or(usize::MAX);
+
+            let max_dist =
+                usize::min(max_dist_till_goal, max_dist_till_visited).min(max_dist_till_wall);
+
+            if max_dist == 0 {
+                // The direction that was chosen was not constructive; check a new direction
+                // (And delete the commands that would have been made to get into that position; it
+                // is not important)
+                continue;
+            }
+
+            // INFO: max_dist > 0 --> Actually do the move
+            // First: apply move back along path (/rotate in spot)
+            // WARN: We will not be able to adjust the path fully as we do not yet know where the
+            // command will interrupt; When doing the next cmd-step, it will be given at the start
+            let moves = successor
+                .current_path
                 .return_to(MouseTransform {
-                    pos: *next_intersection,
-                    dir: *rand_dir,
+                    pos: next_intersection,
+                    dir: in_direction,
                 })
-                .expect("Should be accessible");
+                .expect("Checked");
 
-            (moves, *rand_dir, new_path)
-        };
+            commands_emitted.append(
+                &mut moves
+                    .into_iter()
+                    .map(|m| Command {
+                        ty: m,
+                        interrupts: vec![],
+                    })
+                    .collect(),
+            );
 
-        potential_paths.try_directions.remove(&in_direction);
+            // INFO: Then: Add the forward-searching-move to the end
 
-        if potential_paths.try_directions.is_empty() {
-            // This intersection is finished after this step
-            successor.task_directions.remove(next_intersection);
-            successor.intersection_stack.pop();
+            let interrupts = if self.config.forward_first {
+                vec![
+                    MeasurementInterrupt {
+                        direction: RelativeDirection::Left,
+                        at_step: InterruptStep::Each,
+                        action: InterruptAction::Continue,
+                    },
+                    MeasurementInterrupt {
+                        direction: RelativeDirection::Forward,
+                        at_step: InterruptStep::Each,
+                        action: InterruptAction::StopIfOpen,
+                    },
+                    MeasurementInterrupt {
+                        direction: RelativeDirection::Right,
+                        at_step: InterruptStep::Each,
+                        action: InterruptAction::Continue,
+                    },
+                ]
+            } else {
+                vec![
+                    MeasurementInterrupt {
+                        direction: RelativeDirection::Left,
+                        at_step: InterruptStep::Each,
+                        action: InterruptAction::StopIfOpen,
+                    },
+                    MeasurementInterrupt {
+                        direction: RelativeDirection::Forward,
+                        at_step: InterruptStep::Each,
+                        action: InterruptAction::StopIfOpen,
+                    },
+                    MeasurementInterrupt {
+                        direction: RelativeDirection::Right,
+                        at_step: InterruptStep::Each,
+                        action: InterruptAction::StopIfOpen,
+                    },
+                ]
+            };
+
+            commands_emitted.push(Command {
+                ty: MovementType::Move(max_dist as u8),
+                interrupts,
+            });
+
+            let mut computed_actions: Vec<_> = commands_emitted
+                .into_iter()
+                .map(|command| ComputedAction {
+                    next_strategy_state: None,
+                    after_command: command,
+                })
+                .collect::<Vec<ComputedAction<N, Self>>>();
+
+            // Make the last command in the chain have a head
+            computed_actions
+                .last_mut()
+                .expect("At least 1 cmd")
+                .next_strategy_state = Some(successor);
+
+            return StrategyComputationResult::Computed(Ok(ComputedActions(
+                computed_actions.non_empty().expect("At least 1 cmd"),
+            )));
         }
-
-        todo!()
     }
 }
 
@@ -280,12 +428,15 @@ impl<const N: usize> DepthFirst<N> {
             }
         }
 
-        todo!("I acutally still need to check that there is not a visited cell behind those walls");
+        // todo!("I acutally still need to check that there is not a visited cell behind those walls");
 
         Some(intersections)
     }
 
-    pub fn add_task_directions(&mut self, branches: impl IntoIterator<Item = MouseTransform>) {
+    pub fn add_task_directions<'a>(
+        &mut self,
+        branches: impl IntoIterator<Item = &'a MouseTransform>,
+    ) {
         for branch in branches.into_iter() {
             if let Some(intersection_tasks) = self.task_directions.get_mut(&branch.pos) {
                 intersection_tasks.try_directions.insert(branch.dir);

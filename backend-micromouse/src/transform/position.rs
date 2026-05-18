@@ -119,6 +119,9 @@ impl Position {
 }
 
 
+/// WARN: THE RAY ITERATOR DOES NOT START AT THE CELL; THE FIRST ELEMENT IS THE ONE OUTSIDE THE
+/// CELL
+#[derive(Clone)]
 pub struct RayIterator<const N: usize> {
     pub current_transf: MouseTransform,
 }

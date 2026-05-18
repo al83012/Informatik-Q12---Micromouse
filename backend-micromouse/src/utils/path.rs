@@ -44,6 +44,15 @@ impl Path {
         }
     }
 
+    // Like connect_to, but will first check that the given end is not already the last element
+    pub fn end_with(&mut self, end: MouseTransform) -> bool {
+        if self.nodes.last() != Some(&end) {
+            self.connect_to(end)        
+        } else {
+            false
+        }
+    }
+
     pub fn nodes(&self) -> &Vec<MouseTransform> {
         &self.nodes
     }
