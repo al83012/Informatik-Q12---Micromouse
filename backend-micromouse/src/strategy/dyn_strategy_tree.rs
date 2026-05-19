@@ -11,10 +11,10 @@ use crate::{
             breadth_first::BreadthFirst, dbg_known_path::DbgKnownPath, depth_first::DepthFirst,
             flood_fill::FloodFill, follow_wall::FollowWall, random_move::RandomMove,
         },
-        strategy::{FromConfig, GoalPosition, Strategy},
+        strategy::{FromConfig, GoalPosition, Strategy, StrategyEndState},
         strategy_tree::{
-            SentUnfinishedCommands, StrategyStart, StrategyTree, StrategyTreeConfig,
-            StrategyTreeError, TreeCreationError, TreeCreationSuccess,
+            FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
+            StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationSuccess,
         },
     },
     transform::position::{MouseTransform, Position},
@@ -223,19 +223,75 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     }
 
     /// Called upon an update_map-Event being sent
-    pub fn update_filter(&mut self, map: Map<N>) /* -> ? */
-    {
-        todo!("Call prune_potentially_not_eq; Also: update the own map");
+    pub fn update_filter(&mut self, map: Map<N>) -> Result<(), PruneError> /* -> ? */ {
+        let partial = map.into();
+        macro_rules! update_filter {
+            ([$($variant:ident),+]) => {
+
+                {
+                let prune_result = match self.strategy_tree {
+                        $(DynStrategyTree::$variant(ref mut tree) => {
+                            tree.prune_not_potentially_eq(&partial)
+                        },)+
+                        DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
+                    };
+                prune_result
+                }
+
+            }
+        }
+
+        update_filter!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ])
     }
 
-    pub fn update_pos(&mut self, transform: MouseTransform) /* --> ? */
+    pub fn update_pos(&mut self, transform: MouseTransform) -> Result<(), StrategyTreeError> /* --> ? */
     {
-        todo!("Update the own world")
+        self.modify(StrategyChangeCommand {
+            set_postion: Some(transform),
+            reset_map: false,
+            set_strategy: Some(self.strat_config.clone()),
+            set_goal: Some(self.goal_pos),
+        })
     }
 
-    pub fn finish_current_cmd(&mut self) /* -> ? */
+    pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, FinishRootError> /* -> ? */
     {
-        todo!("Call finish_root; Also interpret the result (e.g. Splitting a StrategyEndState into Success (found goal) and Failure (no possible action))");
+        macro_rules! finish_current_cmd {
+            ([$($variant:ident),+]) => {
+
+                {
+                let finish_root_result = match self.strategy_tree {
+                        $(DynStrategyTree::$variant(ref mut tree) => {
+                            tree.finish_root()
+                        },)+
+                        DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
+                    };
+                finish_root_result
+                }
+
+            }
+        }
+        match finish_current_cmd!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ]) {
+            Ok(()) => Ok(None),
+            Err(e) => match e {
+                FinishRootError::SuccessorIsEnd(end_state) => Ok(Some(end_state)),
+                _ => Err(e),
+            },
+        }
     }
 
     // pub fn apply_measurement(&mut self)

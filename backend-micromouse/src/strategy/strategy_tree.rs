@@ -639,7 +639,7 @@ where
         ),
         skip(self)
     )]
-    pub fn finish_root(&mut self) -> Result<Option<NodeAction<N>>, FinishRootError> {
+    pub fn finish_root(&mut self) -> Result<(), FinishRootError> {
         let (_outcome_id, successor) = {
             let _root = self.root_node();
             // WARN: Will not expand the root before getting its successor; Any successor should
@@ -649,6 +649,8 @@ where
             let Some(strategy_res) = &root.applied_strategy else {
                 // The root will be expanded, at least when it is placed into the root-slot (since the
                 // execution starts there and the potential outcomes have to be known)
+                // WARN: Root can only be sent if it is expanded (send criterion: is_eq + next
+                // layer fully expanded)
                 return Err(FinishRootError::RootNotExpanded);
             };
 
@@ -695,7 +697,7 @@ where
                 self.highest_full_layer += 1;
                 self.highest_eq_layer += 1; // Returning from this function counts as sending
                 self.highest_sent_layer += 1; // Returning from this function counts as sending
-                return Err(FinishRootError::SuccessorIsEnd(Some(s)));
+                return Err(FinishRootError::SuccessorIsEnd(s));
             }
             NodeExpansionResult::Expanded(_) => {
                 // We know that this is expanding a full layer, since the new root layer only
@@ -714,7 +716,7 @@ where
         self.highest_eq_layer -= 1;
         self.highest_sent_layer -= 1;
 
-        Ok(None)
+        Ok(())
     }
 
     #[instrument(
@@ -1306,7 +1308,7 @@ pub enum FinishRootError {
     SuccessorNotExpandable,
     SuccessorNotYetExpandable,
     // Either a valid end or a strategy error
-    SuccessorIsEnd(Option<StrategyEndState>),
+    SuccessorIsEnd(StrategyEndState),
 }
 
 impl RelativeNodeIdCounter {
