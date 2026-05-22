@@ -16,10 +16,10 @@ use tungstenite::{Message, Utf8Bytes};
 use crate::{
     comm::{
         micromouse_manager::{MicromouseEvent, MicromouseManagerError},
-        websocket::{WsChannel, WsChannelConfig, WsChannelConnError},
+        websocket::{WsChannel, WsChannelConfig, WsChannelConnError, WsChannelConnInfo},
     },
     map::map::{CellDiscovery, WallDiscovery},
-    strategy::{dyn_strategy_tree::StrategyChangeCommand, strategy_tree::StrategyTreeError},
+    strategy::{dyn_strategy_tree::StrategyChangeCommand, strategy::StrategyEndState, strategy_tree::StrategyTreeError},
     utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty},
 };
 
@@ -33,6 +33,8 @@ pub struct DiscoveryMessage {
 pub enum FrontendMessage {
     MicromouseEvent(MicromouseEvent),
     StrategyTreeError(StrategyTreeError),
+    StrategyEnd(StrategyEndState),
+    MicromouseConnectionEvent(WsChannelConnInfo),
     Debug(String),
     ConfirmLastChange,
 }

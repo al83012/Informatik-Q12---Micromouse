@@ -140,6 +140,12 @@ impl<const N: usize> MicromouseManager<N> {
         self.channel.next_connection_event().await
     }
 
+    #[instrument(skip(self), name = "set_mode")]
+    pub async fn set_mode(&self, mode: MicromouseMode) {
+        *self.mode.lock().await = mode;
+    }
+
+
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
     /// communication to continue (even though the channel will spin up a separate thread to keep
     /// the connection alive, it won't handle desyncs and the like)
@@ -569,7 +575,7 @@ pub enum MicromouseEvent {
     DebugMessage(String),
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),
     Desync,
-    WsConnectionEvent(WsChannelConnInfo),
+    // WsConnectionEvent(WsChannelConnInfo),
 }
 
 #[derive(Debug)]

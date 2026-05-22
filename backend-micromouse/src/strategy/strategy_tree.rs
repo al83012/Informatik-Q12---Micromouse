@@ -6,6 +6,7 @@ use std::{
 };
 
 use serde::Serialize;
+use thiserror::Error;
 use tracing::{debug, instrument};
 use tracing_subscriber::Layer;
 
@@ -28,12 +29,19 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Error)]
 pub enum StrategyTreeError {
-    WhilePruning(PruneError),
-    WhileExpanding(TreeExpansionError),
-    WhileCreating(TreeCreationError),
-    MeasureDoesNotMatchInner,
+    #[error("Error while Pruning branch ")]
+    WhilePruning(#[from] PruneError),
+    #[error("Error while expanding a node")]
+    WhileExpanding(#[from] TreeExpansionError),
+    #[error("Error while creating the tree")]
+    WhileCreating(#[from] TreeCreationError),
+    #[error("Error while declaring the root finished")]
+    WhileFinishingCommand(#[from] FinishRootError),
+    #[error("The given map_update cannot be valid for the internal map")]
+    MapConflictsWithMapUpdate,
+    // MeasureDoesNotMatchInner,
 }
 
 pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> {
@@ -121,7 +129,8 @@ pub enum NodeExpansionResult {
     Expanded(usize),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Error)]
+#[error("At node {node:?} with result {expansion:?}")]
 pub struct TreeExpansionError {
     node: AbsoluteNodeId,
     expansion: NodeExpansionResult,
@@ -142,10 +151,13 @@ pub enum StrategyStart<const N: usize> {
     DirectlyAtState(WorldData<N>),
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Error)]
 pub enum TreeCreationError {
-    StrategyError(StrategyEndState),
-    ExpansionError(TreeExpansionError),
+    #[error("Strategy ended at start {0:?}")]
+    StrategyError(#[from] StrategyEndState),
+    #[error("Failed expanding the root")]
+    ExpansionError(#[from] TreeExpansionError),
+    #[error("Root was not expanded after attempt to do so")]
     RootNotExpanded,
 }
 
@@ -157,17 +169,17 @@ pub struct TreeCreationSuccess<
     pub origin_command: Option<Command>,
 }
 
-impl From<TreeExpansionError> for TreeCreationError {
-    fn from(value: TreeExpansionError) -> Self {
-        Self::ExpansionError(value)
-    }
-}
-
-impl From<StrategyEndState> for TreeCreationError {
-    fn from(value: StrategyEndState) -> Self {
-        Self::StrategyError(value)
-    }
-}
+// impl From<TreeExpansionError> for TreeCreationError {
+//     fn from(value: TreeExpansionError) -> Self {
+//         Self::ExpansionError(value)
+//     }
+// }
+//
+// impl From<StrategyEndState> for TreeCreationError {
+//     fn from(value: StrategyEndState) -> Self {
+//         Self::StrategyError(value)
+//     }
+// }
 
 impl<const N: usize, S> StrategyTree<N, S>
 where
@@ -1041,7 +1053,7 @@ where
             self.update_equal_layers();
             Ok(self.new_sends())
         } else {
-            Err(StrategyTreeError::MeasureDoesNotMatchInner)
+            Err(StrategyTreeError::MapConflictsWithMapUpdate)
         }
     }
 
@@ -1113,11 +1125,15 @@ where
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Error)]
 pub enum PruneError {
+    #[error("Encountered unknown node: {0:?}")]
     UnknownNode(AbsoluteNodeId),
+    #[error("Root is not prunable (root = {0:?})")]
     CannotDeleteRoot(AbsoluteNodeId),
+    #[error("No child to be pruned (source = {0:?})")]
     SourceHasNoChildren(AbsoluteNodeId),
+    #[error("Tried to prune child that does not exist ({0:?})")]
     SourceDoesNotHaveThisChild(AbsolutePathId),
 }
 
@@ -1142,22 +1158,22 @@ pub struct AbsolutePathId {
     pub branch: PathLocalOutcomeId,
 }
 
-impl From<PruneError> for StrategyTreeError {
-    fn from(value: PruneError) -> Self {
-        Self::WhilePruning(value)
-    }
-}
-impl From<TreeExpansionError> for StrategyTreeError {
-    fn from(value: TreeExpansionError) -> Self {
-        Self::WhileExpanding(value)
-    }
-}
-
-impl From<TreeCreationError> for StrategyTreeError {
-    fn from(value: TreeCreationError) -> Self {
-        Self::WhileCreating(value)
-    }
-}
+// impl From<PruneError> for StrategyTreeError {
+//     fn from(value: PruneError) -> Self {
+//         Self::WhilePruning(value)
+//     }
+// }
+// impl From<TreeExpansionError> for StrategyTreeError {
+//     fn from(value: TreeExpansionError) -> Self {
+//         Self::WhileExpanding(value)
+//     }
+// }
+//
+// impl From<TreeCreationError> for StrategyTreeError {
+//     fn from(value: TreeCreationError) -> Self {
+//         Self::WhileCreating(value)
+//     }
+// }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize)]
 pub struct RelativeNodeId(pub usize);
@@ -1299,15 +1315,22 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
 #[derive(Default)]
 pub struct RelativeNodeIdCounter(pub usize);
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Error)]
 pub enum FinishRootError {
+    #[error("The root has no successor; it could not be expanded")]
     NoSuccessor,
+    #[error("The root has multiple successors; Only 1 should exist at this point")]
     MultipleSuccessors(HashMap<PathLocalOutcomeId, AbsoluteNodeId>),
+    #[error("The root could not be expanded, but it should have 1 successor")]
     RootNotExpanded,
+    #[error("The root was declared finished, but it was not a node that was executable")]
     ImpossibleRootAction(StrategyEndState),
+    #[error("The root cannot have children and thus cannot have a successor")]
     SuccessorNotExpandable,
+    #[error("The root cannot yet have children due to not having enough information, but due to finishing the command, there is no more information available")]
     SuccessorNotYetExpandable,
     // Either a valid end or a strategy error
+    #[error("The successor marks the end of this strategy's execution; Not really an error, just an info")]
     SuccessorIsEnd(StrategyEndState),
 }
 

@@ -38,7 +38,7 @@ impl From<WallDirection> for RelativeDirection {
 
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct FollowWallConfig {
-    follow_wall: WallDirection,
+    pub follow_wall: WallDirection,
 }
 
 impl<const N: usize> FromConfig<N> for FollowWall<N> {

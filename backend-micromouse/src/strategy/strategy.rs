@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::{
     comm::micromouse_message::Command,
@@ -7,9 +8,11 @@ use crate::{
     utils::nonempty::NonEmpty,
 };
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Error)]
 pub enum StrategyEndState {
+    #[error("No possible action to reach goal ({0})")]
     NoPossibleAction(String),
+    #[error("Reached goal; Strategy not further expandable")]
     ReachedGoal
 }
 

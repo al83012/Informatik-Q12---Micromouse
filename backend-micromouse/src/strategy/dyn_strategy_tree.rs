@@ -223,7 +223,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     }
 
     /// Called upon an update_map-Event being sent
-    pub fn update_filter(&mut self, map: Map<N>) -> Result<(), PruneError> /* -> ? */ {
+    pub fn update_filter(&mut self, map: Map<N>) -> Result<Vec<Command>, StrategyTreeError> /* -> ? */ {
         let partial = map.into();
         macro_rules! update_filter {
             ([$($variant:ident),+]) => {
@@ -231,7 +231,8 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                 {
                 let prune_result = match self.strategy_tree {
                         $(DynStrategyTree::$variant(ref mut tree) => {
-                            tree.prune_not_potentially_eq(&partial)
+                            tree.handle_map_update(&partial)
+                            // tree.prune_not_potentially_eq(&partial)
                         },)+
                         DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
                     };
@@ -249,6 +250,18 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             RandomMove,
             DbgKnownPath
         ])
+    }
+
+    pub fn set_pos_to_start_and_restart(&mut self) -> Result<(), StrategyTreeError> {
+        self.modify(StrategyChangeCommand {
+            set_postion: Some(MouseTransform {
+                pos: Position { x: 0, y: 0 },
+                dir: crate::transform::direction::Direction::PosX,
+            }),
+            reset_map: true,
+            set_strategy: Some(self.strat_config.clone()),
+            set_goal: Some(self.goal_pos),
+        })
     }
 
     pub fn update_pos(&mut self, transform: MouseTransform) -> Result<(), StrategyTreeError> /* --> ? */
