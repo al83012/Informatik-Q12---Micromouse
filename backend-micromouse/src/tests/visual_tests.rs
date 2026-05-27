@@ -63,12 +63,9 @@ fn large_discovery_visual_test() {
             debug!(target: "tests/map/display","Applying measurement {m:?}");
             map.apply_measurement(&m).unwrap();
         }
-        // debug!(target: "tests/map/display", "PRINTING");
-        // println!("PRINTING");
         let map_str = format!("{}", map);
         // std::io::stdout().flush().expect("Error flushing");
         debug!(target: "tests/map/display","\n{map}");
-        // println!("{map}");
 
         // No asserts — purely for visual inspection
     });

@@ -132,8 +132,6 @@ impl<const N: usize> MicromouseSimulator<N> {
                     if continue_next_cmd {
                         return true;
                     }
-                    // let _s = enter_process(format!("sim_span_step{i}"));
-                    // tokio::time::sleep(Duration::from_millis(500)).await;
                 }
                 self.full_map.mouse = transformed_move
                     .at_step(current_cmd.max_step_count())
@@ -145,10 +143,8 @@ impl<const N: usize> MicromouseSimulator<N> {
                     ))))
                     .await
                     .expect("Panic on sendinc cmd_finished");
-                // continue 'next_cmd;
                 true
             }
-            // .instrument(process_span(format!("sim_cmd_{}", msg.cmd_id.link())))
             .instrument(span!(
                 Level::INFO,
                 "process",
@@ -162,6 +158,5 @@ impl<const N: usize> MicromouseSimulator<N> {
             }
         }
 
-        // Self { full_map }
     }
 }

@@ -77,7 +77,6 @@ pub fn test_path_return() {
         let mut path_ref = PathReference::new(path.clone(), &mut map_display);
 
         path_ref.set_char('*');
-        // path_ref.apply_style(Style::new().red().on_green());
 
         let map_str = format!("\n{map_display}");
 
@@ -102,7 +101,6 @@ pub fn test_path_return() {
         let mut path_ref = PathReference::new(path.clone(), &mut map_display);
 
         path_ref.set_char('*');
-        // path_ref.apply_style(Style::new().red().on_green());
 
         let map_str = format!("\n{map_display}");
 
@@ -132,7 +130,6 @@ pub fn test_path_return() {
         let mut path_ref = PathReference::new(path.clone(), &mut map_display);
 
         path_ref.set_char('*');
-        // path_ref.apply_style(Style::new().red().on_green());
 
         let map_str = format!("\n{map_display}");
 

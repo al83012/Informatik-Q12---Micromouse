@@ -440,13 +440,6 @@ impl<const N: usize> MicromouseManager<N> {
         self.queue_length_sender
             .send(self.unconfirmed_cmd.lock().await.len())
             .expect("Stays const, shouldn't error");
-        // let mut queue_length_receiver = self.queue_length_receiver.lock().await;
-        // let val = queue_length_receiver.borrow_and_update();
-        //
-        // if *val < self.target_queue_length {
-        //     // Re-updating to get the attention
-        //     self.queue_length_sender.send(*val).expect("Stays const, shouldn't error");
-        // }
     }
 
     /// Sets the current_cmd to none, returns the old one; Should NEVER return None
@@ -471,8 +464,6 @@ impl<const N: usize> MicromouseManager<N> {
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Result<(), MicromouseManagerError> {
         info!(target: "comm/mng/cmd", "UPDATING CURRENT CMD ID");
-        // let (transformed_cmd, mut current_cmd) = self.current_command.lock().await;
-        // let mut current_cmd = self.current_command.lock().await;
         if current_cmd.is_none() {
             debug!(target: "comm/mng/cmd", "NO CURRENT CMD REGISTERED");
             // Get the command we just started from the list of unconfirmed commands (commands that
@@ -508,7 +499,6 @@ impl<const N: usize> MicromouseManager<N> {
             let expected_next_id = self
                 .next_cmd_process_id
                 .load(std::sync::atomic::Ordering::SeqCst);
-            // let expected_next_id = last_processed_id + 1;
             if expected_next_id == response_cmd_id.0 {
                 info!(target: "comm/mng/cmd", "Cmd Id matches next expected --> Next cmd; now = {expected_next_id}, next = {}", expected_next_id + 1);
                 self.next_cmd_process_id
@@ -575,14 +565,8 @@ pub enum MicromouseEvent {
     DebugMessage(String),
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),
     Desync,
-    // WsConnectionEvent(WsChannelConnInfo),
 }
 
-// #[derive(Debug)]
-// pub enum CommandSendError {
-//     /// The strategy was manually stopped, no command should be sent, it will be voided
-//     StoppedExecution,
-// }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MicromouseManagerError {

@@ -21,7 +21,6 @@ pub enum StrategyComputationResult<const N: usize, S: Strategy<N>> {
     Computed(Result<ComputedActions<N, S>, StrategyEndState>),
 }
 
-// pub type ComputedActions<const N: usize, S: Strategy<N>> = NonEmpty<Vec<ComputedAction<N, S>>>;
 pub struct ComputedActions<const N: usize, S: Strategy<N>>(pub NonEmpty<Vec<ComputedAction<N, S>>>);
 
 // The action that was computed from certain starting world state; Contains the next_strategy_state

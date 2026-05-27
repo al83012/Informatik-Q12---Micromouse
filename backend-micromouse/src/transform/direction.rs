@@ -111,12 +111,6 @@ impl Direction {
             let from_last = (transformed_rot_idx.abs() - 1) % 4;
             3 - from_last as usize
         };
-        // let idx = if transformed_rot_idx > 0 {
-        //     transformed_rot_idx as usize % 4
-        // } else {
-        //     let from_last = transformed_rot_idx.abs() as usize % 4;
-        //     3 - from_last
-        // };
 
         Self::COUNTER_CLOCKWISE_ROTATIONS[idx]
     }

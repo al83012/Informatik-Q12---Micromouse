@@ -42,6 +42,5 @@ impl FrontendSimulator {
         //     .await
         //     .expect("Error sending opening msg");
 
-        // Self { full_map }
     }
 }

@@ -235,43 +235,6 @@ impl Path {
         moves
     }
 
-    // Moves one position step towards the root of the path
-    // pub fn one_towards_root(&mut self) -> Vec<MovementType> {
-    //     if self.nodes.len() <= 1 {
-    //         return vec![];
-    //     }
-    //
-    //
-    //     let last = self.nodes.pop().expect("Checked");
-    //     let second_last = self.nodes.last().expect("Checked");
-    //
-    //     let mut moves = vec![];
-    //     if last.dir == second_last.dir {
-    //         // Move
-    //         let move_direction = last
-    //             .pos
-    //             .direction_straight_line(second_last.pos)
-    //             .expect("Should be in a line");
-    //         let rotate = last.dir.shortest_rotate_to(&move_direction);
-    //         if rotate != 0 {
-    //             moves.push(MovementType::Turn(rotate))
-    //         }
-    //
-    //         moves.push(MovementType::Move(
-    //             last.pos
-    //                 .distance_straight_line(second_last.pos)
-    //                 .expect("Should be in a line") as u8,
-    //         ));
-    //     } else {
-    //         // Rotation
-    //         let rotate = last.dir.shortest_rotate_to(&second_last.dir);
-    //         if rotate != 0 {
-    //             moves.push(MovementType::Turn(rotate))
-    //         }
-    //     }
-    //
-    //     moves
-    // }
 }
 
 #[derive(Debug, PartialEq, Clone)]

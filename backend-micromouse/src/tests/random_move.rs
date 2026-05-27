@@ -17,7 +17,6 @@ use crate::{
 
 #[test]
 pub fn do_random_moves() {
-    // let mut rng = rand::thread_rng();
     let mut world = test_world(0.6);
     let mut partial_world = PartialWorldData::<TEST_MAP_SIZE>::default();
     run_test("info", || {
@@ -60,37 +59,6 @@ pub fn do_random_moves() {
                     }
                 ]
             },
-            // Command {
-            //     ty: MovementType::Turn(-1),
-            //     interrupts: vec![MeasurementInterrupt {
-            //         direction: RelativeDirection::Left,
-            //         at_step: InterruptStep::At(0),
-            //         action: InterruptAction::StopIfOpen,
-            //     }],
-            // },
-            // Command {
-            //     ty: MovementType::Turn(-1),
-            //     interrupts: vec![
-            //         MeasurementInterrupt {
-            //             direction: RelativeDirection::Forward,
-            //             at_step: InterruptStep::At(0),
-            //             action: InterruptAction::StopIfOpen,
-            //         },
-            //         MeasurementInterrupt {
-            //             direction: RelativeDirection::Right,
-            //             at_step: InterruptStep::At(0),
-            //             action: InterruptAction::StopIfBlocked,
-            //         },
-            //     ],
-            // },
-            // Command {
-            //     ty: MovementType::Turn(1),
-            //     interrupts: vec![MeasurementInterrupt {
-            //         direction: RelativeDirection::Forward,
-            //         at_step: InterruptStep::At(0),
-            //         action: InterruptAction::StopIfOpen,
-            //     }],
-            // },
             // Escape from turning point
             Command {
                 ty: MovementType::Move(1),
@@ -101,45 +69,6 @@ pub fn do_random_moves() {
         let mut cmd_iter = commands.into_iter().cycle();
         let mut transf_move;
         for i in 0..500 {
-            // let ty = if rng.gen_range(0.0..1.0) > 0.2
-            //     && *world.measure_one(crate::direction::RelativeDirection::Forward)
-            //         == WallDiscoveryStatus::Exists(false)
-            // {
-            //     MovementType::Move(rng.gen_range(1..=4))
-            // } else {
-            //     MovementType::Turn(rng.gen_range(-1..=2))
-            // };
-            // let safety_interrupt = MeasurementInterrupt {
-            //     direction: crate::direction::RelativeDirection::Forward,
-            //     at_step: crate::comm::micromouse_message::InterruptStep::Each,
-            //     action: crate::comm::micromouse_message::InterruptAction::StopIfBlocked,
-            // };
-            // let measures = [
-            //     MeasurementInterrupt {
-            //         direction: crate::direction::RelativeDirection::Left,
-            //         at_step: crate::comm::micromouse_message::InterruptStep::Each,
-            //         action: crate::comm::micromouse_message::InterruptAction::Continue,
-            //     },
-            //     MeasurementInterrupt {
-            //         direction: crate::direction::RelativeDirection::Right,
-            //         at_step: crate::comm::micromouse_message::InterruptStep::Each,
-            //         action: crate::comm::micromouse_message::InterruptAction::Continue,
-            //     },
-            // ];
-            //
-            // let interrupts = measures
-            //     .into_iter()
-            //     .chain(
-            //         (if let MovementType::Move(_) = ty {
-            //             Some(safety_interrupt)
-            //         } else {
-            //             None
-            //         })
-            //         .into_iter(),
-            //     )
-            //     .collect();
-            //
-            // let next_cmd = Command { ty, interrupts };
 
             let next_cmd = cmd_iter.next().clone().expect("Iterator is cycling");
 
@@ -194,8 +123,6 @@ pub fn do_random_moves() {
                             let discoveries = partial_world.apply_measurement(&m);
                             debug!(target: "tests/map", "DISCOVERY: {discoveries:?}");
                         }
-                        // info!(target: "tests/map", "CURRENT partial: \n{partial_world}");
-                        // next cmd
                         break;
                     }
                 }

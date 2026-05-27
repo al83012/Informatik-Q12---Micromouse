@@ -344,19 +344,8 @@ impl std::fmt::Display for MapDisplay {
                 let style = &self.paint[row_num][col_num];
                 row_str.push_str(style.apply_to(c).to_string().as_str());
 
-                // write!(f, "{}", style.apply_to(c))?;
             }
             f.write_str(&row_str)?;
-            // std::io::stdout().write_all(row_str.as_bytes()).expect("errored");
-            // std::io::stdout().write_all("\n".as_bytes()).expect("errored");
-            // std::io::stdout().flush();
-            // let mut row: String = row
-            //     .iter()
-            //     .enumerate()
-            //     .map(|(col_num, c)| format!("{}", style(c.to_string()).red()))
-            //     .collect();
-            // row.push('\n');
-            // println!("Printing line: \n {row}");
 
             writeln!(f)?;
         }
@@ -375,42 +364,18 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
         for x in 0..dim {
             let pos = Position { x: x as u32, y: 0 };
             let dir = Direction::NegY;
-            // let upper_wall = self.wall(&pos, &dir).expect("Wall should exist");
-            // match upper_wall {
-            // WallDiscoveryStatus::Undiscovered => {
-            //     continue;
-            // }
-            // WallDiscoveryStatus::Exists(exists) => {
             let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
-            //     if *exists {
             wall.full().set_char('+');
             wall.inner().set_char('-');
             wall.full().apply_style(discovered_style.clone().red());
-            //             } else {
-            //                 wall.inner().apply_style(discovered_style.clone());
-            //             }
-            //         }
-            //     }
         }
         for y in 0..dim {
             let pos = Position { x: 0, y: y as u32 };
             let dir = Direction::NegX;
-            // let upper_wall = self.wall(&pos, &dir).expect("Wall should exist");
-            // match upper_wall {
-            //     WallDiscoveryStatus::Undiscovered => {
-            //         continue;
-            //     }
-            //     WallDiscoveryStatus::Exists(exists) => {
             let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
-            // if *exists {
             wall.full().set_char('+');
             wall.inner().set_char('|');
             wall.full().apply_style(discovered_style.clone().red());
-            //         } else {
-            //             wall.inner().apply_style(discovered_style.clone());
-            //         }
-            //     }
-            // }
         }
 
         for x in 0..dim {
@@ -434,10 +399,8 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
                         if *exists {
                             wall.full().set_char('+');
                             wall.inner().set_char('|');
-                            // wall.full().apply_style(Style::new().on_red());
                             wall.full().apply_style(discovered_style.clone().red());
                         } else {
-                            // wall.inner().apply_style(Style::new().on_red());
                             wall.inner().apply_style(discovered_style.clone());
                         }
                     }
@@ -454,10 +417,8 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
                         if *exists {
                             wall.full().set_char('+');
                             wall.inner().set_char('-');
-                            // wall.full().apply_style(Style::new().on_blue());
                             wall.full().apply_style(discovered_style.clone().red());
                         } else {
-                            // wall.inner().apply_style(Style::new().on_blue());
                             wall.inner().apply_style(discovered_style.clone());
                         }
                     }
@@ -467,7 +428,6 @@ impl<const N: usize> From<&Map<N>> for MapDisplay {
 
                 match cell {
                     CellDiscoveryStatus::Undiscovered => {
-                        // cell_vis.apply_style(Style::new().on_yellow());
                     }
                     CellDiscoveryStatus::Discovered => {
                         cell_vis.apply_style(discovered_style.clone());
@@ -512,17 +472,11 @@ impl<'a> CharRangeReference<'a> {
             error!(target: "test/op", "Underflow row");
             return None;
         }
-        // } else if *row_range.end() + d_c_row as usize + 1 > self.map.map_size() {
-        //     return None;
-        // }
 
         if d_c_col < 0 && *col_range.start() < d_c_col.unsigned_abs() {
             error!(target: "test/op", "Underflow col");
             return None;
         }
-        // } else if *col_range.end() + d_c_col as usize + 1 > self.map.map_size() {
-        //     return None;
-        // }
 
         Some(CharRangeReference {
             map: self.map,

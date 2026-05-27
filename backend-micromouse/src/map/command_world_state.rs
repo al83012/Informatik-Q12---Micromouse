@@ -233,21 +233,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     }
                 }
             }
-            //
-            // {
-            // if i > 0 {
-            //     if let MovementType::Move(_) = command.ty {
-            //         let current = next_step_start_requirements.mouse.pos;
-            //         let move_dir = next_step_start_requirements.mouse.dir;
-            //         let mark_dir = move_dir.rotated(2);
-            //         if let Some(wall) = next_step_start_requirements
-            //             .map
-            //             .wall_mut(&current, &mark_dir)
-            //         {
-            //             *wall = WallDiscoveryStatus::Visited;
-            //         }
-            //     }
-            // }
 
             // Encoding the info from transformed move, where the mouse is
             // --> Finally combining the map with movement
@@ -290,7 +275,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
                     debug!(target: "map/cmd/apl", "         >> NO CONTINUING WORLD");
 
                     if let Some(terminating_world) = &terminating_world {
-                        //debug!(target: "map/cmd/apl", "             >> TERMINATING_WORLD = \n{terminating_world}");
                         debug!(target: "map/cmd/apl", "        >> BUT FOUND TERMINATING WORLD");
                     } else {
                         error!(target: "map/cmd/apl", "             >> NO TERMINATING_WORLD EITHER");
@@ -330,7 +314,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
                 // or not
                 let continuing_world = continuing_world
                     .expect("Already handled forced end; This path **has** to continue");
-                // debug!(target: "map/cmd/apl", "CONTINUING WORLD {interrupt} at step {i}\n{continuing_world}");
                 debug!(target: "map/cmd/apl", "CONTINUING WORLD at step {i}\n{continuing_world}");
                 next_step_start_requirements = continuing_world.clone();
 
@@ -383,9 +366,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &self.command
     }
 
-    // pub fn max_step(&self) -> usize {
-    //     self.execution_steps.len()
-    // }
 
     pub fn command_unfiltered_max_step(&self) -> usize {
         self.command.max_step_count()
@@ -438,9 +418,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
         };
         let old_outcomes = self.potential_outcome_ids();
 
-        // for
-
-        // todo!()
 
         *self = Self::new(Some(new_filter), self.command.clone());
         let new_outcomes = self.potential_outcome_ids();
@@ -642,7 +619,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
             PartialWorldData::new(map_continued.into(), mouse_transf_at_step)
         })
 
-        // todo!()
     }
 
     #[instrument(
@@ -912,11 +888,6 @@ impl PathLocalInterruptId {
     }
 }
 
-// TODO:
-pub struct CommandApplicationIterator<const N: usize> {
-    next_step: usize,
-    application: FilteredCommandApplication<N>,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RejectedOutcomes {

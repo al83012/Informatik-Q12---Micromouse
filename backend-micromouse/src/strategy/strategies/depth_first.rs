@@ -437,8 +437,6 @@ impl<const N: usize> DepthFirst<N> {
             }
         }
 
-        // todo!("I acutally still need to check that there is not a visited cell behind those walls");
-
         Some(intersections)
     }
 

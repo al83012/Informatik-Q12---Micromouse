@@ -19,7 +19,6 @@ pub mod frontend_simulator;
 pub mod micromouse_simulator;
 mod path;
 mod random_move;
-mod shortcircuit_discovery;
 mod spans;
 mod test_map_discoveries;
 mod visual_tests;

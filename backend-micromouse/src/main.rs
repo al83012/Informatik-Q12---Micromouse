@@ -1,8 +1,3 @@
-
-// use env_logger::{Builder, Env};
-// use log4rs::{Config, Logger, append::console::ConsoleAppender, config::{Appender, Root}};
-
-
 use crate::utils::logging::init_logging;
 
 pub mod comm;

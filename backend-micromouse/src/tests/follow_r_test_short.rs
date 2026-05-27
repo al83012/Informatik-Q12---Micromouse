@@ -33,7 +33,6 @@ pub fn follow_r() {
     let world = super::test_map(0.5);
     init_tree_logger();
     let s = enter_process("test");
-    // let guards = init_logging();
     info!(target: "tests/map", "TEST WORLD:\n{world}");
     let mut micromouse_simulator = MicromouseSimulator::new(world);
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -51,7 +50,6 @@ pub fn follow_r() {
         .instrument(process_span("simulator")),
     );
     info!(target: "comm/msg_log", "****************************************************************************************");
-    // run_test("trace", || {
     rt.block_on(async {
         let micromouse_manager = MicromouseManager::<TEST_MAP_SIZE>::new(9001)
             .await
@@ -149,5 +147,4 @@ pub fn follow_r() {
         }
     }.instrument(process_span("manager")));
     local_cancel.cancel();
-    // });
 }

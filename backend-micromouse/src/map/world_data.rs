@@ -171,12 +171,7 @@ pub struct PartialWorldData<const N: usize>(WorldData<N>);
 
 impl<const N: usize> Display for PartialWorldData<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0 // "PARTIAL(pos = {:?}, dir = {:?})\n{}",
-                   // self.0.mouse.pos, self.0.mouse.dir, self.0.map
-        )
+        write!(f, "{}", self.0)
     }
 }
 
@@ -291,7 +286,6 @@ impl<const N: usize> PartialWorldData<N> {
                     return None;
                 }
             }
-            _ => return None,
         };
 
         Some(self)
@@ -340,10 +334,6 @@ pub struct CommandExecution<const N: usize> {
     pub next_step: usize,
 }
 
-// pub enum CommandStepResult<const N: usize> {
-//     Ongoing(CommandExecution<N>),
-//     Finished(WorldData<N>),
-// }
 
 pub enum EndState<const N: usize> {
     Ongoing(CommandExecution<N>),

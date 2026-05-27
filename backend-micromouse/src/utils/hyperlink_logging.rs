@@ -336,20 +336,6 @@ where
                 .ok();
                 writeln!(link_file, "</dl></details>").ok();
 
-                // writeln!(
-                //     link_file,
-                //     "<div>Linked span: {}</div>",
-                //     link_str(rel_back.to_string_lossy(), name)
-                // )
-                // .ok();
-
-                // let rel_to = diff_paths(&link_path, &current_dir).unwrap();
-                // writeln!(
-                //     file,
-                //     "<div>→ Related: {}</div>",
-                //     link_str(rel_to.to_string_lossy(), &link.name)
-                // )
-                // .ok();
             }
             if !visitor.links.is_empty() {
                 writeln!(file, "</details>").ok();

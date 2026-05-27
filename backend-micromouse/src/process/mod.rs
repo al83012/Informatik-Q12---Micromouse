@@ -28,7 +28,7 @@ pub struct Process<const N: usize> {
     frontend_manager: FrontendManager<N>,
     strategy_tree_manager: DynStrategyTreeManager<N>,
     cmd_queue: Sender<Command>,
-    cmd_queue_recv: Receiver<Command>, // strategy_tree: DynamicStrategyTree<N>
+    cmd_queue_recv: Receiver<Command>,
 }
 
 #[derive(Error, Debug)]
@@ -86,7 +86,6 @@ impl<const N: usize> Process<N> {
 
         let (cmd_queue, cmd_queue_recv) = channel(128);
 
-        // todo!()
 
         Ok(Self {
             cmd_queue,
@@ -109,7 +108,6 @@ impl<const N: usize> Process<N> {
             let frontend_response = self.frontend_manager.next_read();
             let sendable_cmd = self.cmd_queue_recv.recv();
 
-            // todo!("Handle conn event");
             tokio::select! {
                 cmd = sendable_cmd => {
                     let Some(cmd) = cmd else {
@@ -173,7 +171,11 @@ impl<const N: usize> Process<N> {
             .await;
     }
 
-    #[instrument(skip(self), name = "send_micromouse_cmd", fields(description = "Send command into command queue"))]
+    #[instrument(
+        skip(self),
+        name = "send_micromouse_cmd",
+        fields(description = "Send command into command queue")
+    )]
     pub async fn send_micromouse_cmd(&mut self, cmd: Command) {
         self.frontend_manager
             .send(FrontendMessage::Debug(format!("SENT COMMAND {cmd:?}")))
@@ -198,8 +200,7 @@ impl<const N: usize> Process<N> {
                 match self.strategy_tree_manager.update_filter(current_map) {
                     Ok(new_commands) => {
                         for command in new_commands {
-                            let send_res = self.micromouse_manager.send_command(command).await;
-                            // self.send_micromouse_cmd(command).await;
+                            let _send_res = self.micromouse_manager.send_command(command).await;
                         }
                     }
                     Err(e) => {
@@ -251,7 +252,6 @@ impl<const N: usize> Process<N> {
             .send(FrontendMessage::MicromouseEvent(micromouse_event))
             .await;
 
-        // todo!("Send the event to the frontend and if it modifies the strategy_tree, also do that and send the necessary events for that (to the frontend and to the micromouse)")
     }
 
     #[instrument(
@@ -281,6 +281,5 @@ impl<const N: usize> Process<N> {
                     .await;
             }
         }
-        // todo!("Modify the strategy_tree or send the appropriate commands to the Micromouse")
     }
 }

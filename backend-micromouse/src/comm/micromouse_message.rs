@@ -506,7 +506,6 @@ impl<const N: usize> TransformedCommand<N> {
         let mut results = vec![];
 
         let mut step_start = PartialWorldData::new(self.starting_map, self.start_transform);
-        // let mut step_start_transf = self.start_transform;
 
         for i in 0..max_step {
             for interrupt in self.command.interrupts.iter() {
@@ -546,13 +545,6 @@ impl<const N: usize> TransformedCommand<N> {
                         return results;
                     }
                     (WallDiscoveryStatus::Undiscovered, _action) => {
-                        // let terminating_case = match action {
-                        //     InterruptAction::StopIfOpen => WallDiscoveryStatus::Exists(false),
-                        //     InterruptAction::StopIfBlocked => WallDiscoveryStatus::Exists(true),
-                        //     _ => unreachable!(
-                        //         "Sorted out at the start, Continue-cases are not wanted here"
-                        //     ),
-                        // };
                         let terminating_world = step_start
                             .clone()
                             .with_interrupt_termination_triggered(
@@ -695,11 +687,6 @@ impl TryFrom<String> for CommandMessage {
                 direction: dir,
                 action,
             });
-            // let action = InterruptAction::try_from
-
-            // measurements_parsed.push(MeasurementInterrupt {
-            //     at_step: at,
-            // });
         }
         Ok(CommandMessage {
             cmd: Command {
@@ -736,17 +723,6 @@ impl TryFrom<String> for RelativeDirection {
     }
 }
 
-// impl TryFrom<String> for InterruptAction {
-//     type Error = FormatError<InterruptAction>;
-//     fn try_from(value: String) -> Result<Self, Self::Error> {
-//         match value.as_str() {
-//             "STOP-IF-BLOCKED" => Ok(InterruptAction::StopIfBlocked),
-//             "STOP-IF-OPEN" => Ok(InterruptAction::StopIfOpen),
-//             "CONTINUE" => Ok(InterruptAction::Continue),
-//             _ => Err(FormatError::new(value)),
-//         }
-//     }
-// }
 
 impl From<FormatError<InterruptStep>> for FormatError<CommandMessage> {
     fn from(value: FormatError<InterruptStep>) -> Self {

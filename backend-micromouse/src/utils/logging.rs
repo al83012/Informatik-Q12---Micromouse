@@ -140,8 +140,6 @@ where
 
         write!(writer, " {msg}")?;
 
-        // ctx.format_fields(writer.by_ref(), event)?;
-
         write!(writer, "{RESET_COLOR}")?;
 
         writeln!(writer)
@@ -193,8 +191,6 @@ where
         // header
         write!(writer, "{info} {msg} ",)?;
 
-        // ctx.format_fields(writer.by_ref(), event)?;
-
         writeln!(writer)
     }
 }
@@ -218,15 +214,10 @@ pub fn init_logging() -> Vec<WorkerGuard> {
     let fmt_layer = fmt::layer()
         .event_format(MyFormatter::new())
         .with_ansi(true);
-    // .with_filter(FilterFn::new(|meta| {
-    //     !meta.module_path().unwrap_or("").ends_with("websocket")
-    // }));
 
     let (non_blocking, guard) = file_writer::file_appender("comm/msg_log", "messages");
 
     let msg_log_layer = tracing_subscriber::fmt::layer()
-        // .with_file(true)
-        // .with_target(true)
         .with_ansi(true)
         .with_writer(non_blocking)
         .event_format(MyFormatter::new())

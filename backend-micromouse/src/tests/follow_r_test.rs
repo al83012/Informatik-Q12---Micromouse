@@ -22,10 +22,8 @@ use crate::{
 #[test]
 #[instrument(name = "follow_r_test_short")]
 pub fn follow_r_and_conn() {
-    // let guards = init_logging();
     init_tree_logger();
     info!(target: "comm/msg_log", "****************************************************************************************");
-    // run_test("trace", || {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         let micromouse_manager = MicromouseManager::<TEST_MAP_SIZE>::new(9001)
@@ -119,5 +117,4 @@ pub fn follow_r_and_conn() {
             }
         }
     })
-    // });
 }

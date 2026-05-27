@@ -68,12 +68,6 @@ pub enum WsChannelConnError {
     WsConnError(#[serde(skip)]  tungstenite::Error),
 }
 
-fn ser_t_err<S>(val: tungstenite::Error, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer {
-    todo!()
-
-}
 
 impl From<tungstenite::Error> for WsChannelConnError {
     fn from(value: tungstenite::Error) -> Self {
@@ -128,10 +122,8 @@ pub struct WsChannelInternal {
     port: u16,
     #[cfg(feature = "comm_stats")]
     latency_stats: StatAccumulator,
-    // latency_stats: incr_stats::incr::Stats,
     #[cfg(feature = "comm_stats")]
     period_stats: StatAccumulator,
-    // period_stats: incr_stats::incr::Stats,
 }
 
 impl WsChannelInternal {
@@ -185,10 +177,8 @@ impl WsChannelInternal {
             port,
             #[cfg(feature = "comm_stats")]
             latency_stats: StatAccumulator::new(1000),
-            // latency_stats: incr_stats::incr::Stats::new(),
             #[cfg(feature = "comm_stats")]
             period_stats: StatAccumulator::new(1000),
-            // period_stats: incr_stats::incr::Stats::new(),
         })
     }
 
@@ -338,14 +328,6 @@ impl WsChannelInternal {
                                 debug!(target: "comm/stats", "{}", percentiles_period);
                             }
                         }
-                        // let _ = self.latency_stats.array_update(&[time_since_last_ping.as_millis() as f64]);
-                        // let _ = self.period_stats.array_update(&[time_since_last_pong.as_millis() as f64]);
-                        // let avg_latency = self.latency_stats.sum().unwrap() as u32 / self.latency_stats.count();
-                        // let avg_period = self.period_stats.sum().unwrap() as u32 / self.latency_stats.count();
-                        // let sd_latency = self.latency_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
-                        // let sd_period = self.period_stats.sample_standard_deviation().map(|v| v.to_string()).unwrap_or("/".to_string());
-                        // info!(target: "comm", "LATENCY: Ø = {avg_latency}, σ = {sd_latency}");
-                        // info!(target: "comm", "PERIOD : Ø = {avg_period}, σ = {sd_period}");
                     }
                     self.last_pong = Instant::now();
                 }
@@ -477,12 +459,6 @@ impl WsChannelInternal {
 
         info!(target: "comm", "RECONNECT ACCEPTED ({new_connection_addr})");
 
-        // match accept_async(tcp_stream).await {
-        //     Ok(ws_stream) => self.ws_stream = ws_stream,
-        //     Err(e) => {
-        //         self.handle_recoverable_ws_error(e).await?;
-        //     }
-        // }
 
         info!(target: "comm", "CLOSING OLD WS");
         let _ = self

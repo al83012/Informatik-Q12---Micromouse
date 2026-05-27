@@ -8,7 +8,6 @@ use crate::{
 #[test]
 #[ignore]
 fn test_simple_conn() {
-    // let guards = init_logging();
     init_tree_logger();
     let rt = tokio::runtime::Runtime::new().unwrap();
     info!(target: "test/webs", "Attempting simple connection");

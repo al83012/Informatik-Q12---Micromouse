@@ -164,7 +164,6 @@ impl<const N: usize> FrontendConnectionManagerInternal<N> {
     )]
     pub async fn next_read(read_source: &WsChannel) -> Option<Message> {
         read_source.read().await
-        // todo!("Only one state in the future; should never interrupt execution halfway through")
     }
     #[instrument(
         name = "next_send",
@@ -218,7 +217,6 @@ impl<const N: usize> FrontendConnectionManagerInternal<N> {
             error!(target: "comm/webs", "Invalid message: {msg}");
             return;
         };
-        // let parsed_msg = todo!("Parse command or cmd close");
         self.read_queue
             .send(parsed)
             .await

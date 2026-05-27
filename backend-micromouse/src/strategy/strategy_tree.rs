@@ -83,11 +83,6 @@ pub struct AbsoluteLayerId(pub usize);
 // The lowest layer of a tree has id 0
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize)]
 pub struct RelativeLayerId(pub usize);
-//
-// pub enum StrategyTreeError {
-//     MultipleSuccessors,
-//     NoSuccessor,
-// }
 
 #[derive(Debug)]
 pub struct StrategyTreeConfig<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> {
@@ -173,17 +168,6 @@ pub struct TreeCreationSuccess<
     pub origin_command: Option<Command>,
 }
 
-// impl From<TreeExpansionError> for TreeCreationError {
-//     fn from(value: TreeExpansionError) -> Self {
-//         Self::ExpansionError(value)
-//     }
-// }
-//
-// impl From<StrategyEndState> for TreeCreationError {
-//     fn from(value: StrategyEndState) -> Self {
-//         Self::StrategyError(value)
-//     }
-// }
 
 impl<const N: usize, S> StrategyTree<N, S>
 where
@@ -237,7 +221,6 @@ where
                         Some(S::from_config(&tree_config.strategy_config, world));
                 });
 
-                // let highest_sent_layer = last_layer.absolute_layer_id;
 
                 let tree = Self {
                     config: tree_config,
@@ -352,7 +335,6 @@ where
 
             // in step 0, it will be the lowest non-expanded layer
             let layer_to_expand = highest_full_layer + RelativeLayerId(i + 1);
-            // let layer_to_expand = self.lowest_expandable_layer();
             let non_expanded_node_ids = {
                 let layer = self
                     .layer_mut(layer_to_expand)
@@ -371,7 +353,6 @@ where
                     node_id: non_expanded_node_id,
                 };
 
-                // todo!("Handle different outputs; only count up if necc, prop errors");
 
                 let node_expansion_result = self.try_expand_node(abs_node_id);
                 match node_expansion_result {
@@ -508,7 +489,6 @@ where
                         from_node: parent_node,
                         branch: child_path_id,
                     };
-                    // let child_world = if
                     // TODO: maybe reset child_world
                     let child_node = StrategyTreeNode::new_leaf(
                         child_world.clone(),
@@ -595,19 +575,11 @@ where
     }
 
     fn fully_expanded_layer_count(&self) -> usize {
-        // self.layers
-        //     .iter()
-        //     .map(|l| if l.is_fully_expanded { 1 } else { 0 })
-        //     .sum()
         self.highest_full_layer + 1
     }
 
     fn highest_full_layer(&self) -> AbsoluteLayerId {
         self.first_layer_absolute_id + RelativeLayerId(self.highest_full_layer)
-        // self.layers
-        //     .iter().find(|l| !l.is_fully_expanded)
-        //     .map(|l| l.absolute_layer_id)
-        //     .expect("There should always be a layer that has not yet been fully expanded (as expansion creates new non-expanded layers)")
     }
 
     fn node(&self, node_id: AbsoluteNodeId) -> Option<&StrategyTreeNode<N, S>> {
@@ -1159,22 +1131,6 @@ pub struct AbsolutePathId {
     pub branch: PathLocalOutcomeId,
 }
 
-// impl From<PruneError> for StrategyTreeError {
-//     fn from(value: PruneError) -> Self {
-//         Self::WhilePruning(value)
-//     }
-// }
-// impl From<TreeExpansionError> for StrategyTreeError {
-//     fn from(value: TreeExpansionError) -> Self {
-//         Self::WhileExpanding(value)
-//     }
-// }
-//
-// impl From<TreeCreationError> for StrategyTreeError {
-//     fn from(value: TreeCreationError) -> Self {
-//         Self::WhileCreating(value)
-//     }
-// }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize)]
 pub struct RelativeNodeId(pub usize);
