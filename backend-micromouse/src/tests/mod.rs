@@ -4,24 +4,25 @@ use rand::{Rng, RngExt};
 use tracing::debug;
 
 use crate::{
-    transform::direction::{Direction, DirectionNormalizedVector},
     map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
+    map::world_data::{WorldData, SIM_MAX_DEPTH},
+    transform::direction::{Direction, DirectionNormalizedVector},
     transform::position::{MouseTransform, Position, PositionOffset},
-    map::world_data::{SIM_MAX_DEPTH, WorldData},
 };
 
+mod conn_website;
+mod follow_r_test;
+mod follow_r_test_short;
+mod follow_r_test_short_with_fe;
+mod frontend_msg_parsing;
+pub mod frontend_simulator;
+pub mod micromouse_simulator;
+mod path;
 mod random_move;
+mod shortcircuit_discovery;
+mod spans;
 mod test_map_discoveries;
 mod visual_tests;
-mod shortcircuit_discovery;
-pub mod follow_r_test;
-pub mod follow_r_test_short;
-pub mod micromouse_simulator;
-mod frontend_msg_parsing;
-mod conn_website;
-mod spans;
-mod path;
-mod follow_r_test_short_with_fe;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
@@ -39,7 +40,6 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
     // [row][col] = [y][x]
     let mut groups = Vec::<Vec<usize>>::new();
     let mut possible_connections = HashMap::<Position, HashSet<Direction>>::new();
-
 
     debug!(target: "tests/map/gen", "Initializing...");
 

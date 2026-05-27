@@ -53,10 +53,12 @@ impl ProcessError {
 }
 
 impl<const N: usize> Process<N> {
+    pub const MICROMOUSE_PORT: u16 = 9001;
+    pub const FRONTEND_PORT: u16 = 8090;
     #[instrument(name = "new Process", fields(description = "Create the main process"))]
     pub async fn new() -> Result<Self, ProcessError> {
         let frontend_manager = FrontendManager::new(
-            9001,
+            Self::FRONTEND_PORT,
             FrontendConnectionConfig {
                 batching_duration: Duration::from_millis(50),
                 ws_channel_config: WsChannelConfig::default(),
@@ -65,7 +67,7 @@ impl<const N: usize> Process<N> {
         .await
         .map_err(ProcessError::frontend_conn)?;
 
-        let micromouse_manager = MicromouseManager::new()
+        let micromouse_manager = MicromouseManager::new(Self::MICROMOUSE_PORT)
             .await
             .map_err(ProcessError::micromouse_conn)?;
 
@@ -171,6 +173,7 @@ impl<const N: usize> Process<N> {
             .await;
     }
 
+    #[instrument(skip(self), name = "send_micromouse_cmd", fields(description = "Send command into command queue"))]
     pub async fn send_micromouse_cmd(&mut self, cmd: Command) {
         self.frontend_manager
             .send(FrontendMessage::Debug(format!("SENT COMMAND {cmd:?}")))
@@ -195,7 +198,7 @@ impl<const N: usize> Process<N> {
                 match self.strategy_tree_manager.update_filter(current_map) {
                     Ok(new_commands) => {
                         for command in new_commands {
-                            self.micromouse_manager.send_command(command).await;
+                            let send_res = self.micromouse_manager.send_command(command).await;
                             // self.send_micromouse_cmd(command).await;
                         }
                     }

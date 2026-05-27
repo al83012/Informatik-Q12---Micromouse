@@ -425,6 +425,7 @@ pub struct MeasurementMessage {
 
 /// Represents a movement in the context of its starting conditions: Does not do any work to figure
 /// out interrupts; believes the movement will succeed
+#[derive(Debug)]
 pub struct TransformedMovement {
     start_transform: MouseTransform,
     pub movement: MovementType,

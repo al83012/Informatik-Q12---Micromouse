@@ -4,6 +4,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::{
     comm::micromouse_message::{
@@ -71,6 +72,10 @@ impl ClumpedDFTask {
 impl<const N: usize> FromConfig<N> for DepthFirst<N> {
     type Config = DepthFirstConfig;
 
+    #[instrument(
+        name = "from_config DepthFirst",
+        fields(description = "Create new DepthFirst-Strategy instance based on config")
+    )]
     fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self {
         let starting_transf = starting_state.mouse;
         let starting_pos = starting_transf.pos;
@@ -104,13 +109,11 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
     }
 }
 
-impl<const N: usize> DepthFirst<N> {
-    pub fn add_task_to_queue(&mut self, task: DFTask) {
-        todo!()
-    }
-}
-
 impl<const N: usize> Strategy<N> for DepthFirst<N> {
+    #[instrument(
+        name = "next_cmd DepthFirst",
+        fields(description = "Try to get next action")
+    )]
     fn next_cmd(
         &self,
         world: &crate::map::world_data::PartialWorldData<N>,
@@ -340,6 +343,12 @@ impl<const N: usize> DepthFirst<N> {
     ///
     ///
     /// To conclude: The function checks not only if the
+    #[instrument(
+        name = "check_current_fully_measured",
+        fields(
+            description = "Check whether the given command is fully measured, i.e. if all the walls along its path are known"
+        )
+    )]
     pub fn check_current_fully_measured(
         &self,
         projected_termination_state: &PartialWorldData<N>,
@@ -433,6 +442,11 @@ impl<const N: usize> DepthFirst<N> {
         Some(intersections)
     }
 
+    #[instrument(
+        name = "add_task_directions",
+        skip(branches),
+        fields(description = "Add the given directions to the exploration-stack")
+    )]
     pub fn add_task_directions<'a>(
         &mut self,
         branches: impl IntoIterator<Item = &'a MouseTransform>,
@@ -452,6 +466,7 @@ impl<const N: usize> DepthFirst<N> {
         }
     }
 
+    #[instrument(name = "is_visitable", fields(description = "Check whether a given cell is visitable (non visited + inside map)"))]
     pub fn is_visitable(map: Map<N>, from_cell: Position, direction: Direction) -> bool {
         let d_offset = DirectionNormalizedVector::from(direction);
 

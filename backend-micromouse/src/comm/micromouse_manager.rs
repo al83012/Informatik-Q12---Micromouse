@@ -30,7 +30,7 @@ use crate::{
     },
     transform::position::MouseTransform,
     utils::{
-        hyperlink_logging::{LinkFileName, process_span},
+        hyperlink_logging::{process_span, LinkFileName},
         nonempty::{NonEmpty, PotentiallyNonEmpty},
     },
 };
@@ -58,10 +58,10 @@ pub struct InternalMapUpdate {
 
 impl<const N: usize> MicromouseManager<N> {
     #[instrument(name = "new")]
-    pub async fn new() -> Result<Self, WsChannelConnError> {
+    pub async fn new(port: u16) -> Result<Self, WsChannelConnError> {
         // let _s = process_span("MicromouseManager_new");
         info!(target: "comm/mng", "CREATING NEW MicromouseManager");
-        let new_channel = WsChannel::new(WsChannelConfig::default(), 9001).await?;
+        let new_channel = WsChannel::new(WsChannelConfig::default(), port).await?;
         let (queue_length_sender, queue_length_receiver) = watch::channel(0);
         queue_length_sender
             .send(0)
@@ -84,7 +84,7 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     #[instrument(skip(self), name = "send_command")]
-    pub async fn send_command(&self, cmd: Command) -> Result<CommandId, CommandSendError> {
+    pub async fn send_command(&self, cmd: Command) -> CommandId {
         debug!(target: "comm/mng/cmd", "Adding cmd to queue {cmd:?}");
         let cmd_id = CommandId(
             self.next_cmd_send_id
@@ -113,7 +113,8 @@ impl<const N: usize> MicromouseManager<N> {
             link_cmd_id = cmd_id.link(),
         ))
         .await;
-        Ok(cmd_id)
+        //Ok(cmd_id)
+        cmd_id
     }
 
     // Returns boolean --> true = was resent, false = already finished, exited queue
@@ -144,7 +145,6 @@ impl<const N: usize> MicromouseManager<N> {
     pub async fn set_mode(&self, mode: MicromouseMode) {
         *self.mode.lock().await = mode;
     }
-
 
     /// WARN: Even when the event cannot be handled: Polling the next-function is necessary for the
     /// communication to continue (even though the channel will spin up a separate thread to keep
@@ -578,11 +578,11 @@ pub enum MicromouseEvent {
     // WsConnectionEvent(WsChannelConnInfo),
 }
 
-#[derive(Debug)]
-pub enum CommandSendError {
-    /// The strategy was manually stopped, no command should be sent, it will be voided
-    StoppedExecution,
-}
+// #[derive(Debug)]
+// pub enum CommandSendError {
+//     /// The strategy was manually stopped, no command should be sent, it will be voided
+//     StoppedExecution,
+// }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MicromouseManagerError {

@@ -28,7 +28,7 @@ pub fn follow_r_and_conn() {
     // run_test("trace", || {
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        let micromouse_manager = MicromouseManager::<TEST_MAP_SIZE>::new()
+        let micromouse_manager = MicromouseManager::<TEST_MAP_SIZE>::new(9001)
             .await
             .expect("MICROMOUSE CONN ERR");
 
@@ -84,7 +84,7 @@ pub fn follow_r_and_conn() {
                     let next_cmd = always_right_commands[next_cmd_id].clone();
                     info!(target: "comm/mng/cmd", "SENT NEXT COMMAND: {next_cmd:?}");
                     next_cmd_id = (next_cmd_id + 1) % always_right_commands.len();
-                    micromouse_manager.send_command(next_cmd).await.expect("SENDING FAILED");
+                    micromouse_manager.send_command(next_cmd).await;
                     // Need next command
                 }
                 msg = micromouse_manager.await_next_read() => {

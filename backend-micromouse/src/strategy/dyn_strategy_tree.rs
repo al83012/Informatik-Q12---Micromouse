@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{Receiver, Sender};
+use tracing::instrument;
 
 use crate::{
     comm::micromouse_message::Command,
@@ -68,6 +69,10 @@ pub struct StrategyChangeCommand<const N: usize> {
 }
 
 impl<const N: usize> DynStrategyTreeManager<N> {
+    #[instrument(
+        name = "new DynStrategyTreeManager",
+        fields(description = "Create new Strategy Tree Manager")
+    )]
     pub fn new(
         starting_condition: WorldData<N>,
         strategy_config: DynStrategyConfig<N>,
@@ -84,7 +89,12 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         )
     }
 
-    /// Is unsafe as it leaves self in the improper "Closed"-State
+    ///  WARN: Leaves self.strategy_tree in the Closed-Variant
+    #[instrument(
+        skip(self),
+        name = "erase_strat",
+        fields(description = "Erase the last strategy, enabling the application of a new one")
+    )]
     unsafe fn erase_strat(&mut self) -> SentUnfinishedCommands<N> {
         macro_rules! erase_strat {
             ([$($variant:ident),+]) => {
@@ -113,6 +123,11 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         ])
     }
 
+    #[instrument(
+        skip(self),
+        name = "set_starting_cond",
+        fields(description = "Set new strategy start (given an already running strat manager)")
+    )]
     fn set_starting_cond(
         &mut self,
         starting_condition: StrategyStart<N>,
@@ -156,6 +171,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         Ok(())
     }
 
+    #[instrument(
+        name = "new_starting_cond",
+        fields(description = "Create entirely new Strategy Manager with given conditions")
+    )]
     fn new_starting_cond(
         starting_condition: WorldData<N>,
         strategy_config: DynStrategyConfig<N>,
@@ -209,12 +228,22 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         Ok(res)
     }
 
+    #[instrument(
+        skip(self),
+        name = "send_cmd",
+        fields(description = "Add cmd to internal queue")
+    )]
     fn send_cmd(&mut self, cmd: Command) {
         self.command_sender
             .send(cmd)
             .expect("Channel should not be closed");
     }
 
+    #[instrument(
+        skip(self),
+        name = "await_cmd",
+        fields(description = "Wait for new command from the queue")
+    )]
     pub async fn await_cmd(&mut self) -> Command {
         self.command_receiver
             .recv()
@@ -223,7 +252,14 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     }
 
     /// Called upon an update_map-Event being sent
-    pub fn update_filter(&mut self, map: Map<N>) -> Result<Vec<Command>, StrategyTreeError> /* -> ? */ {
+    #[instrument(
+        skip(self),
+        name = "update_filter",
+        fields(
+            description = "Do a full filter-update (update strategy tree using map-information)"
+        )
+    )]
+    pub fn update_filter(&mut self, map: Map<N>) -> Result<Vec<Command>, StrategyTreeError> {
         let partial = map.into();
         macro_rules! update_filter {
             ([$($variant:ident),+]) => {
@@ -252,6 +288,13 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         ])
     }
 
+    #[instrument(
+        skip(self),
+        name = "set_pos_to_start_and_restart",
+        fields(
+            description = "Clear the entire strategy state and make it assume the default starting position (Does not reset command queue of the micromouse); Restarts current strategy"
+        )
+    )]
     pub fn set_pos_to_start_and_restart(&mut self) -> Result<(), StrategyTreeError> {
         self.modify(StrategyChangeCommand {
             set_postion: Some(MouseTransform {
@@ -264,6 +307,11 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         })
     }
 
+    #[instrument(
+        skip(self),
+        name = "update_pos",
+        fields(description = "Overwrite the postion that is assumed; Restarts current strategy")
+    )]
     pub fn update_pos(&mut self, transform: MouseTransform) -> Result<(), StrategyTreeError> /* --> ? */
     {
         self.modify(StrategyChangeCommand {
@@ -274,6 +322,11 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         })
     }
 
+    #[instrument(
+        skip(self),
+        name = "finish_current_cmd",
+        fields(description = "React to command completion (assume root to be finished)")
+    )]
     pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, FinishRootError> /* -> ? */
     {
         macro_rules! finish_current_cmd {
@@ -309,6 +362,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
     // pub fn apply_measurement(&mut self)
 
+    #[instrument(skip(self), name = "modify", fields(description = "Freely change the current strategy (erasing old one)"))]
     pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<(), StrategyTreeError> {
         let StrategyChangeCommand {
             set_postion,

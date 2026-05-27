@@ -15,6 +15,7 @@
 // WARN:
 // See notes on ipad
 
+use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     ops::Sub,
@@ -37,6 +38,24 @@ use crate::{
     transform::direction::RelativeDirection,
     utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
 };
+
+
+impl<const N: usize> std::fmt::Debug for FilteredCommandApplication<N> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[derive(Debug)]
+        struct FCDisplay<'a> {
+            command: &'a Command,
+            transformed_move: &'a TransformedMovement,
+        }
+
+        let t = FCDisplay {
+            command: &self.command,
+            transformed_move: &self.transformed_move
+        };
+
+        fmt::Debug::fmt(&t, f)
+    }
+}
 
 pub struct FilteredCommandApplication<const N: usize> {
     // containing steps 0..<n

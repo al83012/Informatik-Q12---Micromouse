@@ -66,6 +66,7 @@ pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     is_sent: bool,
 }
 
+#[derive(Debug)]
 pub struct SentTreeLayer<const N: usize> {
     nodes: HashMap<RelativeNodeId, SentCommandNode<N>>,
     absolute_layer_id: AbsoluteLayerId,
@@ -107,6 +108,7 @@ pub struct StrategyTreeNode<const N: usize, S: Strategy<N>> {
     pub as_branch_from_parent: Option<AbsolutePathId>,
 }
 
+#[derive(Debug)]
 pub struct SentCommandNode<const N: usize> {
     pub on_basis_of_world: PartialWorldData<N>,
     pub applied_strategy: NodeActionResult<N>,
@@ -115,6 +117,7 @@ pub struct SentCommandNode<const N: usize> {
 
 type NodeActionResult<const N: usize> = Result<NodeAction<N>, StrategyEndState>;
 
+#[derive(Debug)]
 pub struct NodeAction<const N: usize> {
     pub command: FilteredCommandApplication<N>,
     pub potential_outcomes: HashMap<PathLocalOutcomeId, AbsoluteNodeId>,
@@ -142,6 +145,7 @@ pub struct TreeExpansionSuccess {
     layers: usize,
 }
 
+#[derive(Debug)]
 pub enum StrategyStart<const N: usize> {
     ContinueAfterDoing {
         after_cmds: SentUnfinishedCommands<N>,
@@ -638,10 +642,6 @@ where
         }
     }
 
-    pub fn delete_non_sent() {
-        todo!("Delete all those nodes which are still deletable as the micromouse doesn't have them in the buffer yet")
-    }
-
     // removes the root, making its successor the new root; if the successor was not yet expanded
     // into a command, it will do so at this point, returning its NodeAction
     #[instrument(
@@ -811,6 +811,7 @@ where
         }
     }
 
+    #[instrument(skip(self), name = "prune_node", fields(link_node_id = node_and_children.link(), description = "Delete a node and all of its children"))]
     fn prune_node(&mut self, node_and_children: AbsoluteNodeId) -> Result<(), PruneError> {
         let Some(node_to_delete) = self.node(node_and_children) else {
             return Err(PruneError::UnknownNode(node_and_children));
@@ -1178,6 +1179,7 @@ pub struct AbsolutePathId {
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Serialize)]
 pub struct RelativeNodeId(pub usize);
 
+#[derive(Debug)]
 pub enum SentUnfinishedCommands<const N: usize> {
     HasQueue {
         // They are Strategy-Agnostic by not allowing the nodes to expand, which allows us to leave out
@@ -1209,6 +1211,7 @@ impl Add<RelativeLayerId> for AbsoluteLayerId {
 }
 
 impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
+    #[instrument(name = "non_expandable_from_cleaned", fields(link_layer_id = sent_layer.absolute_layer_id.link(), description = "Turns an erased layer into a typed strategy tree layer that has no type-specific value"))]
     pub fn non_expandable_from_cleaned(sent_layer: SentTreeLayer<N>) -> Self {
         let nodes = sent_layer.nodes.into_iter();
         let transformed_nodes = nodes
@@ -1237,6 +1240,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
     pub fn node_mut(&mut self, node_id: RelativeNodeId) -> Option<&mut StrategyTreeNode<N, S>> {
         self.nodes.get_mut(&node_id)
     }
+    #[instrument(name = "new StrategyTreeLayer", fields(link_layer_id = absolute_layer_id.link()))]
     pub fn new(absolute_layer_id: AbsoluteLayerId) -> Self {
         Self {
             node_id_counter: RelativeNodeIdCounter::default(),
@@ -1249,6 +1253,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         }
     }
 
+    #[instrument(name = "add_node", skip(self, node), fields(link_layer_id = self.absolute_layer_id.link()))]
     pub fn add_node(&mut self, node: StrategyTreeNode<N, S>) -> RelativeNodeId {
         let next_id = self.node_id_counter.next();
         self.nodes.insert(next_id, node);
@@ -1256,6 +1261,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         next_id
     }
 
+    #[instrument(name = "delete_node", skip(self), fields(link_layer_id = self.absolute_layer_id.link(), link_node_id = AbsoluteNodeId{ layer_id: self.absolute_layer_id, node_id: node }.link()))]
     pub fn delete_node(&mut self, node: RelativeNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
         let Some(node) = self.nodes.remove(&node) else {
             return Err(PruneError::UnknownNode(AbsoluteNodeId {
@@ -1270,6 +1276,13 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         Ok(c.potential_outcomes.values().cloned().collect())
     }
 
+    #[instrument(
+        name = "equal_command",
+        skip(self),
+        fields(
+            description = "Check whether a layer's commands are all equal and return it if it exists"
+        )
+    )]
     pub fn equal_command(&self) -> Option<Command> {
         if !self.is_fully_expanded {
             return None;
@@ -1297,6 +1310,11 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
     }
 
     // Returns true, if the layer has a common command
+    #[instrument(
+        name = "update_eq_command",
+        skip(self),
+        fields(description = "Update the layer's common command")
+    )]
     pub fn update_eq_command(&mut self) -> bool {
         if self.eq.is_some() {
             return true;
@@ -1354,6 +1372,7 @@ impl<const N: usize> SentCommandNode<N> {
 }
 
 impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
+    #[instrument(name = "new_leaf", skip(state_at_start_of_node), fields(description = "Create new leaf-node at end of path", link_branch_id = at.link()))]
     pub fn new_leaf(
         world_at_start_of_node: PartialWorldData<N>,
         state_at_start_of_node: Option<S>,
@@ -1367,6 +1386,11 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
         }
     }
 
+    #[instrument(
+        name = "new_orphan",
+        skip(state_at_start_of_node),
+        fields(description = "Create new node without parent")
+    )]
     pub fn new_orphan(
         world_at_start_of_node: PartialWorldData<N>,
         state_at_start_of_node: Option<S>,
@@ -1379,6 +1403,12 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
         }
     }
 
+    #[instrument(
+        name = "non_expandable_from_cleaned",
+        fields(
+            description = "Converts an erased node back to a typed node (but without type-specific values)"
+        )
+    )]
     pub fn non_expandable_from_cleaned(cleaned: SentCommandNode<N>) -> Self {
         Self {
             on_basis_of_world: cleaned.on_basis_of_world,
@@ -1412,6 +1442,7 @@ pub enum LayerReductionError {
 
 impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTreeLayer<N> {
     type Error = LayerReductionError;
+    #[instrument(name = "try_from StrategyTreeLayer", skip(value), fields(link_layer_id = value.absolute_layer_id.link(), description = "Erase layer's strategy"))]
     fn try_from(value: StrategyTreeLayer<N, S>) -> Result<Self, Self::Error> {
         if !value.is_fully_expanded {
             return Err(LayerReductionError::LayerNotExpanded);
