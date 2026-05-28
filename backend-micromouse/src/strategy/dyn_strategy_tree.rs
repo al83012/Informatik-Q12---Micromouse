@@ -50,7 +50,7 @@ pub struct DynStrategyTreeManager<const N: usize> {
     max_nodes: usize,
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
 pub enum DynStrategyConfig<const N: usize> {
     DepthFirst(<DepthFirst<N> as FromConfig<N>>::Config),
     BreadthFirst(<BreadthFirst<N> as FromConfig<N>>::Config),
@@ -60,7 +60,7 @@ pub enum DynStrategyConfig<const N: usize> {
     DbgKnownPath(<DbgKnownPath<N> as FromConfig<N>>::Config),
 }
 
-#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
 pub struct StrategyChangeCommand<const N: usize> {
     pub set_postion: Option<MouseTransform>,
     pub reset_map: bool,

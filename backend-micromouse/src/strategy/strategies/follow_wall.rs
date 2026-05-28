@@ -22,7 +22,7 @@ pub struct FollowWall<const N: usize> {
     visited: HashSet<MouseTransform>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Copy)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Copy, Serialize)]
 pub enum WallDirection {
     Left,
     Right,
@@ -37,7 +37,7 @@ impl From<WallDirection> for RelativeDirection {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FollowWallConfig {
     pub follow_wall: WallDirection,
 }

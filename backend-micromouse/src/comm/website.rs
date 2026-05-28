@@ -29,7 +29,7 @@ pub struct DiscoveryMessage {
     pub wall_discoveries: Vec<WallDiscovery>,
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, Deserialize)]
 pub enum FrontendMessage {
     MicromouseEvent(MicromouseEvent),
     StrategyTreeError(StrategyTreeError),
@@ -39,7 +39,7 @@ pub enum FrontendMessage {
     ConfirmLastChange,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub enum FrontendResponse<const N: usize> {
     StrategyChange(StrategyChangeCommand<N>),
     Pause,

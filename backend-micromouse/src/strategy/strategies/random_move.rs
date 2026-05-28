@@ -6,7 +6,7 @@ use crate::strategy::strategy::{FromConfig, Strategy};
 #[derive(Clone, Debug)]
 pub struct RandomMove<const N: usize>;
 
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct RandomMoveConfig;
 
 impl<const N: usize> FromConfig<N> for RandomMove<N> {

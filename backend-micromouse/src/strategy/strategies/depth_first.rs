@@ -32,7 +32,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 pub struct DepthFirstConfig {
     pub forward_first: bool,
 }

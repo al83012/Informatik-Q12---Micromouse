@@ -550,7 +550,7 @@ pub enum MicromouseMode {
     Running,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum MicromouseEvent {
     UpdatePosition(MouseTransform),
     UpdatedMap(NonEmpty<DiscoveryMessage>),

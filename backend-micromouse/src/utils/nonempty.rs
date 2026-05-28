@@ -1,9 +1,9 @@
 use std::{fmt::Display, ops::Deref};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct NonEmpty<T: Sized>(T);
 
 
@@ -65,12 +65,12 @@ impl<T> Deref for NonEmpty<T> {
 }
 
 
-impl<T> Serialize for NonEmpty<T> 
-where T: Serialize
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer {
-        self.0.serialize(serializer)
-    }
-}
+// impl<T> Serialize for NonEmpty<T> 
+// where T: Serialize
+// {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer {
+//         self.0.serialize(serializer)
+//     }
+// }

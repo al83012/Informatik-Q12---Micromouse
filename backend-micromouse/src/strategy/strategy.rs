@@ -8,7 +8,7 @@ use crate::{
     utils::nonempty::NonEmpty,
 };
 
-#[derive(Clone, Debug, Serialize, Error)]
+#[derive(Clone, Debug, Serialize, Error, Deserialize)]
 pub enum StrategyEndState {
     #[error("No possible action to reach goal ({0})")]
     NoPossibleAction(String),
@@ -32,7 +32,7 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
     pub after_command: Command,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GoalPosition(pub Position);
 
 

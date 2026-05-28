@@ -1,7 +1,7 @@
 use std::{io::ErrorKind, net::SocketAddr, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use thiserror::Error;
 use tokio::{
     net::{TcpListener, TcpStream},
@@ -41,7 +41,7 @@ pub enum WsChannelMode {
     Stable,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum WsChannelConnInfo {
     Error(WsChannelConnError),
     Connect,
@@ -60,12 +60,16 @@ impl From<WsChannelConnError> for WsChannelConnInfo {
     }
 }
 
-#[derive(Debug, Error, Serialize)]
+#[derive(Debug, Error, Serialize, Deserialize)]
 pub enum WsChannelConnError {
     #[error("Failed to meet connection guidelines ")]
     ChannelConnError(ChannelConnError),
     #[error("Websocket failed")]
-    WsConnError(#[serde(skip)]  tungstenite::Error),
+    WsConnError(#[serde(skip, default = "default_ws_conn_err")]  tungstenite::Error),
+}
+
+fn default_ws_conn_err() -> tungstenite::Error {
+    tungstenite::Error::ConnectionClosed
 }
 
 
