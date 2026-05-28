@@ -216,12 +216,14 @@ where
                 after_cmds: SentUnfinishedCommands::HasQueue { layers },
                 reset_world,
             } => {
-                let num_of_unfinished_cmds = layers.len();
+                info!(target: "strat", "Continue after doing");
+                // let num_of_unfinished_cmds = layers.len();
                 let node_count = layers.iter().map(|l| l.node_count).sum::<usize>();
                 let first_layer_absolute_id = layers
                     .first()
                     .map(|l| l.absolute_layer_id)
                     .unwrap_or(AbsoluteLayerId(0));
+                info!(target: "strat", link_layer_id = first_layer_absolute_id.link(), "First layer which was sent, but not finished = {first_layer_absolute_id:?}");
 
                 let layers = layers.into_inner().into_iter();
                 let mut transformed_layers = layers
@@ -230,6 +232,7 @@ where
 
                 let last_layer = transformed_layers.last_mut().expect("layers are nonempty");
                 let last_layer_id = last_layer.absolute_layer_id;
+                info!(target: "strat", link_layer_id = last_layer_id.link(), "Last layer which was sent, but not finished = {last_layer_id:?}");
 
                 // WARN:
                 // The last layer contained in the sent unfinished commands is a layer, which was
@@ -271,6 +274,7 @@ where
                         after_cmds: SentUnfinishedCommands::HasBlockingRoot { world },
                         reset_world,
                     } => {
+                        info!(target: "strat", "Continue after blocking root");
                         if reset_world {
                             world.only_pos()
                         } else {
@@ -281,6 +285,7 @@ where
                     _ => panic!("Covered previously"),
                 };
 
+                info!(target: "strat", "Without previous Strategy");
                 let first_strategy = S::from_config(&tree_config.strategy_config, &starting_state);
 
                 let first_layer_id = AbsoluteLayerId(0);
@@ -339,6 +344,7 @@ where
         skip(self)
     )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
+        info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
         const MIN_LAYER: usize = 2;
         let node_budget = self.config.max_nodes.saturating_sub(self.node_count);
         let layer_budget = self
@@ -350,6 +356,8 @@ where
 
         let mut nodes_created = 0;
         let mut layers_fully_expanded = 0;
+
+        let starting_full_layer = self.highest_full_layer;
 
         // Once a layer in-between was not fully expanded, that layer and all layers after that
         // will not incr the fully_expanded_layer-counter
@@ -368,10 +376,15 @@ where
             }
 
             // in step 0, it will be the lowest non-expanded layer
-            let layer_to_expand = match self.highest_full_layer {
+            let layer_to_expand = match starting_full_layer {
                 MarkerLayerId::NotExistant => self.first_layer_absolute_id + RelativeLayerId(i),
-                MarkerLayerId::AtLayer(l) => l + RelativeLayerId(i + 1),
+                MarkerLayerId::AtLayer(l) => l + RelativeLayerId(i),
             };
+            let _s = span!(
+                Level::INFO,
+                "expand_layer",
+                link_layer_id = layer_to_expand.link()
+            );
             let non_expanded_node_ids = {
                 let layer = self
                     .layer_mut(layer_to_expand)
@@ -384,11 +397,6 @@ where
                     .map(|(k, _v)| *k)
                     .collect::<Vec<_>>()
             };
-            let _s = span!(
-                Level::INFO,
-                "expand_layer",
-                link_layer_id = layer_to_expand.link()
-            );
 
             'layer_expansion: for non_expanded_node_id in non_expanded_node_ids {
                 let abs_node_id = AbsoluteNodeId {
