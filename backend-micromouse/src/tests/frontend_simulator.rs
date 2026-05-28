@@ -44,7 +44,7 @@ impl FrontendSimulator {
     }
     #[instrument(skip(self), name = "run")]
     pub async fn run(&mut self) {
-        let (mut ws_stream, response) = tokio_tungstenite::connect_async("ws://localhost:9002")
+        let (mut ws_stream, response) = tokio_tungstenite::connect_async("ws://localhost:8090")
             .await
             .expect("Connection failed");
         info!(target: "test/sim", " < Connection Response = {response:?}");
@@ -69,8 +69,10 @@ impl FrontendSimulator {
                 // Ping or other msg
                 continue;
             };
-            let frontend_msg: FrontendMessage = serde_json::de::from_str(frontend_msg)
-                .expect("Message from backend should always be parseable");
+            let Ok(frontend_msg) = serde_json::de::from_str(frontend_msg) else {
+                warn!(target: "tests/sim/webs", "Non-pareseable msg {frontend_msg:?}");
+                continue;
+            };
 
             info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg:?}");
 
