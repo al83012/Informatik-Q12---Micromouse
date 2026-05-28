@@ -37,7 +37,12 @@ struct LogVisitor {
 impl Visit for LogVisitor {
     fn record_str(&mut self, field: &Field, value: &str) {
         if field.name() == "name" {
-            self.name = Some(value.to_string());
+            let name = value
+                .to_string();
+                // .split_at_checked(10)
+                // .map(|m| m.0.to_string())
+                // .unwrap_or(value.to_string());
+            self.name = Some(name);
         } else if field.name() == "message" {
             self.message = Some(value.to_string());
         } else if field.name().starts_with("link_") {
@@ -271,12 +276,14 @@ where
 
         let name = visitor.name.as_deref().unwrap_or(span.metadata().name());
 
+        let short_name = name.split_at_checked(8).map(|m| m.0).unwrap_or(name);
+
         let parent_dir = span
             .parent()
             .and_then(|p| p.extensions().get::<LogSpan>().map(|s| s.dir.clone()))
             .unwrap_or_else(|| self.run_root.clone());
 
-        let current_dir = parent_dir.join(name);
+        let current_dir = parent_dir.join(short_name);
         let current_file = current_dir.join(BASE_FILE);
         let parent_file = parent_dir.join(BASE_FILE);
 
@@ -335,7 +342,6 @@ where
                 )
                 .ok();
                 writeln!(link_file, "</dl></details>").ok();
-
             }
             if !visitor.links.is_empty() {
                 writeln!(file, "</details>").ok();
@@ -376,7 +382,8 @@ where
                 let name = &link.name;
                 let link_dir = self.run_root.join(&link.category);
                 let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
-                let rel_to = diff_paths(&link_path, &current_dir).unwrap();
+                let rel_to =
+                    diff_paths(&link_path, current_dir.parent().expect("Should exist")).unwrap();
                 writeln!(
                     file,
                     "    <dt>{cat}</dt><dd>{}</dd>",
@@ -457,7 +464,15 @@ where
             writeln!(main_log_file, "<details class='log-entry'><summary>").ok();
             writeln!(main_log_file, "  <pre>{}</pre>", event_str).ok();
             writeln!(main_log_file, "</summary><div class='expanded-entry'><dl>").ok();
-            writeln!(main_log_file, "    <dt>SOURCE</dt><dd><code>{}</code></dd>", link_str(link_to_file.to_string_lossy(), current_file.to_string_lossy())).ok();
+            writeln!(
+                main_log_file,
+                "    <dt>SOURCE</dt><dd><code>{}</code></dd>",
+                link_str(
+                    link_to_file.to_string_lossy(),
+                    current_file.to_string_lossy()
+                )
+            )
+            .ok();
             writeln!(main_log_file, "</dl></div></details>").ok();
         }
         let mut file = self.get_file(&current_file);
