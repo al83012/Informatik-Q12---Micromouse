@@ -2,7 +2,7 @@ use std::sync::mpsc;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{Receiver, Sender};
-use tracing::instrument;
+use tracing::{info, instrument};
 
 use crate::{
     comm::micromouse_message::Command,
@@ -165,7 +165,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         self.strategy_tree = new_tree;
 
         if let Some(cmd) = cmd {
-            self.send_cmd(cmd);
+            self.send_cmd(cmd.clone());
         }
 
         Ok(())
@@ -235,8 +235,9 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     )]
     fn send_cmd(&mut self, cmd: Command) {
         self.command_sender
-            .send(cmd)
+            .send(cmd.clone())
             .expect("Channel should not be closed");
+        info!(target: "strat", "Queued dyn strategy cmd {cmd:?}");
     }
 
     #[instrument(
@@ -312,8 +313,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "update_pos",
         fields(description = "Overwrite the postion that is assumed; Restarts current strategy")
     )]
-    pub fn update_pos(&mut self, transform: MouseTransform) -> Result<(), StrategyTreeError> 
-    {
+    pub fn update_pos(&mut self, transform: MouseTransform) -> Result<(), StrategyTreeError> {
         self.modify(StrategyChangeCommand {
             set_postion: Some(transform),
             reset_map: false,
@@ -327,8 +327,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "finish_current_cmd",
         fields(description = "React to command completion (assume root to be finished)")
     )]
-    pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, FinishRootError> 
-    {
+    pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, FinishRootError> {
         macro_rules! finish_current_cmd {
             ([$($variant:ident),+]) => {
 
@@ -362,7 +361,11 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
     // pub fn apply_measurement(&mut self)
 
-    #[instrument(skip(self), name = "modify", fields(description = "Freely change the current strategy (erasing old one)"))]
+    #[instrument(
+        skip(self),
+        name = "modify",
+        fields(description = "Freely change the current strategy (erasing old one)")
+    )]
     pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<(), StrategyTreeError> {
         let StrategyChangeCommand {
             set_postion,
@@ -376,7 +379,6 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         self.goal_pos = set_goal.unwrap_or(self.goal_pos);
 
         let erased = unsafe { self.erase_strat() };
-
 
         let strategy_start = StrategyStart::ContinueAfterDoing {
             after_cmds: erased,

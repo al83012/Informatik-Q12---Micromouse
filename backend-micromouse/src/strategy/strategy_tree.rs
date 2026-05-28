@@ -324,8 +324,13 @@ where
                     .map_err(TreeCreationError::from)?;
                 let first_cmd = root_send.command.command().clone();
 
+
+                // Actually mark layers as eq
+                res.update_equal_layers();
+
+                // By returning the origin_command, it is basically the same as sending that layer
                 res.highest_sent_layer = MarkerLayerId::AtLayer(first_layer_id);
-                res.highest_eq_layer = MarkerLayerId::AtLayer(first_layer_id);
+
 
                 Ok(TreeCreationSuccess {
                     tree: res,
@@ -974,7 +979,7 @@ where
         };
         let highest_eq_layer_offset = match self.highest_eq_layer {
             MarkerLayerId::NotExistant => {
-                error!(target: "strat", "There is not a single eq layer while updating eq layers; Should only be the case at startup");
+                // error!(target: "strat", "There is not a single eq layer while updating eq layers; Should only be the case at startup");
                 -1
             }
             MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).0 as i32,
@@ -1575,12 +1580,15 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTr
     #[instrument(name = "try_from StrategyTreeLayer", skip(value), fields(link_layer_id = value.absolute_layer_id.link(), description = "Erase layer's strategy"))]
     fn try_from(value: StrategyTreeLayer<N, S>) -> Result<Self, Self::Error> {
         if !value.is_fully_expanded {
+            error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not fully expanded");
             return Err(LayerReductionError::LayerNotExpanded);
         }
         if value.eq.is_none() {
+            error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not equal");
             return Err(LayerReductionError::LayerNotEq);
         }
         if value.is_sent {
+            error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not sent");
             return Err(LayerReductionError::LayerNotSent);
         }
 

@@ -19,7 +19,10 @@ use crate::{
         websocket::{WsChannel, WsChannelConfig, WsChannelConnError, WsChannelConnInfo},
     },
     map::map::{CellDiscovery, WallDiscovery},
-    strategy::{dyn_strategy_tree::StrategyChangeCommand, strategy::StrategyEndState, strategy_tree::StrategyTreeError},
+    strategy::{
+        dyn_strategy_tree::StrategyChangeCommand, strategy::StrategyEndState,
+        strategy_tree::StrategyTreeError,
+    },
     utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty},
 };
 
@@ -46,7 +49,7 @@ pub enum FrontendResponse<const N: usize> {
     Continue,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BatchedFrontendMessage(pub Vec<FrontendMessage>);
 
 impl Into<Message> for BatchedFrontendMessage {

@@ -12,7 +12,7 @@ use crate::{
             CommandMessage, InterruptAction, InterruptOccurence, MeasurementMessage,
             MeasurementOccurrence, MicromouseResponse, TransformedMovement,
         },
-        website::{FrontendMessage, FrontendResponse},
+        website::{BatchedFrontendMessage, FrontendMessage, FrontendResponse},
     },
     map::{
         map::Map,
@@ -28,7 +28,7 @@ use crate::{
         strategy::GoalPosition,
     },
     transform::position::{MouseTransform, Position},
-    utils::hyperlink_logging::{enter_process, process_span, LinkFileName},
+    utils::hyperlink_logging::{LinkFileName, enter_process, process_span},
 };
 
 pub struct FrontendSimulator {
@@ -54,9 +54,9 @@ impl FrontendSimulator {
             .await
             .expect("Error sending opening msg");
 
-        while let Some(frontend_msg) = ws_stream.next().await {
-            let Ok(frontend_msg) = frontend_msg else {
-                error!(target: "tests/sim/webs", "Error while receiving from backend {}", frontend_msg.expect_err("Checked"));
+        while let Some(frontend_msg_batch) = ws_stream.next().await {
+            let Ok(frontend_msg_batch) = frontend_msg_batch else {
+                error!(target: "tests/sim/webs", "Error while receiving from backend {}", frontend_msg_batch.expect_err("Checked"));
                 ws_stream
                     .close(Some(tungstenite::protocol::CloseFrame {
                         code: CloseCode::Error,
@@ -65,61 +65,70 @@ impl FrontendSimulator {
                     .await;
                 return;
             };
-            let Ok(frontend_msg) = frontend_msg.to_text() else {
+            let Ok(frontend_msg_batch) = frontend_msg_batch.to_text() else {
                 // Ping or other msg
                 continue;
             };
-            let Ok(frontend_msg) = serde_json::de::from_str(frontend_msg) else {
-                warn!(target: "tests/sim/webs", "Non-pareseable msg {frontend_msg:?}");
+            let Ok(frontend_msg_batch) = serde_json::de::from_str::<BatchedFrontendMessage>(frontend_msg_batch) else {
+                warn!(target: "tests/sim/webs", "Non-parseable msg {frontend_msg_batch:?}");
                 continue;
             };
 
-            info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg:?}");
+            info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg_batch:?}");
 
-            match frontend_msg {
-                FrontendMessage::MicromouseEvent(MicromouseEvent::Error(e)) => {
-                    error!(target: "tests/sim/webs", "Error in micromouse: {e:?}");
-                    ws_stream
-                        .close(Some(tungstenite::protocol::CloseFrame {
-                            code: CloseCode::Error,
-                            reason: Utf8Bytes::from_static(
-                                "Encountered Error on read from backend",
-                            ),
-                        }))
-                        .await;
-                    return;
-                }
-                FrontendMessage::MicromouseEvent(_) => {}
-                FrontendMessage::StrategyTreeError(strategy_tree_error) => {
-                    error!(target: "tests/sim/webs", "Error in strategy tree: {strategy_tree_error:?}");
-                    ws_stream
-                        .close(Some(tungstenite::protocol::CloseFrame {
-                            code: CloseCode::Error,
-                            reason: Utf8Bytes::from_static(
-                                "Encountered Error on read from backend",
-                            ),
-                        }))
-                        .await;
-                    return;
-                }
-                FrontendMessage::StrategyEnd(strategy_end_state) => {
-                    match strategy_end_state {
-                        crate::strategy::strategy::StrategyEndState::NoPossibleAction(msg) => {
-                            warn!(target: "tests/sim/webs", "Strategy cannot continue: {msg}");
-                        }
-                        crate::strategy::strategy::StrategyEndState::ReachedGoal => {
-                            info!(target: "tests/sim/webs", "Strategy ended; Reached Goal")
-                        }
+            for frontend_msg in frontend_msg_batch.0 {
+                match frontend_msg {
+                    FrontendMessage::MicromouseEvent(MicromouseEvent::Error(e)) => {
+                        error!(target: "tests/sim/webs", "Error in micromouse: {e:?}");
+                        ws_stream
+                            .close(Some(tungstenite::protocol::CloseFrame {
+                                code: CloseCode::Error,
+                                reason: Utf8Bytes::from_static(
+                                    "Encountered Error on read from backend",
+                                ),
+                            }))
+                            .await;
+                        return;
                     }
-                    let next_strat = self.other_strategy();
-                    ws_stream
-                        .send(Message::Text(Utf8Bytes::from(next_strat)))
-                        .await
-                        .expect("Sending should not just panic");
+                    FrontendMessage::MicromouseEvent(_) => {}
+                    FrontendMessage::StrategyTreeError(strategy_tree_error) => {
+                        error!(target: "tests/sim/webs", "Error in strategy tree: {strategy_tree_error:?}");
+                        ws_stream
+                            .close(Some(tungstenite::protocol::CloseFrame {
+                                code: CloseCode::Error,
+                                reason: Utf8Bytes::from_static(
+                                    "Encountered Error on read from backend",
+                                ),
+                            }))
+                            .await;
+                        return;
+                    }
+                    FrontendMessage::StrategyEnd(strategy_end_state) => {
+                        match strategy_end_state {
+                            crate::strategy::strategy::StrategyEndState::NoPossibleAction(msg) => {
+                                warn!(target: "tests/sim/webs", "Strategy cannot continue: {msg}");
+                            }
+                            crate::strategy::strategy::StrategyEndState::ReachedGoal => {
+                                info!(target: "tests/sim/webs", "Strategy ended; Reached Goal")
+                            }
+                        }
+                        let next_strat = self.other_strategy();
+                        ws_stream
+                            .send(Message::Text(Utf8Bytes::from(next_strat)))
+                            .await
+                            .expect("Sending should not just panic");
+                    }
+                    FrontendMessage::MicromouseConnectionEvent(ws_channel_conn_info) => {
+                        info!(target: "tests/sim/webs", "Micromouse Connection Event >> {ws_channel_conn_info:?}");
+                    },
+                    FrontendMessage::Debug(msg) => {
+                        info!(target: "tests/sim/webs", "DEBUG {msg}");
+                    },
+                    FrontendMessage::ConfirmLastChange => {
+                        info!(target: "tests/sim/webs", "Confirmed Last Change");
+                    },
                 }
-                FrontendMessage::MicromouseConnectionEvent(ws_channel_conn_info) => todo!(),
-                FrontendMessage::Debug(_) => todo!(),
-                FrontendMessage::ConfirmLastChange => todo!(),
+
             }
         }
     }

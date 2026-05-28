@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use thiserror::Error;
 use tokio::sync::mpsc::*;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument, Instrument};
 
 use crate::{
     comm::{
@@ -21,14 +21,13 @@ use crate::{
         strategy_tree::{StrategyTree, StrategyTreeError},
     },
     transform::position::Position,
+    utils::hyperlink_logging::process_span,
 };
 
 pub struct Process<const N: usize> {
     micromouse_manager: MicromouseManager<N>,
     frontend_manager: FrontendManager<N>,
     strategy_tree_manager: DynStrategyTreeManager<N>,
-    cmd_queue: Sender<Command>,
-    cmd_queue_recv: Receiver<Command>,
 }
 
 #[derive(Error, Debug)]
@@ -84,12 +83,7 @@ impl<const N: usize> Process<N> {
             200,
         )?;
 
-        let (cmd_queue, cmd_queue_recv) = channel(128);
-
-
         Ok(Self {
-            cmd_queue,
-            cmd_queue_recv,
             frontend_manager,
             micromouse_manager,
             strategy_tree_manager,
@@ -106,13 +100,11 @@ impl<const N: usize> Process<N> {
             let micromouse_response = self.micromouse_manager.await_next_read();
             let micromouse_conn_event = self.micromouse_manager.await_next_conn_event();
             let frontend_response = self.frontend_manager.next_read();
-            let sendable_cmd = self.cmd_queue_recv.recv();
+            let sendable_cmd = self.strategy_tree_manager.await_cmd();
 
             tokio::select! {
                 cmd = sendable_cmd => {
-                    let Some(cmd) = cmd else {
-                        continue;
-                    };
+                    info!(target: "proc", "New sendable cmd ({cmd:?})");
                     self.send_micromouse_cmd(cmd).await;
                 }
                 micromouse_conn_event = micromouse_conn_event => {
@@ -177,13 +169,14 @@ impl<const N: usize> Process<N> {
         fields(description = "Send command into command queue")
     )]
     pub async fn send_micromouse_cmd(&mut self, cmd: Command) {
+        let cmd_id = self.micromouse_manager.send_command(cmd.clone()).await;
+
         self.frontend_manager
-            .send(FrontendMessage::Debug(format!("SENT COMMAND {cmd:?}")))
+            .send(FrontendMessage::Debug(format!(
+                "SENT COMMAND {cmd_id} {cmd:?}"
+            )))
             .await;
-        self.cmd_queue
-            .send(cmd)
-            .await
-            .expect("Channel should be open");
+        info!(target: "proc", "SENT COMMAND ({cmd:?}) with id {cmd_id}");
     }
 
     #[instrument(
@@ -251,7 +244,6 @@ impl<const N: usize> Process<N> {
         self.frontend_manager
             .send(FrontendMessage::MicromouseEvent(micromouse_event))
             .await;
-
     }
 
     #[instrument(
