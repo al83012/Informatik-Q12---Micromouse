@@ -6,7 +6,10 @@ use tracing::{info, instrument};
 
 use crate::{
     comm::micromouse_message::Command,
-    map::{command_world_state::RejectedOutcomes, map::Map, measurement::Measurement, world_data::WorldData},
+    map::{
+        command_world_state::RejectedOutcomes, map::Map, measurement::Measurement,
+        world_data::WorldData,
+    },
     strategy::{
         strategies::{
             breadth_first::BreadthFirst, dbg_known_path::DbgKnownPath, depth_first::DepthFirst,
@@ -289,15 +292,15 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         ])
     }
 
-
-#[instrument(
+    #[instrument(
         skip(self),
         name = "prune_current",
-        fields(
-            description = "Prune using the given RejectedOutcomes"
-        )
+        fields(description = "Prune using the given RejectedOutcomes")
     )]
-    pub fn prune_current(&mut self, rejected: &RejectedOutcomes) -> Result<Vec<Command>, StrategyTreeError> {
+    pub fn prune_current(
+        &mut self,
+        rejected: &RejectedOutcomes,
+    ) -> Result<Vec<Command>, StrategyTreeError> {
         macro_rules! prune_current {
             ([$($variant:ident),+]) => {
 

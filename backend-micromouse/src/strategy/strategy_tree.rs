@@ -50,10 +50,11 @@ impl PartialOrd for MarkerLayerId {
     }
 }
 
-// impl Ord for MarkerLayerId {
-//     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-//     }
-// }
+impl Ord for MarkerLayerId {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.partial_cmp(other).expect("Implemented")
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Error, Deserialize)]
 pub enum StrategyTreeError {
@@ -786,7 +787,7 @@ where
                 info!(target: "strat", link_node_id = successor.link(), "Successor marks end of strategy_execution; Will need new strategy");
                 // We know that this is expanding a full layer, since the new root layer only
                 // contains the successor
-                /*self.highest_full_layer = match self.highest_full_layer {
+                self.highest_full_layer = match self.highest_full_layer {
                     MarkerLayerId::NotExistant => {
                         error!(target: "strat", "Highest Full layer does not exsit, but we are finishing root, which was sent");
                         MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
@@ -806,7 +807,7 @@ where
                         MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
                     }
                     MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                };*/
+                };
                 return Err(FinishRootError::SuccessorIsEnd(s));
             }
             NodeExpansionResult::Expanded(_) => {
@@ -814,13 +815,14 @@ where
                 // We know that this is expanding a full layer, since the new root layer only
                 // contains the successor
                 // layer is now fully expanded
-                /*self.highest_full_layer = match self.highest_full_layer {
-                    MarkerLayerId::NotExistant => {
-                        error!(target: "strat", "Highest Full layer does not exsit, but we are finishing root, which was sent");
-                        MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
-                    }
-                    MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                };*/
+                self.highest_full_layer = self.highest_full_layer.max(MarkerLayerId::AtLayer(self.first_layer_absolute_id));
+                // self.highest_full_layer = match self.highest_full_layer {
+                //     MarkerLayerId::NotExistant => {
+                //         error!(target: "strat", "Highest Full layer does not exsit, but we are finishing root, which was sent");
+                //         MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
+                //     }
+                //     MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
+                // };
             }
         }
 

@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, time::Duration};
 
 use thiserror::Error;
-use tokio::sync::mpsc::*;
+use tokio::{sync::mpsc::*, time};
 use tracing::{error, info, instrument, Instrument};
 
 use crate::{
@@ -98,6 +98,7 @@ impl<const N: usize> Process<N> {
         fields(description = "Execute the main process")
     )]
     pub async fn run(mut self) {
+        let mut tick = time::interval(Duration::from_secs(1));
         loop {
             let micromouse_response = self.micromouse_manager.await_next_read();
             let micromouse_conn_event = self.micromouse_manager.await_next_conn_event();
@@ -135,6 +136,9 @@ impl<const N: usize> Process<N> {
                 frontend_msg = frontend_response => {
                     info!(target: "proc", "F RESPONSE");
                     self.handle_frontend_command(frontend_msg).await;
+                }
+                _ = tick.tick() => {
+                    info!(target: "proc/tests", "TICK");
                 }
             }
         }
@@ -278,7 +282,8 @@ impl<const N: usize> Process<N> {
                             .send(FrontendMessage::StrategyEnd(end))
                             .await
                     }
-                    Ok(None) => {}
+                    Ok(None) => {
+                    }
                     Err(e) => {
                         self.frontend_manager
                             .send(FrontendMessage::StrategyTreeError(e.into()))
