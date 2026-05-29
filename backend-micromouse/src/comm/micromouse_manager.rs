@@ -626,14 +626,14 @@ impl From<CertainStepError> for MicromouseManagerError {
 impl From<InternalMapUpdate> for Vec<MicromouseEvent> {
     fn from(value: InternalMapUpdate) -> Self {
         let mut vec = Vec::with_capacity(3);
+        if let Some(x) = value.rejected_outcomes {
+            vec.push(MicromouseEvent::RejectedOutcomes(x))
+        }
         if let Some(x) = value.new_transf {
             vec.push(MicromouseEvent::UpdatePosition(x))
         }
         if let Some(x) = value.discoveries {
             vec.push(MicromouseEvent::UpdatedMap(x))
-        }
-        if let Some(x) = value.rejected_outcomes {
-            vec.push(MicromouseEvent::RejectedOutcomes(x))
         }
         vec
     }
