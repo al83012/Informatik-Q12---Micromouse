@@ -21,10 +21,12 @@ pub enum StrategyComputationResult<const N: usize, S: Strategy<N>> {
     Computed(Result<ComputedActions<N, S>, StrategyEndState>),
 }
 
+#[derive(Debug)]
 pub struct ComputedActions<const N: usize, S: Strategy<N>>(pub NonEmpty<Vec<ComputedAction<N, S>>>);
 
 // The action that was computed from certain starting world state; Contains the next_strategy_state
 // after completing that action
+#[derive(Debug)]
 pub struct ComputedAction<const N: usize, S: Strategy<N>> {
     // If the next_strategy_state is None, it means that this state is not meant to compute a next
     // step (It was likely created as the result of a batched action)

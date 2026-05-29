@@ -462,7 +462,8 @@ where
             } else {
                 layers_fully_expanded += 1;
                 // The highest full layer is the layer after one in which all nodes were expanded
-                self.highest_full_layer = MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
+                self.highest_full_layer =
+                    MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
                 info!(target: "strat", "Increase full layers to {:?}", self.highest_full_layer);
                 // self.highest_full_layer = match self.highest_full_layer {
                 //     MarkerLayerId::NotExistant => {
@@ -508,13 +509,16 @@ where
         // INFO: ############# Checking that it isn't already expanded ##############################
         if node.applied_strategy.is_some() {
             // The node already is fully expanded
+            info!(target: "strat", "Alreay Expanded");
             return NodeExpansionResult::AlreadyExpanded;
         }
 
         let basis_world = &node.on_basis_of_world;
+        info!(target: "strat", "BASED ON WORLD: \n{basis_world}");
 
         // INFO: ############# Checking that it has a strategy needed for expansion ##############################
         let Some(basis_strategy_state) = &node.on_basis_of_state else {
+            info!(target: "strat", "NO ASSOCIATED STRATEGY --> Not expandable");
             // There is no strategy to base this expansion on
             return NodeExpansionResult::NotExpandable;
         };
@@ -523,12 +527,15 @@ where
         let StrategyComputationResult::Computed(expansion_actions) =
             basis_strategy_state.next_cmd(basis_world, &goal_position)
         else {
+            info!(target: "strat", "Not yet expandable");
             return NodeExpansionResult::NotYetExpandable;
         };
+        info!(target: "strat", "EXPANSION: \n{expansion_actions:#?}");
 
         let expansion_actions: ComputedActions<N, S> = match expansion_actions {
             Ok(o) => o,
             Err(e) => {
+                info!(target: "strat", "=> Expanded to EndState");
                 // Only trigger this error if this node is reached
                 node.applied_strategy = Some(Err(e.clone()));
                 return NodeExpansionResult::EndState(e);
@@ -544,6 +551,7 @@ where
         // INFO: ############# If there are multiple substeps, apply on all the children of
         // expansion ##############################
         for expansion_action in expansion_actions.0.into_inner().into_iter() {
+            info!(target: "strat", "Applying action: {expansion_action:?}");
             let do_cmd = expansion_action.after_command;
             let strategy_state_after = expansion_action.next_strategy_state;
 
@@ -551,10 +559,11 @@ where
             // there could be an entire collection of them
             let mut new_apply_on_node = vec![];
             for parent_node in apply_on_node {
+                info!(target: "strat",link_node_id = parent_node.link(), "Based on node {parent_node:?}");
                 let child_node_layer = parent_node.layer_id + RelativeLayerId(1);
                 let basis_world = {
                     let parent_node = self.node(parent_node).expect("Checked");
-                    parent_node.on_basis_of_world.clone()
+                    &parent_node.on_basis_of_world
                 };
 
                 let cmd_application = FilteredCommandApplication::new(
@@ -579,6 +588,7 @@ where
                         path_id,
                     );
                     let child_node_id = self.add_node(child_node, child_node_layer);
+                    info!(target: "strat", link_node_id = child_node_id.link(), "CHILD NODE {child_node_id:?}\n{child_world}");
                     nodes_created += 1;
                     new_apply_on_node.push(child_node_id);
 
