@@ -1003,6 +1003,10 @@ where
                 error!(target: "strat", "There is not a single full layer while updating eq layers; Should only be the case at startup");
                 -1
             }
+            MarkerLayerId::AtLayer(l) if l + RelativeLayerId(1) == self.first_layer_absolute_id => {
+                info!(target: "strat", "highest full layer is directly below the current first_layer");
+                -1
+            }
             MarkerLayerId::AtLayer(l) => {
                 info!(target: "strat", "highest_full_layer = {highest_full_layer:?}");
                 (l - self.first_layer_absolute_id).0 as i32
@@ -1013,8 +1017,12 @@ where
                 // error!(target: "strat", "There is not a single eq layer while updating eq layers; Should only be the case at startup");
                 -1
             }
+            MarkerLayerId::AtLayer(l) if l + RelativeLayerId(1) == self.first_layer_absolute_id => {
+                info!(target: "strat", "highest eq layer is directly below the current first_layer");
+                -1
+            }
             MarkerLayerId::AtLayer(l) => {
-                info!(target: "strat", "highest_full_layer = {highest_full_layer:?}");
+                info!(target: "strat", "highest_eq_layer = {highest_eq_layer:?}");
                 (l - self.first_layer_absolute_id).0 as i32
             }
         };
