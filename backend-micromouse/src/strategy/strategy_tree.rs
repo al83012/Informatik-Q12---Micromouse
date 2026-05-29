@@ -85,7 +85,9 @@ pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> 
 pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     nodes: HashMap<RelativeNodeId, StrategyTreeNode<N, S>>,
     absolute_layer_id: AbsoluteLayerId,
-    is_fully_expanded: bool,
+    // whether the layer before this one is fully expanded / whether no additional nodes will be
+    // added to this layer
+    is_full: bool,
     eq: Option<Command>,
     node_count: usize,
     node_id_counter: RelativeNodeIdCounter,
@@ -310,6 +312,8 @@ where
                     AbsoluteLayerId(0),
                 );
 
+                res.layer_mut(first_layer_id).expect("Checked").is_full = true;
+
                 res.expand_fully().map_err(TreeCreationError::from)?;
 
                 let root_send = res
@@ -472,9 +476,9 @@ where
                 //     }
                 //     MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
                 // };
-                self.layer_mut(layer_to_expand)
+                self.layer_mut(layer_to_expand + RelativeLayerId(1))
                     .expect("ID should be in bounds")
-                    .is_fully_expanded = true;
+                    .is_full = true;
             }
         }
         Ok(TreeExpansionSuccess {
@@ -791,42 +795,28 @@ where
                 info!(target: "strat", link_node_id = successor.link(), "Successor successfully expanded");
                 // We know that this is expanding a full layer, since the new root layer only
                 // contains the successor
-                // layer is now fully expanded
-                self.highest_full_layer = self
-                    .highest_full_layer
-                    .max(MarkerLayerId::AtLayer(self.first_layer_absolute_id));
+                // layer after the successor (which was just expanded) is now full
+                self.highest_full_layer = self.highest_full_layer.max(MarkerLayerId::AtLayer(
+                    *successor.layer_id() + RelativeLayerId(1),
+                ));
             }
         }
+
+        // let successor_node = self.node_mut(successor).expect("Successor has to exist");
+        // successor_node.
 
         self.layers.remove(0);
         self.node_count -= 1;
 
-        let new_first_layer = self.layers.first().expect("Has Successor");
+        let new_first_layer = self.layers.first_mut().expect("Has Successor");
+        // new_first_layer.is_full = true;
         self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
 
-        info!(target: "strat", "New first_layer = {:?}", self.first_layer_absolute_id);
+        self.layer_mut(self.first_layer_absolute_id + RelativeLayerId(1))
+            .expect("Just created (and filled) it")
+            .is_full = true;
 
-        /*self.highest_full_layer = match self.highest_full_layer {
-            MarkerLayerId::NotExistant => {
-                error!(target: "strat", "Highest Full layer does not exsit, but we are finishing root, which was sent");
-                MarkerLayerId::AtLayer(new_first_layer.absolute_layer_id)
-            }
-            MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l - RelativeLayerId(1)),
-        };
-        self.highest_eq_layer = match self.highest_eq_layer {
-            MarkerLayerId::NotExistant => {
-                error!(target: "strat", "Highest Eq layer does not exsit, but we are finishing root, which was sent");
-                MarkerLayerId::AtLayer(new_first_layer.absolute_layer_id)
-            }
-            MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l - RelativeLayerId(1)),
-        };
-        self.highest_sent_layer = match self.highest_sent_layer {
-            MarkerLayerId::NotExistant => {
-                error!(target: "strat", "Highest Sent layer does not exsit, but we are finishing root, which was sent");
-                MarkerLayerId::AtLayer(new_first_layer.absolute_layer_id)
-            }
-            MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l - RelativeLayerId(1)),
-        };*/
+        info!(target: "strat", "New first_layer = {:?}", self.first_layer_absolute_id);
 
         self.update_equal_layers();
         Ok(self.new_sends())
@@ -839,7 +829,7 @@ where
         ),
         skip(self)
     )]
-    pub fn prune_not_potentially_eq(&mut self, filter: &PartialMap<N>) -> Result<(), PruneError> {
+    pub fn prune_not_potentially_eq(&mut self, filter: &Map<N>) -> Result<(), PruneError> {
         let node_indices = self
             .layers
             .iter_mut()
@@ -859,7 +849,7 @@ where
                             v.on_basis_of_world.map = v
                                 .on_basis_of_world
                                 .map
-                                .union(&filter.0)
+                                .union(filter)
                                 .expect("Should be potentially_eq");
                         }
                         None
@@ -1055,28 +1045,28 @@ where
         info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
         info!(target: "strat", "highest_eq_layer = {:?}", self.highest_eq_layer);
         info!(target: "strat", "highest_sent_layer = {:?}", self.highest_sent_layer);
+
         let highest_full_layer_offset = match self.highest_full_layer {
             MarkerLayerId::NotExistant => {
                 error!(target: "strat", "Highest full layer does not exist, but should");
                 return vec![];
             }
-            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => {
-                info!(target: "strat", "Only first layer is full; Cannot send new");
-                return vec![];
-            }
-            MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
+            MarkerLayerId::AtLayer(l) => l.0 as i32 - self.first_layer_absolute_id.0 as i32,
         };
+
+        // todo!("Need to make the exact condition more clear");
+
+        if self.highest_eq_layer <= self.highest_sent_layer {
+            error!(target: "strat", "Only eq layer is smaller than sent layer");
+            return vec![];
+        }
 
         let highest_eq_layer_offset = match self.highest_eq_layer {
             MarkerLayerId::NotExistant => {
                 error!(target: "strat", "Highest eq layer does not exist, but should");
                 return vec![];
             }
-            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => {
-                info!(target: "strat", "Only first layer is eq; Cannot send new");
-                return vec![];
-            }
-            MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
+            MarkerLayerId::AtLayer(l) => l.0 as i32 - self.first_layer_absolute_id.0 as i32,
         };
 
         let highest_sent_layer_offset = match self.highest_sent_layer {
@@ -1085,7 +1075,7 @@ where
                 return vec![];
             }
             // MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
-            MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
+            MarkerLayerId::AtLayer(l) => l.0 as i32 - self.first_layer_absolute_id.0 as i32,
         };
 
         // INFO:
@@ -1095,37 +1085,43 @@ where
         // generally), we have no way of expanding them just in time, which means, that we must
         // constrain the send here
 
-        let highest_sendable_layer = MarkerLayerId::AtLayer(
-            self.first_layer_absolute_id
-                + RelativeLayerId(
-                    highest_eq_layer_offset
-                        .0
-                        .min(highest_full_layer_offset.0 - 1),
-                ),
-        );
+        let highest_sendable_layer_offset =
+            i32::min(highest_eq_layer_offset, highest_full_layer_offset - 1);
+        // let highest_sendable_layer = MarkerLayerId::AtLayer(
+        //     self.first_layer_absolute_id
+        //         + RelativeLayerId(
+        //             highest_eq_layer_offset
+        //                 .min(highest_full_layer_offset.0 - 1),
+        //         ),
+        // );
 
         info!(target: "strat", "highest_full_layer_offset = {highest_full_layer_offset:?}");
         info!(target: "strat", "highest_eq_layer_offset = {highest_eq_layer_offset:?}");
         info!(target: "strat", "highest_sent_layer_offset = {highest_sent_layer_offset:?}");
-        info!(target: "strat", "highest_sendable_layer = {highest_sendable_layer:?}");
+        info!(target: "strat", "highest_sendable_layer_offset = {highest_sendable_layer_offset:?}");
 
-        let highest_sendable_layer_offset = match highest_sendable_layer {
-            MarkerLayerId::NotExistant => {
-                // error!(target: "strat", "Highest sendable layer does not exist, but should");
-                return vec![];
-            }
-            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
-            MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
-        };
+        // let highest_sendable_layer_offset = match highest_sendable_layer {
+        //     MarkerLayerId::NotExistant => {
+        //         // error!(target: "strat", "Highest sendable layer does not exist, but should");
+        //         return vec![];
+        //     }
+        //     MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
+        //     MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
+        // };
 
-        info!(target: "strat", "Sending: [{}..={}]", highest_sent_layer_offset.0 + 1, highest_sendable_layer_offset.0);
+        info!(target: "strat", "Sending: [{}..={}]", highest_sent_layer_offset + 1, highest_sendable_layer_offset);
 
-        if self.highest_sent_layer < highest_sendable_layer {
-            let l = self.layers[highest_sent_layer_offset.0 + 1..=highest_sendable_layer_offset.0]
+        if highest_sent_layer_offset < highest_sendable_layer_offset {
+            let l = self.layers
+                [(highest_sent_layer_offset + 1) as usize..=highest_sendable_layer_offset as usize]
                 .iter()
                 .map(|l| l.eq.as_ref().expect("Explicitly should exist").clone())
                 .collect();
-            self.highest_sent_layer = highest_sendable_layer;
+
+            self.highest_sent_layer = MarkerLayerId::AtLayer(
+                self.first_layer_absolute_id
+                    + RelativeLayerId(highest_sendable_layer_offset as usize),
+            );
             return l;
         }
         vec![]
@@ -1237,14 +1233,14 @@ where
     )]
     pub fn handle_map_update(
         &mut self,
-        map: &PartialMap<N>,
+        map: &Map<N>,
     ) -> Result<Vec<Command>, StrategyTreeError> {
         if self
             .node(self.root_node())
             .expect("Index should be valid")
             .on_basis_of_world
             .map
-            .potentially_eq(map)
+            .potentially_eq(&map)
         {
             self.prune_not_potentially_eq(map)?;
             let _ = self.expand_fully()?;
@@ -1418,7 +1414,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         StrategyTreeLayer {
             nodes: transformed_nodes,
             absolute_layer_id: sent_layer.absolute_layer_id,
-            is_fully_expanded: true,
+            is_full: true,
             eq: Some(sent_layer.eq),
             node_count: sent_layer.node_count,
             // This is not technically correct, but it should not be used after this
@@ -1439,7 +1435,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
             node_id_counter: RelativeNodeIdCounter::default(),
             nodes: HashMap::new(),
             absolute_layer_id,
-            is_fully_expanded: false,
+            is_full: false,
             eq: None,
             node_count: 0,
             is_sent: false,
@@ -1480,7 +1476,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         )
     )]
     pub fn equal_command(&self) -> Option<Command> {
-        if !self.is_fully_expanded {
+        if !self.is_full {
             return None;
         }
         if self.node_count == 0 {
@@ -1515,7 +1511,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
         if self.eq.is_some() {
             return true;
         }
-        if !self.is_fully_expanded {
+        if !self.is_full {
             return false;
         }
         self.eq = self.equal_command();
@@ -1631,7 +1627,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeNode<N, S> {
 #[derive(Debug, Copy, Clone)]
 pub enum LayerReductionError {
     NodesNotExpanded,
-    LayerNotExpanded,
+    LayerNotFull,
     LayerNotEq,
     LayerNotSent,
 }
@@ -1640,9 +1636,9 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTr
     type Error = LayerReductionError;
     #[instrument(name = "try_from StrategyTreeLayer", skip(value), fields(link_layer_id = value.absolute_layer_id.link(), description = "Erase layer's strategy"))]
     fn try_from(value: StrategyTreeLayer<N, S>) -> Result<Self, Self::Error> {
-        if !value.is_fully_expanded {
-            error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not fully expanded");
-            return Err(LayerReductionError::LayerNotExpanded);
+        if !value.is_full {
+            error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not full");
+            return Err(LayerReductionError::LayerNotFull);
         }
         if value.eq.is_none() {
             error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not equal");

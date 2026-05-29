@@ -1,14 +1,14 @@
 use std::{
     collections::HashMap,
     ops::Deref,
-    sync::atomic::{AtomicBool, AtomicU32},
+    sync::atomic::{AtomicBool, AtomicU32}, time::Duration,
 };
 
 use console::Style;
 use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use tokio::sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard};
+use tokio::{sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, watch}, time};
 use tracing::{debug, error, info, instrument, span, warn, Instrument, Level};
 use tungstenite::Message;
 
@@ -427,17 +427,19 @@ impl<const N: usize> MicromouseManager<N> {
             info!(target: "comm/mng/cmd", "COMMAND PENDING; Micromouse Stopped");
             return pending().await;
         }
+        let tick = time::interval(Duration::from_millis(50));
         loop {
             let mut queue_length_receiver = self.queue_length_receiver.lock().await;
             if *queue_length_receiver.borrow() < self.target_queue_length {
                 break;
-            }
-            queue_length_receiver.changed().await.expect("Please no");
-            debug!(target: "comm/mng", "NOTIFY QUEUE CHANGE");
-            let val = queue_length_receiver.borrow_and_update();
-            if *val < self.target_queue_length {
-                debug!(target: "comm/mng", ">>> BELOW TARGET ({} < {})",*val, self.target_queue_length);
-                break;
+            } else {
+                queue_length_receiver.changed().await.expect("Please no");
+                debug!(target: "comm/mng", "NOTIFY QUEUE CHANGE");
+                let val = queue_length_receiver.borrow_and_update();
+                if *val < self.target_queue_length {
+                    debug!(target: "comm/mng", ">>> BELOW TARGET ({} < {})",*val, self.target_queue_length);
+                    break;
+                }
             }
         }
     }

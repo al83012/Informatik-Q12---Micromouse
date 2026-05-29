@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, time::Duration};
 
 use thiserror::Error;
-use tokio::{sync::mpsc::*, time};
+use tokio::{sync::mpsc::*, task::spawn_blocking, time};
 use tracing::{error, info, instrument, Instrument};
 
 use crate::{
@@ -164,6 +164,7 @@ impl<const N: usize> Process<N> {
             _ = tokio::time::sleep(Duration::from_millis(1)) => {
                 info!(target: "proc", "    ~> Placed in queue");
                 self.blocked_cmd_queue.push_back(cmd);
+                info!(target: "proc", "QUEUE: \n{:#?}", self.blocked_cmd_queue);
             }
         }
     }
@@ -228,7 +229,8 @@ impl<const N: usize> Process<N> {
         match micromouse_event {
             MicromouseEvent::UpdatedMap(ref _discoveries) => {
                 let current_map = self.micromouse_manager.current_world_lock().await.map;
-                match self.strategy_tree_manager.update_filter(current_map) {
+                let filter_res = self.strategy_tree_manager.update_filter(&current_map);
+                match filter_res {
                     Ok(_) => {}
                     Err(e) => {
                         self.frontend_manager

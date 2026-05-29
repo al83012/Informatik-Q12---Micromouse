@@ -1,7 +1,10 @@
 use std::sync::mpsc;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::{broadcast::{Receiver, Sender}, mpsc::{UnboundedReceiver, UnboundedSender}};
+use tokio::sync::{
+    broadcast::{Receiver, Sender},
+    mpsc::{UnboundedReceiver, UnboundedSender},
+};
 use tracing::{info, instrument};
 
 use crate::{
@@ -268,15 +271,17 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             description = "Do a full filter-update (update strategy tree using map-information)"
         )
     )]
-    pub fn update_filter(&mut self, map: Map<N>) -> Result</*Vec<Command>*/ (), StrategyTreeError> {
-        let partial = map.into();
+    pub fn update_filter(
+        &mut self,
+        map: &Map<N>,
+    ) -> Result</*Vec<Command>*/ (), StrategyTreeError> {
         macro_rules! update_filter {
             ([$($variant:ident),+]) => {
 
                 {
                 let prune_result = match self.strategy_tree {
                         $(DynStrategyTree::$variant(ref mut tree) => {
-                            tree.handle_map_update(&partial)
+                            tree.handle_map_update(map)
                             // tree.prune_not_potentially_eq(&partial)
                         },)+
                         DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
@@ -435,7 +440,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             set_goal,
         } = change;
 
-        let current_mouse = set_postion.unwrap_or(self.current_world.mouse);
+        // let current_mouse = set_postion.unwrap_or(self.current_world.mouse);
 
         self.goal_pos = set_goal.unwrap_or(self.goal_pos);
 

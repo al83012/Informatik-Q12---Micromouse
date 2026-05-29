@@ -1,4 +1,6 @@
-use tracing::{error, span, Instrument};
+use std::time::Duration;
+
+use tracing::{error, info, span, Instrument};
 
 use crate::{
     process::Process,
@@ -6,7 +8,7 @@ use crate::{
         frontend_simulator::{self, FrontendSimulator},
         micromouse_simulator::{self, MicromouseSimulator},
     },
-    utils::hyperlink_logging::{init_tree_logger, process_span},
+    utils::{hyperlink_logging::{init_tree_logger, process_span}, logging::init_logging},
 };
 
 #[test]
@@ -15,26 +17,34 @@ fn process_test_short() {
     const N: usize = super::TEST_MAP_SIZE;
     let world = super::test_map(0.5);
     init_tree_logger();
-
+    // let _g = init_logging();
+    info!(target: "tests", "Fully shorted process test");
     let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let m_handle = async {
-        let mut micromouse_simulator = MicromouseSimulator::new(world);
-        micromouse_simulator.run(3).await;
-    }
-    .instrument(process_span("micromouse_simulator"));
-
-    let f_handle = async {
-        let mut frontend_simulator = FrontendSimulator::new();
-        frontend_simulator.run().await;
-    }
-    .instrument(process_span("frontend_simulator"));
-
-    let p_handle = async {
-        let process: Process<N> = Process::new().await.expect("Process creation failed");
-        process.run().await;
-    }
-    .instrument(process_span("process"));
+    let m_handle = rt.spawn(
+        async move {
+            let mut micromouse_simulator = MicromouseSimulator::new(world);
+            micromouse_simulator.run(3).await;
+        }
+        .instrument(process_span("process")),
+    );
+    let f_handle = rt.spawn(
+        async {
+            let mut frontend_simulator = FrontendSimulator::new();
+            frontend_simulator.run().await;
+        }
+        .instrument(process_span("process")),
+    );
+    let p_handle = rt.spawn_blocking(|| {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(
+            async {
+                let process: Process<N> = Process::new().await.expect("Process creation failed");
+                process.run().await;
+            }
+            .instrument(process_span("process")),
+        )
+    });
 
     rt.block_on(async {
         tokio::select! {

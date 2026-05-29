@@ -33,14 +33,14 @@ impl PotentiallyEq for WallDiscoveryStatus {
 }
 
 impl<const N: usize> PotentiallyEq for Map<N> {
-    type Other = PartialMap<N>;
+    type Other = Map<N>;
 
     #[instrument(
         name = "potentially_eq",
         fields(description = "Check if Map is potentially_eq to PartialMap")
     )]
     fn potentially_eq(&self, other: &Self::Other) -> bool {
-        let inner_map = other.0;
+        let inner_map = other;
         for x in 0..N {
             for y in 0..N {
                 let pos = Position {
@@ -81,14 +81,14 @@ impl<const N: usize> PotentiallyEq for Map<N> {
 }
 
 impl<const N: usize> PotentiallyEq for WorldData<N> {
-    type Other = PartialWorldData<N>;
+    type Other = WorldData<N>;
     #[instrument(
         name = "potentially_eq",
         fields(description = "Check if World is potentially_eq"),
         skip_all
     )]
     fn potentially_eq(&self, other: &Self::Other) -> bool {
-        if !self.map.potentially_eq(&other.map()) {
+        if !self.map.potentially_eq(&other.map) {
             return false;
         }
         if self.mouse != other.mouse {
