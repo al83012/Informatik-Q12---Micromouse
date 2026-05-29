@@ -21,7 +21,7 @@ use crate::{
         strategy_tree::{StrategyTree, StrategyTreeError},
     },
     transform::position::Position,
-    utils::hyperlink_logging::process_span,
+    utils::hyperlink_logging::{process_span, LinkFileName},
 };
 
 pub struct Process<const N: usize> {
@@ -176,7 +176,7 @@ impl<const N: usize> Process<N> {
                 "SENT COMMAND {cmd_id} {cmd:?}"
             )))
             .await;
-        info!(target: "proc", "SENT COMMAND ({cmd:?}) with id {cmd_id}");
+        info!(target: "proc", link_cmd_id = cmd_id.link(), "SENT COMMAND ({cmd:?}) with id {cmd_id}");
     }
 
     #[instrument(

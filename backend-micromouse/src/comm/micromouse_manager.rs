@@ -101,6 +101,7 @@ impl<const N: usize> MicromouseManager<N> {
             self.channel.send(cmd_msg).await;
             let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
             unconfirmed_cmd_queue.insert(cmd_id, msg);
+            info!(target: "comm/mng/cmd", "CURRENT QUEUE: {unconfirmed_cmd_queue:?}");
             debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
             self.queue_length_sender
                 .send(unconfirmed_cmd_queue.len())
@@ -118,7 +119,7 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     // Returns boolean --> true = was resent, false = already finished, exited queue
-    #[instrument(skip(self), name = "resend")]
+    #[instrument(skip(self), name = "resend", fields(link_cmd_id = cmd_id.link()))]
     async fn resend(&self, cmd_id: CommandId) -> bool {
         warn!(target: "comm/mng/cmd", "RESENDING {cmd_id:?}");
         if let Some(msg) = self.unconfirmed_cmd.lock().await.get(&cmd_id) {
@@ -150,6 +151,7 @@ impl<const N: usize> MicromouseManager<N> {
     /// communication to continue (even though the channel will spin up a separate thread to keep
     /// the connection alive, it won't handle desyncs and the like)
     #[instrument(skip(self), name = "process_next_read")]
+
     pub async fn process_next_read(
         &self,
         read: Option<Message>,
@@ -171,7 +173,7 @@ impl<const N: usize> MicromouseManager<N> {
             }
             MicromouseResponse::Measurement(measurement_message) => {
                 let _s = span!(
-                    Level::DEBUG,
+                    Level::INFO,
                     "process_measurement",
                     link_cmd_id = measurement_message.from_cmd.link(),
                     message_link = %measurement_message.from_cmd
@@ -193,7 +195,7 @@ impl<const N: usize> MicromouseManager<N> {
             }
             MicromouseResponse::CommandFinished(command_finished_message) => {
                 let _s = span!(
-                    Level::DEBUG,
+                    Level::INFO,
                     "process_command_finished",
                     link_cmd_id = command_finished_message.cmd_id.link(),
                     finished_cmd_id = %command_finished_message.cmd_id
@@ -258,6 +260,7 @@ impl<const N: usize> MicromouseManager<N> {
                 let _s = process_span("process_desync");
                 warn!(target: "comm/mng/cmd", "DESYNC {command_ids:?}");
                 for c in command_ids {
+                    info!(target: "comm/mng/cmd", link_cmd_id = c.link(), "DESYNCED CMD: {c}");
                     if !self.resend(c).await {
                         error!(target: "comm/mng/cmd", "RESEND FAILED");
                         return Err(MicromouseManagerError::CmdConfirmThenReqested(c));
@@ -308,7 +311,7 @@ impl<const N: usize> MicromouseManager<N> {
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }
 
-    #[instrument(skip(self), name = "remove_unordered")]
+    #[instrument(skip(self), name = "remove_unordered", fields(link_cmd_id = cmd_to_remove.link()))]
     async fn remove_unordered(
         &self,
         cmd_to_remove: CommandId,
@@ -327,7 +330,7 @@ impl<const N: usize> MicromouseManager<N> {
 
     /// Uses a measurement or a command finished message (-> measurment = None) to update the
     /// current position (as those messages carry a step-number)
-    #[instrument(skip(self, current_cmd), name = "update_cmd_application")]
+    #[instrument(skip(self, current_cmd), name = "update_cmd_application", fields(link_cmd_id = current_cmd.as_ref().map(|x| x.1.link()).unwrap_or("".to_string())))]
     async fn update_cmd_application<'a>(
         &self,
         step_number: StepNum,
@@ -340,8 +343,9 @@ impl<const N: usize> MicromouseManager<N> {
         let (current_cmd_application, id) = current_cmd
             .as_mut()
             .ok_or(MicromouseManagerError::MeasurementWithoutAssociatedCmd)?;
+
         async {
-            debug!(target: "comm/mng/map",link_cmd_id = id.link(), "Updating cmd for {id:?}");
+            // debug!(target: "comm/mng/map",link_cmd_id = id.link(), "Updating cmd for {id:?}");
             if step_number > current_cmd_application.step_with_termination() as u32 {
                 error!(target: "comm/mng/map", "SHOULD ALREADY HAVE TERMINATED IN PREVIOUS STEP");
                 return Err(MicromouseManagerError::CmdTooLong(*id));
@@ -452,12 +456,13 @@ impl<const N: usize> MicromouseManager<N> {
         debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
         // let mut current_cmd = self.current_command.lock().await;
         let old_cmd = current_cmd.take();
+        info!(target: "comm/mng/cmd", link_cmd_id = old_cmd.as_ref().map(|x| x.1.link()).unwrap_or("".to_string()), "Cleared current command");
         old_cmd.map(|x| x.0)
     }
 
     /// Checks whether the cmd_id contained in the response is a new one --> Would mean, that the
     /// previous command **has** to be finished and a new cmd started
-    #[instrument(skip(self, current_cmd), name = "update_current_command_id")]
+    #[instrument(skip(self, current_cmd), name = "update_current_command_id" fields(link_cmd_id = response_cmd_id.link()))]
     async fn update_current_command_id<'a>(
         &self,
         response_cmd_id: CommandId,
@@ -474,7 +479,9 @@ impl<const N: usize> MicromouseManager<N> {
                 let mut unconfirmed_cmd_queue = self.unconfirmed_cmd.lock().await;
                 let new_cmd = unconfirmed_cmd_queue
                     .remove(&response_cmd_id)
-                    .ok_or(MicromouseManagerError::CmdNotKnown(response_cmd_id))?;
+                    .ok_or_else(|| {
+                        error!(target: "comm/mng/cmd", "Tried to set cmd to be current cmd, but it was not found in list, current non-started queue = {unconfirmed_cmd_queue:?}");
+                        MicromouseManagerError::CmdNotKnown(response_cmd_id)})?;
 
                 debug!(target: "comm/mng/cmd", "COMMAND QUEUE LEN = {}", unconfirmed_cmd_queue.len());
                 // Queue decreased in length:
@@ -517,7 +524,7 @@ impl<const N: usize> MicromouseManager<N> {
             }
         } else {
             let current_cmd_id = current_cmd.as_ref().unwrap().1;
-            debug!(target: "comm/mng/cmd", "CURRENTLY REGISTERED = {current_cmd_id}");
+            debug!(target: "comm/mng/cmd",  "CURRENTLY REGISTERED = {current_cmd_id}");
 
             if current_cmd_id == response_cmd_id {
                 // No change; current command = new command
@@ -566,7 +573,6 @@ pub enum MicromouseEvent {
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),
     Desync,
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum MicromouseManagerError {
