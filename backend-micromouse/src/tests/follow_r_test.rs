@@ -77,7 +77,7 @@ pub fn follow_r_and_conn() {
         loop {
             info!(target: "test/comm", "TEST TICK");
             tokio::select! {
-                _ = micromouse_manager.notified_empty_queue() => {
+                _ = micromouse_manager.await_space_in_queue() => {
                     info!(target: "comm/mng", "EMPTY QUEUE");
                     let next_cmd = always_right_commands[next_cmd_id].clone();
                     info!(target: "comm/mng/cmd", "SENT NEXT COMMAND: {next_cmd:?}");

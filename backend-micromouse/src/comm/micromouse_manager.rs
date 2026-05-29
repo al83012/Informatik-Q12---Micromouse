@@ -422,7 +422,7 @@ impl<const N: usize> MicromouseManager<N> {
 
     // WARN: LOCKS THE QUEUE RECEIVER; Also returns pending as long as the micromouse is stopped
     #[instrument(skip(self), name = "notified_empty_queue")]
-    pub async fn notified_empty_queue(&self) {
+    pub async fn await_space_in_queue(&self) {
         if *self.mode.lock().await == MicromouseMode::Stopped {
             info!(target: "comm/mng/cmd", "COMMAND PENDING; Micromouse Stopped");
             return pending().await;

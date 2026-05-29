@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::VecDeque, time::Duration};
 
 use thiserror::Error;
 use tokio::sync::mpsc::*;
@@ -28,6 +28,7 @@ pub struct Process<const N: usize> {
     micromouse_manager: MicromouseManager<N>,
     frontend_manager: FrontendManager<N>,
     strategy_tree_manager: DynStrategyTreeManager<N>,
+    blocked_cmd_queue: VecDeque<Command>,
 }
 
 #[derive(Error, Debug)]
@@ -87,6 +88,7 @@ impl<const N: usize> Process<N> {
             frontend_manager,
             micromouse_manager,
             strategy_tree_manager,
+            blocked_cmd_queue: VecDeque::new(),
         })
     }
 
@@ -101,11 +103,14 @@ impl<const N: usize> Process<N> {
             let micromouse_conn_event = self.micromouse_manager.await_next_conn_event();
             let frontend_response = self.frontend_manager.next_read();
             let sendable_cmd = self.strategy_tree_manager.await_cmd();
+            let space_in_send_queue = self.micromouse_manager.await_space_in_queue();
 
             tokio::select! {
                 cmd = sendable_cmd => {
-                    info!(target: "proc", "New sendable cmd ({cmd:?})");
-                    self.send_micromouse_cmd(cmd).await;
+                    self.handle_sendable_cmd(cmd).await;
+                }
+                _ = space_in_send_queue => {
+                    self.handle_space_in_queue().await;
                 }
                 micromouse_conn_event = micromouse_conn_event => {
                     self.handle_micromouse_conn_event(micromouse_conn_event).await;
@@ -126,6 +131,27 @@ impl<const N: usize> Process<N> {
                 frontend_msg = frontend_response => {
                     self.handle_frontend_command(frontend_msg).await;
                 }
+            }
+        }
+    }
+
+    async fn handle_space_in_queue(&mut self) {
+        let cmd_from_blocked = self.blocked_cmd_queue.pop_front();
+        if let Some(cmd_from_blocked) = cmd_from_blocked {
+            self.send_micromouse_cmd(cmd_from_blocked).await;
+        } else {
+            info!(target: "proc", "Command queue has a space, but there is no new command to send");
+        };
+    }
+
+    async fn handle_sendable_cmd(&mut self, cmd: Command) {
+        info!(target: "proc", "New sendable cmd ({cmd:?}) (Added to queue)");
+        tokio::select! {
+            _ = self.micromouse_manager.await_space_in_queue() => {
+                self.send_micromouse_cmd(cmd).await;
+            }
+            _ = tokio::time::sleep(Duration::from_millis(1)) => {
+                self.blocked_cmd_queue.push_back(cmd);
             }
         }
     }

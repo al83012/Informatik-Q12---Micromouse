@@ -103,7 +103,7 @@ pub fn follow_r() {
         loop {
             info!(target: "test/comm", "TEST TICK");
             tokio::select! {
-                _ = micromouse_manager.notified_empty_queue() => {
+                _ = micromouse_manager.await_space_in_queue() => {
                     let _s = enter_process("notify_empty");
                     info!(target: "comm/mng", "EMPTY QUEUE");
                     let next_cmd = always_right_commands[next_cmd_id].clone();
