@@ -107,15 +107,19 @@ impl<const N: usize> Process<N> {
 
             tokio::select! {
                 cmd = sendable_cmd => {
+                    info!(target: "proc", "SENDABLE CMD");
                     self.handle_sendable_cmd(cmd).await;
                 }
                 _ = space_in_send_queue => {
+                    info!(target: "proc", "SPACE IN QUEUE");
                     self.handle_space_in_queue().await;
                 }
                 micromouse_conn_event = micromouse_conn_event => {
+                    info!(target: "proc", "M CONN EVENT");
                     self.handle_micromouse_conn_event(micromouse_conn_event).await;
                 }
                 micromouse_msg = micromouse_response => {
+                    info!(target: "proc", "M RESPONSE");
                     let micromouse_event = self.micromouse_manager.process_next_read(micromouse_msg).await;
                     match micromouse_event {
                         Ok(events) => {
@@ -129,6 +133,7 @@ impl<const N: usize> Process<N> {
                     }
                 }
                 frontend_msg = frontend_response => {
+                    info!(target: "proc", "F RESPONSE");
                     self.handle_frontend_command(frontend_msg).await;
                 }
             }
