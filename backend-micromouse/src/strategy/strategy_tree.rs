@@ -324,13 +324,11 @@ where
                     .map_err(TreeCreationError::from)?;
                 let first_cmd = root_send.command.command().clone();
 
-
                 // Actually mark layers as eq
                 res.update_equal_layers();
 
                 // By returning the origin_command, it is basically the same as sending that layer
                 res.highest_sent_layer = MarkerLayerId::AtLayer(first_layer_id);
-
 
                 Ok(TreeCreationSuccess {
                     tree: res,
@@ -975,15 +973,23 @@ where
                 error!(target: "strat", "There is not a single full layer while updating eq layers; Should only be the case at startup");
                 -1
             }
-            MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).0 as i32,
+            MarkerLayerId::AtLayer(l) => {
+                info!(target: "strat", "highest_full_layer = {highest_full_layer:?}");
+                (l - self.first_layer_absolute_id).0 as i32
+            }
         };
         let highest_eq_layer_offset = match self.highest_eq_layer {
             MarkerLayerId::NotExistant => {
                 // error!(target: "strat", "There is not a single eq layer while updating eq layers; Should only be the case at startup");
                 -1
             }
-            MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).0 as i32,
+            MarkerLayerId::AtLayer(l) => {
+                info!(target: "strat", "highest_full_layer = {highest_full_layer:?}");
+                (l - self.first_layer_absolute_id).0 as i32
+            }
         };
+
+        info!(target: "strat", "Rechecking layer[{}..={}]", highest_eq_layer_offset + 1, highest_full_layer_offset);
 
         for layer_offset in highest_eq_layer_offset + 1..=highest_full_layer_offset {
             let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset as usize);
@@ -992,12 +998,11 @@ where
                 .expect("Should always be in bounds")
                 .update_eq_command()
             {
+                info!(target: "strat", link_layer_id = layer_id.link(),"{layer_id:?} is not EQ");
                 break;
             }
-            self.highest_eq_layer = match self.highest_eq_layer {
-                MarkerLayerId::NotExistant => MarkerLayerId::AtLayer(self.first_layer_absolute_id),
-                MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-            }
+            info!(target: "strat", link_layer_id = layer_id.link(),"{layer_id:?} is EQ");
+            self.highest_eq_layer = MarkerLayerId::AtLayer(layer_id);
         }
     }
 
@@ -1009,13 +1014,18 @@ where
         skip(self)
     )]
     fn new_sends(&mut self) -> Vec<Command> {
-        let highest_full_layer = self.highest_full_layer;
+        info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
+        info!(target: "strat", "highest_eq_layer = {:?}", self.highest_eq_layer);
+        info!(target: "strat", "highest_sent_layer = {:?}", self.highest_sent_layer);
         let highest_full_layer_offset = match self.highest_full_layer {
             MarkerLayerId::NotExistant => {
                 error!(target: "strat", "Highest full layer does not exist, but should");
                 return vec![];
             }
-            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
+            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => {
+                info!(target: "strat", "Only first layer is full; Cannot send new");
+                return vec![];
+            }
             MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
         };
 
@@ -1024,7 +1034,10 @@ where
                 error!(target: "strat", "Highest eq layer does not exist, but should");
                 return vec![];
             }
-            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
+            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => {
+                info!(target: "strat", "Only first layer is eq; Cannot send new");
+                return vec![];
+            }
             MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
         };
 
@@ -1033,7 +1046,7 @@ where
                 error!(target: "strat", "Highest sent layer does not exist, but should");
                 return vec![];
             }
-            MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
+            // MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
             MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
         };
 
@@ -1052,6 +1065,11 @@ where
                         .min(highest_full_layer_offset.0 - 1),
                 ),
         );
+
+        info!(target: "strat", "highest_full_layer_offset = {highest_full_layer_offset:?}");
+        info!(target: "strat", "highest_eq_layer_offset = {highest_eq_layer_offset:?}");
+        info!(target: "strat", "highest_sent_layer_offset = {highest_sent_layer_offset:?}");
+        info!(target: "strat", "highest_sendable_layer = {highest_sendable_layer:?}");
 
         let highest_sendable_layer_offset = match highest_sendable_layer {
             MarkerLayerId::NotExistant => {

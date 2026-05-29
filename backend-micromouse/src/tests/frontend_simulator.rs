@@ -56,7 +56,7 @@ impl FrontendSimulator {
 
         while let Some(frontend_msg_batch) = ws_stream.next().await {
             let Ok(frontend_msg_batch) = frontend_msg_batch else {
-                error!(target: "tests/sim/webs", "Error while receiving from backend {}", frontend_msg_batch.expect_err("Checked"));
+                error!(target: "tests/sim/webs", "Error while receiving from backend {:#?}", frontend_msg_batch.expect_err("Checked"));
                 ws_stream
                     .close(Some(tungstenite::protocol::CloseFrame {
                         code: CloseCode::Error,
@@ -70,11 +70,11 @@ impl FrontendSimulator {
                 continue;
             };
             let Ok(frontend_msg_batch) = serde_json::de::from_str::<BatchedFrontendMessage>(frontend_msg_batch) else {
-                warn!(target: "tests/sim/webs", "Non-parseable msg {frontend_msg_batch:?}");
+                warn!(target: "tests/sim/webs", "Non-parseable msg {frontend_msg_batch:#?}");
                 continue;
             };
 
-            info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg_batch:?}");
+            info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg_batch:#?}");
 
             for frontend_msg in frontend_msg_batch.0 {
                 match frontend_msg {
