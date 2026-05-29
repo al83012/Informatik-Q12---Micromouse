@@ -717,7 +717,7 @@ where
         ),
         skip(self)
     )]
-    pub fn finish_root(&mut self) -> Result<(), FinishRootError> {
+    pub fn finish_root(&mut self) -> Result<Vec<Command>, FinishRootError> {
         let (_outcome_id, successor) = {
             let root_id = self.root_node();
             info!(target: "strat", link_node_id = root_id.link(), "FINISHING NODE {root_id:?}");
@@ -854,7 +854,7 @@ where
             MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l - RelativeLayerId(1)),
         };*/
 
-        Ok(())
+        Ok(self.new_sends())
     }
 
     #[instrument(

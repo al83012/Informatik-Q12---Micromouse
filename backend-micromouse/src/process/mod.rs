@@ -229,12 +229,7 @@ impl<const N: usize> Process<N> {
             MicromouseEvent::UpdatedMap(ref _discoveries) => {
                 let current_map = self.micromouse_manager.current_world_lock().await.map;
                 match self.strategy_tree_manager.update_filter(current_map) {
-                    Ok(new_commands) => {
-                        for command in new_commands {
-                            self.handle_sendable_cmd(command).await;
-                            // let _send_res = self.micromouse_manager.send_command(command).await;
-                        }
-                    }
+                    Ok(_) => {}
                     Err(e) => {
                         self.frontend_manager
                             .send(FrontendMessage::StrategyTreeError(e))
@@ -263,10 +258,7 @@ impl<const N: usize> Process<N> {
             }
             MicromouseEvent::RejectedOutcomes(ref rejected) => {
                 // match self.strategy_tree_manager.prune_current(&rejected) {
-                //     Ok(new_commands) => {
-                //         for command in new_commands {
-                // self.handle_sendable_cmd(command).await;
-                //         }
+                //     Ok(_) => {
                 //     }
                 //     Err(e) => {
                 //         self.frontend_manager
@@ -282,8 +274,7 @@ impl<const N: usize> Process<N> {
                             .send(FrontendMessage::StrategyEnd(end))
                             .await
                     }
-                    Ok(None) => {
-                    }
+                    Ok(None) => {}
                     Err(e) => {
                         self.frontend_manager
                             .send(FrontendMessage::StrategyTreeError(e.into()))

@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::broadcast::{Receiver, Sender};
+use tokio::sync::{broadcast::{Receiver, Sender}, mpsc::{UnboundedReceiver, UnboundedSender}};
 use tracing::{info, instrument};
 
 use crate::{
@@ -36,10 +36,14 @@ pub enum DynStrategyTree<const N: usize> {
     Closed,
 }
 
+// pub enum FinishCommandResult {
+//     Expanded
+// }
+
 pub struct DynStrategyTreeManager<const N: usize> {
     strategy_tree: DynStrategyTree<N>,
-    command_sender: Sender<Command>,
-    command_receiver: Receiver<Command>,
+    command_sender: UnboundedSender<Command>,
+    command_receiver: UnboundedReceiver<Command>,
 
     // We are separately storing the current world in order to be able to plug it into the
     // StartingState if necessary; The strategy tree itself only stores the world where interrupts
@@ -211,7 +215,8 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             DbgKnownPath
         ]);
 
-        let (command_sender, command_receiver) = tokio::sync::broadcast::channel(16);
+        // let (command_sender, command_receiver) = tokio::sync::broadcast::channel(16);
+        let (command_sender, command_receiver) = tokio::sync::mpsc::unbounded_channel();
 
         let mut res = Self {
             strategy_tree: new_tree,
@@ -263,7 +268,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             description = "Do a full filter-update (update strategy tree using map-information)"
         )
     )]
-    pub fn update_filter(&mut self, map: Map<N>) -> Result<Vec<Command>, StrategyTreeError> {
+    pub fn update_filter(&mut self, map: Map<N>) -> Result</*Vec<Command>*/ (), StrategyTreeError> {
         let partial = map.into();
         macro_rules! update_filter {
             ([$($variant:ident),+]) => {
@@ -282,14 +287,20 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             }
         }
 
-        update_filter!([
+        let res = update_filter!([
             DepthFirst,
             BreadthFirst,
             FollowWall,
             FloodFill,
             RandomMove,
             DbgKnownPath
-        ])
+        ])?;
+
+        for c in res {
+            self.send_cmd(c);
+        }
+
+        Ok(())
     }
 
     #[instrument(
@@ -300,7 +311,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     pub fn prune_current(
         &mut self,
         rejected: &RejectedOutcomes,
-    ) -> Result<Vec<Command>, StrategyTreeError> {
+    ) -> Result</*Vec<Command>*/ (), StrategyTreeError> {
         macro_rules! prune_current {
             ([$($variant:ident),+]) => {
 
@@ -317,14 +328,20 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             }
         }
 
-        prune_current!([
+        let res = prune_current!([
             DepthFirst,
             BreadthFirst,
             FollowWall,
             FloodFill,
             RandomMove,
             DbgKnownPath
-        ])
+        ])?;
+
+        for c in res {
+            self.send_cmd(c);
+        }
+
+        Ok(())
     }
 
     #[instrument(
@@ -389,7 +406,13 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             RandomMove,
             DbgKnownPath
         ]) {
-            Ok(()) => Ok(None),
+            Ok(v) => {
+                for c in v {
+                    self.send_cmd(c);
+                }
+
+                Ok(None)
+            }
             Err(e) => match e {
                 FinishRootError::SuccessorIsEnd(end_state) => Ok(Some(end_state)),
                 _ => Err(e),
