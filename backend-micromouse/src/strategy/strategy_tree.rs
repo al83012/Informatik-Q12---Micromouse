@@ -692,16 +692,18 @@ where
     )]
     pub fn finish_root(&mut self) -> Result<(), FinishRootError> {
         let (_outcome_id, successor) = {
-            let _root = self.root_node();
+            let root_id = self.root_node();
+            info!(target: "strat", link_node_id = root_id.link(), "FINISHING NODE {root_id:?}");
             // WARN: Will not expand the root before getting its successor; Any successor should
             // already have been determined by the preceding measurements
-            let root = self.node_mut(self.root_node()).expect("Checked");
+            let root = self.node_mut(root_id).expect("Checked");
 
             let Some(strategy_res) = &root.applied_strategy else {
                 // The root will be expanded, at least when it is placed into the root-slot (since the
                 // execution starts there and the potential outcomes have to be known)
                 // WARN: Root can only be sent if it is expanded (send criterion: is_eq + next
                 // layer fully expanded)
+                error!(target: "strat", link_node_id = root_id.link(), "ROOT cannot have been executed as it has not been expanded");
                 return Err(FinishRootError::RootNotExpanded);
             };
 
@@ -710,6 +712,7 @@ where
                 Err(e) => {
                     // Per definition, the command that just finished cannot be a command which was
                     // not executable
+                    error!(target: "strat", link_node_id = root_id.link(), "ROOT cannot have been executed as it does not have an associated command");
                     return Err(FinishRootError::ImpossibleRootAction(e.clone()));
                 }
             };
@@ -717,32 +720,44 @@ where
             let potential_outcomes = &node_action.potential_outcomes;
             let next_action_len = potential_outcomes.len();
 
+            info!(target: "strat", link_node_id = root_id.link(), "Potential successors ({next_action_len}): \n{potential_outcomes:#?}");
+
             match next_action_len {
-                0 => return Err(FinishRootError::NoSuccessor),
+                0 => {
+                    error!(target: "strat", link_node_id = root_id.link(), "ROOT does not have a successor");
+                    return Err(FinishRootError::NoSuccessor);
+                }
                 1 => {
                     let (o, c) = potential_outcomes.iter().next().unwrap();
+                    info!(target: "strat", link_node_id = c.link(), "SUCCESSOR = {c:?}");
                     (*o, *c)
                 }
                 2.. => {
+                    error!(target: "strat", link_node_id = root_id.link(), "ROOT has multiple successors");
                     return Err(FinishRootError::MultipleSuccessors(
                         potential_outcomes.clone(),
-                    ))
+                    ));
                 }
             }
         };
 
         let next_root_expansion_res = self.try_expand_node(successor);
+        info!(target: "strat", link_node_id = successor.link(), "SUCCESSOR Expansion ~~> {next_root_expansion_res:?}");
         match next_root_expansion_res {
             NodeExpansionResult::AlreadyExpanded => {
+                info!(target: "strat", link_node_id = successor.link(), "Already expanded; No further processing");
                 // Best case
             }
             NodeExpansionResult::NotExpandable => {
+                error!(target: "strat", link_node_id = successor.link(), "Successor can never be expanded; Does not have a strategy");
                 return Err(FinishRootError::SuccessorNotExpandable);
             }
             NodeExpansionResult::NotYetExpandable => {
+                error!(target: "strat", link_node_id = successor.link(), "Successor can never be expanded; Waiting for more measurements, but there are no more coming");
                 return Err(FinishRootError::SuccessorNotYetExpandable);
             }
             NodeExpansionResult::EndState(s) => {
+                info!(target: "strat", link_node_id = successor.link(), "Successor marks end of strategy_execution; Will need new strategy");
                 // We know that this is expanding a full layer, since the new root layer only
                 // contains the successor
                 /*self.highest_full_layer = match self.highest_full_layer {
@@ -769,6 +784,7 @@ where
                 return Err(FinishRootError::SuccessorIsEnd(s));
             }
             NodeExpansionResult::Expanded(_) => {
+                info!(target: "strat", link_node_id = successor.link(), "Successor successfully expanded");
                 // We know that this is expanding a full layer, since the new root layer only
                 // contains the successor
                 // layer is now fully expanded
@@ -1079,6 +1095,8 @@ where
             MarkerLayerId::AtLayer(l) if l == self.first_layer_absolute_id => return vec![],
             MarkerLayerId::AtLayer(l) => l - self.first_layer_absolute_id,
         };
+
+        info!(target: "strat", "Sending: [{}..={}]", highest_sent_layer_offset.0 + 1, highest_sendable_layer_offset.0);
 
         if self.highest_sent_layer < highest_sendable_layer {
             let l = self.layers[highest_sent_layer_offset.0 + 1..=highest_sendable_layer_offset.0]

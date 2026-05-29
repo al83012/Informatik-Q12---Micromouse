@@ -80,8 +80,8 @@ impl<const N: usize> Process<N> {
                 x: N as u32 - 1,
                 y: N as u32 - 1,
             }),
-            3,
-            200,
+            4,
+            100,
         )?;
 
         Ok(Self {
@@ -138,6 +138,7 @@ impl<const N: usize> Process<N> {
     async fn handle_space_in_queue(&mut self) {
         let cmd_from_blocked = self.blocked_cmd_queue.pop_front();
         if let Some(cmd_from_blocked) = cmd_from_blocked {
+            info!(target: "proc", "Sending queued command: {cmd_from_blocked:?}");
             self.send_micromouse_cmd(cmd_from_blocked).await;
         } else {
             info!(target: "proc", "Command queue has a space, but there is no new command to send");
@@ -148,9 +149,11 @@ impl<const N: usize> Process<N> {
         info!(target: "proc", "New sendable cmd ({cmd:?}) (Added to queue)");
         tokio::select! {
             _ = self.micromouse_manager.await_space_in_queue() => {
+                info!(target: "proc", "    ~> Sent directly");
                 self.send_micromouse_cmd(cmd).await;
             }
             _ = tokio::time::sleep(Duration::from_millis(1)) => {
+                info!(target: "proc", "    ~> Placed in queue");
                 self.blocked_cmd_queue.push_back(cmd);
             }
         }
@@ -214,7 +217,7 @@ impl<const N: usize> Process<N> {
     )]
     pub async fn handle_micromouse_event(&mut self, micromouse_event: MicromouseEvent) {
         match micromouse_event {
-            MicromouseEvent::UpdatedMap(_) => {
+            MicromouseEvent::UpdatedMap(ref _discoveries) => {
                 let current_map = self.micromouse_manager.current_world_lock().await.map;
                 match self.strategy_tree_manager.update_filter(current_map) {
                     Ok(new_commands) => {
@@ -248,7 +251,21 @@ impl<const N: usize> Process<N> {
                     .send(FrontendMessage::Debug(s.clone()))
                     .await
             }
-            MicromouseEvent::RejectedOutcomes(_) => {}
+            MicromouseEvent::RejectedOutcomes(ref rejected) => {
+                match self.strategy_tree_manager.prune_current(&rejected) {
+                    Ok(new_commands) => {
+                        for command in new_commands {
+                            let _send_res = self.micromouse_manager.send_command(command).await;
+                        }
+                    }
+                    Err(e) => {
+                        self.frontend_manager
+                            .send(FrontendMessage::StrategyTreeError(e))
+                            .await;
+                    }
+                }
+                
+            }
             MicromouseEvent::FinishedCommand { .. } => {
                 match self.strategy_tree_manager.finish_current_cmd() {
                     Ok(Some(end)) => {

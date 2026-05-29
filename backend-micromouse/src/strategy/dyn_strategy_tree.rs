@@ -6,7 +6,7 @@ use tracing::{info, instrument};
 
 use crate::{
     comm::micromouse_message::Command,
-    map::{map::Map, measurement::Measurement, world_data::WorldData},
+    map::{command_world_state::RejectedOutcomes, map::Map, measurement::Measurement, world_data::WorldData},
     strategy::{
         strategies::{
             breadth_first::BreadthFirst, dbg_known_path::DbgKnownPath, depth_first::DepthFirst,
@@ -280,6 +280,41 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         }
 
         update_filter!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ])
+    }
+
+
+#[instrument(
+        skip(self),
+        name = "prune_current",
+        fields(
+            description = "Prune using the given RejectedOutcomes"
+        )
+    )]
+    pub fn prune_current(&mut self, rejected: &RejectedOutcomes) -> Result<Vec<Command>, StrategyTreeError> {
+        macro_rules! prune_current {
+            ([$($variant:ident),+]) => {
+
+                {
+                let prune_result = match self.strategy_tree {
+                        $(DynStrategyTree::$variant(ref mut tree) => {
+                            tree.handle_cmd_rejection(rejected)
+                        },)+
+                        DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
+                    };
+                prune_result
+                }
+
+            }
+        }
+
+        prune_current!([
             DepthFirst,
             BreadthFirst,
             FollowWall,
