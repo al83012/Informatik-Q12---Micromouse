@@ -75,6 +75,7 @@ impl<const N: usize> Process<N> {
             WorldData::default().only_pos(),
             DynStrategyConfig::FollowWall(FollowWallConfig {
                 follow_wall: WallDirection::Right,
+                measure_all: false,
             }),
             GoalPosition(Position {
                 x: N as u32 - 1,

@@ -5,9 +5,12 @@ use tracing::instrument;
 
 use crate::{
     comm::micromouse_message::{
-        Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
+        Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType, StepNum,
     },
-    strategy::strategy::{ComputedAction, ComputedActions, FromConfig, Strategy, StrategyEndState},
+    strategy::strategy::{
+        ComputedAction, ComputedActions, FromConfig, Strategy, StrategyComputationResult,
+        StrategyEndState,
+    },
     transform::{direction::RelativeDirection, position::MouseTransform},
     utils::nonempty::NonEmpty,
 };
@@ -16,6 +19,7 @@ use crate::{
 pub struct FollowWall<const N: usize> {
     next_move_id: usize,
     follow: WallDirection,
+    measure_all: bool,
 
     // The list of places it has been when next_move_id % 4 == 0
     // If an element would occur twice, we have gone in a loop
@@ -40,17 +44,22 @@ impl From<WallDirection> for RelativeDirection {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FollowWallConfig {
     pub follow_wall: WallDirection,
+    pub measure_all: bool,
 }
 
 impl<const N: usize> FromConfig<N> for FollowWall<N> {
     type Config = FollowWallConfig;
 
-    #[instrument(name = "from_config FollowWall", fields(description = "Create new FollowWall-Strategy instance from config"))]
+    #[instrument(
+        name = "from_config FollowWall",
+        fields(description = "Create new FollowWall-Strategy instance from config")
+    )]
     fn from_config(
         config: &Self::Config,
         _starting_state: &crate::map::world_data::WorldData<N>,
     ) -> Self {
         Self {
+            measure_all: config.measure_all,
             next_move_id: 0,
             follow: config.follow_wall,
             visited: HashSet::new(),
@@ -59,12 +68,18 @@ impl<const N: usize> FromConfig<N> for FollowWall<N> {
 }
 
 impl<const N: usize> Strategy<N> for FollowWall<N> {
-    #[instrument(name = "next_cmd FollowWall", fields(description = "Try to find next action after state"))]
+    #[instrument(
+        name = "next_cmd FollowWall",
+        fields(description = "Try to find next action after state")
+    )]
     fn next_cmd(
         &self,
         world: &crate::map::world_data::PartialWorldData<N>,
         goal: &crate::strategy::strategy::GoalPosition,
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
+        if world.mouse.pos == goal.0 {
+            return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
+        }
         if self.next_move_id.is_multiple_of(4) {
             // At forward searching move
             let current_pos = world.mouse;
@@ -94,7 +109,10 @@ impl<const N: usize> Strategy<N> for FollowWall<N> {
 }
 
 impl<const N: usize> FollowWall<N> {
-    #[instrument(name = "command", fields(description = "Access the command at the given index"))]
+    #[instrument(
+        name = "command",
+        fields(description = "Access the command at the given index")
+    )]
     pub fn command(&self, index: usize) -> Command {
         let always_right_commands: [Command; 4] = [
             Command {
@@ -147,6 +165,26 @@ impl<const N: usize> FollowWall<N> {
             });
             if let MovementType::Turn(i) = &mut cmd.ty {
                 *i = *i * -1;
+            }
+        }
+
+        if self.measure_all {
+            let mut missing_dirs = HashSet::from([
+                RelativeDirection::Left,
+                RelativeDirection::Forward,
+                RelativeDirection::Right,
+            ]);
+
+            for i in cmd.interrupts.iter() {
+                missing_dirs.remove(&i.direction);
+            }
+
+            for dir in missing_dirs {
+                cmd.interrupts.push(MeasurementInterrupt {
+                    direction: dir,
+                    at_step: InterruptStep::Each,
+                    action: InterruptAction::Continue,
+                });
             }
         }
 

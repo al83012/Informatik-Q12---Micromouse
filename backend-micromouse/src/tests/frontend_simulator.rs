@@ -28,7 +28,7 @@ use crate::{
         strategy::GoalPosition,
     },
     transform::position::{MouseTransform, Position},
-    utils::hyperlink_logging::{LinkFileName, enter_process, process_span},
+    utils::hyperlink_logging::{enter_process, process_span, LinkFileName},
 };
 
 pub struct FrontendSimulator {
@@ -69,7 +69,9 @@ impl FrontendSimulator {
                 // Ping or other msg
                 continue;
             };
-            let Ok(frontend_msg_batch) = serde_json::de::from_str::<BatchedFrontendMessage>(frontend_msg_batch) else {
+            let Ok(frontend_msg_batch) =
+                serde_json::de::from_str::<BatchedFrontendMessage>(frontend_msg_batch)
+            else {
                 warn!(target: "tests/sim/webs", "Non-parseable msg {frontend_msg_batch:#?}");
                 continue;
             };
@@ -120,15 +122,14 @@ impl FrontendSimulator {
                     }
                     FrontendMessage::MicromouseConnectionEvent(ws_channel_conn_info) => {
                         info!(target: "tests/sim/webs", "Micromouse Connection Event >> {ws_channel_conn_info:?}");
-                    },
+                    }
                     FrontendMessage::Debug(msg) => {
                         info!(target: "tests/sim/webs", "DEBUG {msg}");
-                    },
+                    }
                     FrontendMessage::ConfirmLastChange => {
                         info!(target: "tests/sim/webs", "Confirmed Last Change");
-                    },
+                    }
                 }
-
             }
         }
     }
@@ -142,6 +143,7 @@ impl FrontendSimulator {
             }),
             DynStrategyConfig::FollowWall(FollowWallConfig {
                 follow_wall: WallDirection::Right,
+                measure_all: false,
             }),
         ][current_strat_id];
 

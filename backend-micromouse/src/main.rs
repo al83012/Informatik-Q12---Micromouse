@@ -13,9 +13,10 @@ pub mod tests;
 
 #[tokio::main]
 async fn main() {
-    init_logging();
+    // init_logging();
 
-    tracing::info!(target = "main", "STARTUP");
+    // tests::process_test_short::process_test_short();
+    // tracing::info!(target = "main", "STARTUP");
 
     
 }

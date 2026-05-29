@@ -22,7 +22,7 @@ mod random_move;
 mod spans;
 mod test_map_discoveries;
 mod visual_tests;
-mod process_test_short;
+pub mod process_test_short;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
