@@ -785,29 +785,6 @@ where
             }
             NodeExpansionResult::EndState(s) => {
                 info!(target: "strat", link_node_id = successor.link(), "Successor marks end of strategy_execution; Will need new strategy");
-                // We know that this is expanding a full layer, since the new root layer only
-                // contains the successor
-                self.highest_full_layer = match self.highest_full_layer {
-                    MarkerLayerId::NotExistant => {
-                        error!(target: "strat", "Highest Full layer does not exsit, but we are finishing root, which was sent");
-                        MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
-                    }
-                    MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                };
-                self.highest_eq_layer = match self.highest_eq_layer {
-                    MarkerLayerId::NotExistant => {
-                        error!(target: "strat", "Highest Eq layer does not exsit, but we are finishing root, which was sent");
-                        MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
-                    }
-                    MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                };
-                self.highest_sent_layer = match self.highest_sent_layer {
-                    MarkerLayerId::NotExistant => {
-                        error!(target: "strat", "Highest Sent layer does not exsit, but we are finishing root, which was sent");
-                        MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
-                    }
-                    MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                };
                 return Err(FinishRootError::SuccessorIsEnd(s));
             }
             NodeExpansionResult::Expanded(_) => {
@@ -815,14 +792,9 @@ where
                 // We know that this is expanding a full layer, since the new root layer only
                 // contains the successor
                 // layer is now fully expanded
-                self.highest_full_layer = self.highest_full_layer.max(MarkerLayerId::AtLayer(self.first_layer_absolute_id));
-                // self.highest_full_layer = match self.highest_full_layer {
-                //     MarkerLayerId::NotExistant => {
-                //         error!(target: "strat", "Highest Full layer does not exsit, but we are finishing root, which was sent");
-                //         MarkerLayerId::AtLayer(self.first_layer_absolute_id + RelativeLayerId(1))
-                //     }
-                //     MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                // };
+                self.highest_full_layer = self
+                    .highest_full_layer
+                    .max(MarkerLayerId::AtLayer(self.first_layer_absolute_id));
             }
         }
 
@@ -831,6 +803,8 @@ where
 
         let new_first_layer = self.layers.first().expect("Has Successor");
         self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
+
+        info!(target: "strat", "New first_layer = {:?}", self.first_layer_absolute_id);
 
         /*self.highest_full_layer = match self.highest_full_layer {
             MarkerLayerId::NotExistant => {
@@ -854,6 +828,7 @@ where
             MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l - RelativeLayerId(1)),
         };*/
 
+        self.update_equal_layers();
         Ok(self.new_sends())
     }
 
