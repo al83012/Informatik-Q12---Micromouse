@@ -222,7 +222,8 @@ impl<const N: usize> Process<N> {
                 match self.strategy_tree_manager.update_filter(current_map) {
                     Ok(new_commands) => {
                         for command in new_commands {
-                            let _send_res = self.micromouse_manager.send_command(command).await;
+                            self.handle_sendable_cmd(command).await;
+                            // let _send_res = self.micromouse_manager.send_command(command).await;
                         }
                     }
                     Err(e) => {
@@ -252,19 +253,18 @@ impl<const N: usize> Process<N> {
                     .await
             }
             MicromouseEvent::RejectedOutcomes(ref rejected) => {
-                match self.strategy_tree_manager.prune_current(&rejected) {
-                    Ok(new_commands) => {
-                        for command in new_commands {
-                            let _send_res = self.micromouse_manager.send_command(command).await;
-                        }
-                    }
-                    Err(e) => {
-                        self.frontend_manager
-                            .send(FrontendMessage::StrategyTreeError(e))
-                            .await;
-                    }
-                }
-                
+                // match self.strategy_tree_manager.prune_current(&rejected) {
+                //     Ok(new_commands) => {
+                //         for command in new_commands {
+                // self.handle_sendable_cmd(command).await;
+                //         }
+                //     }
+                //     Err(e) => {
+                //         self.frontend_manager
+                //             .send(FrontendMessage::StrategyTreeError(e))
+                //             .await;
+                //     }
+                // }
             }
             MicromouseEvent::FinishedCommand { .. } => {
                 match self.strategy_tree_manager.finish_current_cmd() {

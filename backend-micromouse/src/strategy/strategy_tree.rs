@@ -348,12 +348,15 @@ where
     )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
         info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
+        info!(target: "strat", "max_nodes = {:?}; node_count = {:?}", self.config.max_nodes, self.node_count);
+
         const MIN_LAYER: usize = 2;
         let node_budget = self.config.max_nodes.saturating_sub(self.node_count);
         let layer_budget = self
             .config
             .desired_depth
             .saturating_sub(self.full_layer_count());
+        info!(target: "strat", "full_layer_count = {:?}", self.full_layer_count());
 
         info!(target: "strat", "node_budget = {node_budget}, layer_budget = {layer_budget}");
 
@@ -406,23 +409,31 @@ where
                     layer_id: layer_to_expand,
                     node_id: non_expanded_node_id,
                 };
+                let _s = span!(
+                    Level::INFO,
+                    "expand_node",
+                    link_node_id = abs_node_id.link()
+                );
                 info!(target: "strat", link_node_id = abs_node_id.link(), "Expanding: {non_expanded_node_id:?}");
 
                 let node_expansion_result = self.try_expand_node(abs_node_id);
                 info!(target: "strat", "    Res = {node_expansion_result:?}");
                 match node_expansion_result {
                     NodeExpansionResult::NotExpandable => {
+                        error!(target: "strat", "Cannot expand node");
                         return Err(TreeExpansionError {
                             node: abs_node_id,
                             expansion: node_expansion_result,
                         });
                     }
                     NodeExpansionResult::NotYetExpandable => {
+                        info!(target: "strat", "Could not expand yet --> skipped_layer = true");
                         skipped_layer = true;
                         // INFO: This should be alright, as long as the root node isn't being
                         // completed and is the only one left
                     }
                     NodeExpansionResult::AlreadyExpanded => {
+                        error!(target: "strat", "Already expanded, but not marked as such");
                         // This shouldn't happen, we already filtered them
                         return Err(TreeExpansionError {
                             node: abs_node_id,
@@ -439,6 +450,7 @@ where
                 }
 
                 if node_budget <= nodes_created && self.full_layer_count() >= MIN_LAYER {
+                    info!(target: "strat", "Reached node budged");
                     break 'expansion;
                 }
             }
@@ -446,14 +458,18 @@ where
                 // We skipped some node expansion in this layer as it was not yet available to us
                 // INFO: it will still try to expand the already existing layers up to that depth,
                 // but it will not incr the expanden-layer-counter
+                info!(target: "strat", "Cannot increase full layer; skipped previously");
             } else {
                 layers_fully_expanded += 1;
-                self.highest_full_layer = match self.highest_full_layer {
-                    MarkerLayerId::NotExistant => {
-                        MarkerLayerId::AtLayer(self.first_layer_absolute_id)
-                    }
-                    MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                };
+                // The highest full layer is the layer after one in which all nodes were expanded
+                self.highest_full_layer = MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
+                info!(target: "strat", "Increase full layers to {:?}", self.highest_full_layer);
+                // self.highest_full_layer = match self.highest_full_layer {
+                //     MarkerLayerId::NotExistant => {
+                //         MarkerLayerId::AtLayer(self.first_layer_absolute_id)
+                //     }
+                //     MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
+                // };
                 self.layer_mut(layer_to_expand)
                     .expect("ID should be in bounds")
                     .is_fully_expanded = true;
@@ -1444,7 +1460,10 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
     }
 
     #[instrument(name = "delete_node", skip(self), fields(link_layer_id = self.absolute_layer_id.link(), link_node_id = AbsoluteNodeId{ layer_id: self.absolute_layer_id, node_id: node }.link()))]
-    pub unsafe fn delete_node(&mut self, node: RelativeNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
+    pub unsafe fn delete_node(
+        &mut self,
+        node: RelativeNodeId,
+    ) -> Result<Vec<AbsoluteNodeId>, PruneError> {
         let Some(node) = self.nodes.remove(&node) else {
             return Err(PruneError::UnknownNode(AbsoluteNodeId {
                 layer_id: self.absolute_layer_id,

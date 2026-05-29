@@ -103,8 +103,8 @@ impl Default for WsChannelConfig {
         Self {
             buffer_size: 64,
             conn_config: ChannelConnConfig::BindToFirst,
-            ping_interval: Duration::from_millis(1000),
-            valid_pong_duration: Duration::from_millis(300),
+            ping_interval: Duration::from_millis(2000),
+            valid_pong_duration: Duration::from_millis(1000),
             nodelay: false,
         }
     }
