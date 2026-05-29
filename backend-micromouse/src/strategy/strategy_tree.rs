@@ -914,11 +914,29 @@ where
         let Some(node_to_delete) = self.node(node_and_children) else {
             return Err(PruneError::UnknownNode(node_and_children));
         };
-        let Some(branch) = &node_to_delete.as_branch_from_parent else {
-            return Err(PruneError::CannotDeleteRoot(node_and_children));
-        };
 
-        self.prune_branch(branch.clone())
+        if let Some((child_id, parent)) = node_to_delete.as_branch_from_parent.clone().map(|p| {
+            (
+                p.branch,
+                self.node_mut(p.from_node).expect("Parent should exist"),
+            )
+        }) {
+            parent
+                .children_mut()
+                .expect("Parent should have children")
+                .remove(&child_id);
+        }
+
+        let mut to_delete = vec![node_and_children];
+        while let Some(delete_node) = to_delete.pop() {
+            let Some(n) = self.node(delete_node) else {
+                return Err(PruneError::UnknownNode(delete_node));
+            };
+            let mut children = unsafe { self.delete_node_no_clean(delete_node) }?;
+            to_delete.append(&mut children);
+        }
+
+        Ok(())
     }
 
     #[instrument(
@@ -942,14 +960,7 @@ where
             return Err(PruneError::SourceDoesNotHaveThisChild(branch));
         };
 
-        let mut to_delete = vec![first_delete_node];
-
-        while let Some(node_to_delete) = to_delete.pop() {
-            let mut new_nodes =
-                unsafe { self.delete_node_no_clean(node_to_delete).unwrap_or(vec![]) };
-            to_delete.append(&mut new_nodes);
-        }
-        Ok(())
+        self.prune_node(first_delete_node)
     }
 
     // Returns the nodes children
@@ -1433,7 +1444,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
     }
 
     #[instrument(name = "delete_node", skip(self), fields(link_layer_id = self.absolute_layer_id.link(), link_node_id = AbsoluteNodeId{ layer_id: self.absolute_layer_id, node_id: node }.link()))]
-    pub fn delete_node(&mut self, node: RelativeNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
+    pub unsafe fn delete_node(&mut self, node: RelativeNodeId) -> Result<Vec<AbsoluteNodeId>, PruneError> {
         let Some(node) = self.nodes.remove(&node) else {
             return Err(PruneError::UnknownNode(AbsoluteNodeId {
                 layer_id: self.absolute_layer_id,
