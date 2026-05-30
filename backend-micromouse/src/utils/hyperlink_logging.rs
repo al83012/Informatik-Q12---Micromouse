@@ -15,12 +15,14 @@ use tracing::{
     span::{self, EnteredSpan},
     Event, Level, Subscriber,
 };
-use tracing_subscriber::{layer::Context, registry::LookupSpan, EnvFilter, Layer};
+use tracing_subscriber::{fmt, layer::Context, registry::LookupSpan, EnvFilter, Layer};
 
 use crate::{
     comm::micromouse_message::CommandId,
     strategy::strategy_tree::{AbsoluteLayerId, AbsoluteNodeId, AbsolutePathId},
-    utils::logging::{level_bg_color, level_color, MessageVisitor, BLACK, RESET_COLOR, STD_BG},
+    utils::logging::{
+        level_bg_color, level_color, MessageVisitor, TestFormatter, BLACK, RESET_COLOR, STD_BG,
+    },
 };
 
 pub const BASE_FILE: &str = "index.html";
@@ -37,11 +39,10 @@ struct LogVisitor {
 impl Visit for LogVisitor {
     fn record_str(&mut self, field: &Field, value: &str) {
         if field.name() == "name" {
-            let name = value
-                .to_string();
-                // .split_at_checked(10)
-                // .map(|m| m.0.to_string())
-                // .unwrap_or(value.to_string());
+            let name = value.to_string();
+            // .split_at_checked(10)
+            // .map(|m| m.0.to_string())
+            // .unwrap_or(value.to_string());
             self.name = Some(name);
         } else if field.name() == "message" {
             self.message = Some(value.to_string());
@@ -549,10 +550,26 @@ fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
 
 pub fn init_tree_logger() {
     use tracing_subscriber::prelude::*;
-    tracing_subscriber::registry()
-        .with(EnvFilter::new("debug"))
-        .with(RoutingLayer::new())
-        .init();
+
+    #[cfg(feature = "hyperlink_logging")]
+    {
+        tracing_subscriber::registry()
+            .with(EnvFilter::new("debug"))
+            .with(RoutingLayer::new())
+            .init();
+    }
+    #[cfg(not(feature = "hyperlink_logging"))]
+    {
+        let warn_fmt_layer = fmt::layer()
+            .with_file(true)
+            .with_target(true)
+            .with_ansi(true)
+            .event_format(TestFormatter::new());
+
+        tracing_subscriber::registry()
+            .with(EnvFilter::new("warn"))
+            .with(warn_fmt_layer);
+    }
 }
 
 pub fn enter_process(span_name: impl Into<String>) -> EnteredSpan {

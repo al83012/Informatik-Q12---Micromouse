@@ -146,12 +146,12 @@ where
     }
 }
 
-struct TestFormatter {
+pub struct TestFormatter {
     start: Instant,
 }
 
 impl TestFormatter {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             start: Instant::now(),
         }

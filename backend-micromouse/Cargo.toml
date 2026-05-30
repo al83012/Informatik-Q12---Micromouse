@@ -28,4 +28,5 @@ thiserror = "2.0.18"
 
 [features]
 comm_stats = []
-default = ["comm_stats"]
+hyperlink_logging = []
+default = ["comm_stats", "hyperlink_logging"]
