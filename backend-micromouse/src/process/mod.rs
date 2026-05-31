@@ -19,6 +19,7 @@ use crate::{
         strategies::follow_wall::{FollowWall, FollowWallConfig, WallDirection},
         strategy::{GoalPosition, Strategy},
         strategy_tree::{StrategyTree, StrategyTreeError},
+        visuals::{FrontendVisuals, TreeVisualEvent},
     },
     transform::position::Position,
     utils::hyperlink_logging::{process_span, LinkFileName},
@@ -29,6 +30,7 @@ pub struct Process<const N: usize> {
     frontend_manager: FrontendManager<N>,
     strategy_tree_manager: DynStrategyTreeManager<N>,
     blocked_cmd_queue: VecDeque<Command>,
+    tree_visual_recv: UnboundedReceiver<TreeVisualEvent>,
 }
 
 #[derive(Error, Debug)]
@@ -71,6 +73,8 @@ impl<const N: usize> Process<N> {
             .await
             .map_err(ProcessError::micromouse_conn)?;
 
+        let (tree_visuals, tree_visual_recv) = FrontendVisuals::visual_event_channel().await;
+
         let strategy_tree_manager = DynStrategyTreeManager::new(
             WorldData::default().only_pos(),
             DynStrategyConfig::FollowWall(FollowWallConfig {
@@ -83,6 +87,7 @@ impl<const N: usize> Process<N> {
             }),
             4,
             100,
+            tree_visuals,
         )?;
 
         Ok(Self {
@@ -90,6 +95,7 @@ impl<const N: usize> Process<N> {
             micromouse_manager,
             strategy_tree_manager,
             blocked_cmd_queue: VecDeque::new(),
+            tree_visual_recv,
         })
     }
 
@@ -106,6 +112,10 @@ impl<const N: usize> Process<N> {
             let frontend_response = self.frontend_manager.next_read();
             let sendable_cmd = self.strategy_tree_manager.await_cmd();
             let space_in_send_queue = self.micromouse_manager.await_space_in_queue();
+            let mut visual_event_buffer = vec![];
+            let visual_events = self
+                .tree_visual_recv
+                .recv_many(&mut visual_event_buffer, 32);
 
             tokio::select! {
                 cmd = sendable_cmd => {
@@ -137,6 +147,11 @@ impl<const N: usize> Process<N> {
                 frontend_msg = frontend_response => {
                     info!(target: "proc", "F RESPONSE");
                     self.handle_frontend_command(frontend_msg).await;
+                }
+                visual_event_count = visual_events => {
+                    for event in visual_event_buffer[0..visual_event_count] {
+                        self.frontend_manager.send(FrontendMessage::VisualEvent(event)).await;
+                    }
                 }
                 _ = tick.tick() => {
                     info!(target: "proc/tests", "TICK");

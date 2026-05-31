@@ -11,20 +11,22 @@ tokio-tungstenite = "0.29.0"
 futures-util = "0.3"
 # log = "*"
 # env_logger = "*"
-tokio-util = "*"
-incr_stats = "*"
+tokio-util = "0.7.18"
+incr_stats = "1.0.2"
 # log4rs 
 tracing = "0.1.44"
-tracing-subscriber = { version = "*", features = ["fmt", "env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
 tracing-log = "0.2"
 tracing-appender = "0.2"
-console = "*"
-rand = "*"
-serde_json = "*"
-chrono = "*"
-pathdiff = "*"
-ansi-to-html = "*"
+console = "0.16.3"
+rand = "0.8.6"
+serde_json = "1.0.150"
+chrono = "0.4.44"
+pathdiff = "0.2.3"
+ansi-to-html = "0.2.3"
 thiserror = "2.0.18"
+derive_more = {verison = "2.1.1", features = ["from"]}
+macroquad = "0.4.15"
 
 [features]
 comm_stats = []

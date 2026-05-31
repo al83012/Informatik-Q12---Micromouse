@@ -1,86 +1,91 @@
 use std::sync::mpsc::Receiver;
 
-use tokio::sync::mpsc::Sender;
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
+
+use derive_more::with_trait::*;
 
 use crate::{
     comm::website::FrontendResponse,
-    strategy::strategy_tree::{AbsoluteNodeId, AbsolutePathId},
+    strategy::strategy_tree::{AbsoluteLayerId, AbsoluteNodeId, AbsolutePathId},
     transform::position::MouseTransform,
     utils::path::Path,
 };
 
+#[derive(Debug, From, Serialize, Deserialize)]
 pub enum TreeVisualEvent {
+    #[from]
     PathVisualEvent(PathVisualEvent),
+    #[from]
+    CmdVisualEvent(CmdVisualEvent),
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CmdVisualEvent {
+    layer_id: AbsoluteLayerId,
+    ty: CmdVisualEventType,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum CmdVisualEventType {
+    Send,
+    Finish,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PathVisualEvent {
     path_id: AbsolutePathId,
     ty: PathVisualEventType,
 }
 
-pub type TreeDepth = usize;
-
+#[derive(Debug, Serialize, Deserialize)]
 pub enum PathVisualEventType {
     Create {
-        before_child: AbsoluteNodeId,
         path: PathSegment,
-        depth: TreeDepth,
-    },
-    UpdateDepth {
-        depth: TreeDepth,
     },
     Remove,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PathSegment {
     from: MouseTransform,
     to: MouseTransform,
 }
 
 pub struct FrontendVisuals {
-    event_sender: Sender<PathVisualEvent>,
+    event_sender: UnboundedSender<TreeVisualEvent>,
 }
 
 impl FrontendVisuals {
-    pub async fn visual_event_channel() -> (Self, Receiver<PathVisualEvent>) {
-        todo!()
+    pub async fn visual_event_channel() -> (Self, UnboundedReceiver<TreeVisualEvent>) {
+        let (send, recv) = tokio::sync::mpsc::unbounded_channel();
+        (Self { event_sender: send }, recv)
     }
     pub async fn create_path(
         &mut self,
         path_id: AbsolutePathId,
-        to_child: AbsoluteNodeId,
-        at_depth: TreeDepth,
         path: PathSegment,
     ) {
         self.event_sender
-            .send(PathVisualEvent {
+            .send(TreeVisualEvent::from(PathVisualEvent {
                 path_id,
                 ty: PathVisualEventType::Create {
-                    before_child: to_child,
                     path,
-                    depth: at_depth,
                 },
-            })
+            }))
             .await
             .expect("Should be open during execution");
     }
 
     pub async fn remove_path(&self, path_id: AbsolutePathId) {
         self.event_sender
-            .send(PathVisualEvent {
-                path_id,
-                ty: PathVisualEventType::Remove,
-            })
-            .await
-            .expect("Should be open during execution");
-    }
-
-    pub async fn update_depth(&self, path_id: AbsolutePathId, depth: TreeDepth) {
-        self.event_sender
-            .send(PathVisualEvent {
-                path_id,
-                ty: PathVisualEventType::UpdateDepth { depth },
-            })
+            .send(
+                PathVisualEvent {
+                    path_id,
+                    ty: PathVisualEventType::Remove,
+                }
+                .into(),
+            )
             .await
             .expect("Should be open during execution");
     }

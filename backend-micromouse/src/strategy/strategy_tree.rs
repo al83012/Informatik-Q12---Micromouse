@@ -19,10 +19,10 @@ use crate::{
         map_set_op::Union,
         world_data::{PartialWorldData, WorldData},
     },
-    strategy::strategy::{
+    strategy::{strategy::{
         ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult,
         StrategyEndState,
-    },
+    }, visuals::FrontendVisuals},
     utils::{
         hyperlink_logging::LinkFileName,
         nonempty::{NonEmpty, PotentiallyNonEmpty},
@@ -80,6 +80,7 @@ pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> 
     first_layer_absolute_id: AbsoluteLayerId,
     node_count: usize,
     goal_position: GoalPosition,
+    visuals: FrontendVisuals,
 }
 
 pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
@@ -213,6 +214,7 @@ where
         starting_condition: StrategyStart<N>,
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
+        visuals: FrontendVisuals,
     ) -> Result<TreeCreationSuccess<N, S>, StrategyTreeError> {
         match starting_condition {
             StrategyStart::ContinueAfterDoing {
@@ -264,6 +266,7 @@ where
                     first_layer_absolute_id,
                     node_count,
                     goal_position,
+                    visuals
                 };
 
                 Ok(TreeCreationSuccess {
@@ -302,6 +305,7 @@ where
                     first_layer_absolute_id: AbsoluteLayerId(0),
                     node_count: 0,
                     goal_position,
+                    visuals
                 };
 
                 let first_node_id = res.add_node(

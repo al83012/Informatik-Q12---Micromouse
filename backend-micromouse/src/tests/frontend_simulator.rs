@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::{HashMap, hash_map}, time::Duration};
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
@@ -25,21 +25,26 @@ use crate::{
             depth_first::DepthFirstConfig,
             follow_wall::{FollowWallConfig, WallDirection},
         },
-        strategy::GoalPosition,
+        strategy::GoalPosition, strategy_tree::AbsolutePathId, visuals::{PathSegment, TreeVisualEvent},
     },
     transform::position::{MouseTransform, Position},
-    utils::hyperlink_logging::{enter_process, process_span, LinkFileName},
+    utils::hyperlink_logging::{LinkFileName, enter_process, process_span},
 };
 
 pub struct FrontendSimulator {
     current_strat_id: usize,
+    paths: HashMap<AbsolutePathId, PathSegment>
 }
+
+
+
 
 impl FrontendSimulator {
     #[instrument(name = "new FrontendSimulator")]
     pub fn new() -> Self {
         Self {
             current_strat_id: 0,
+            paths: HashMap::new(),
         }
     }
     #[instrument(skip(self), name = "run")]
@@ -128,6 +133,9 @@ impl FrontendSimulator {
                     }
                     FrontendMessage::ConfirmLastChange => {
                         info!(target: "tests/sim/webs", "Confirmed Last Change");
+                    }
+                    FrontendMessage::VisualEvent(visual_event) => {
+                        info!(target: "tests/sim/webs", "VISUAL EVENT {visual_event:?}")
                     }
                 }
             }

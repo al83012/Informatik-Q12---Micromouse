@@ -22,7 +22,7 @@ use crate::{
         strategy_tree::{
             FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
             StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationSuccess,
-        },
+        }, visuals::FrontendVisuals,
     },
     transform::position::{MouseTransform, Position},
 };
@@ -58,6 +58,8 @@ pub struct DynStrategyTreeManager<const N: usize> {
 
     desired_depth: usize,
     max_nodes: usize,
+
+    visuals: FrontendVisuals
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
@@ -89,6 +91,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
+        visuals: FrontendVisuals,
     ) -> Result<Self, StrategyTreeError> {
         Self::new_starting_cond(
             starting_condition,
@@ -96,6 +99,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             goal_position,
             desired_depth,
             max_nodes,
+            visuals
         )
     }
 
@@ -145,6 +149,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
+        visuals: FrontendVisuals
     ) -> Result<(), StrategyTreeError> {
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
@@ -155,7 +160,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                             desired_depth,
                             max_nodes
                         };
-                        let tree = StrategyTree::new(starting_condition, strat_conf, goal_position)?;
+                        let tree = StrategyTree::new(starting_condition, strat_conf, goal_position, visuals)?;
                         let TreeCreationSuccess{tree, origin_command} = tree;
                         (DynStrategyTree::<N>::$variant(tree), origin_command)
                     })+
@@ -191,6 +196,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
+        visuals: FrontendVisuals,
     ) -> Result<Self, StrategyTreeError> {
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
@@ -201,7 +207,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                             desired_depth,
                             max_nodes
                         };
-                        let tree = StrategyTree::new(StrategyStart::DirectlyAtState(starting_condition.clone()), strat_conf, goal_position)?;
+                        let tree = StrategyTree::new(StrategyStart::DirectlyAtState(starting_condition.clone()), strat_conf, goal_position, visuals)?;
                         let TreeCreationSuccess{tree, origin_command} = tree;
                         (DynStrategyTree::<N>::$variant(tree), origin_command)
                     })+
@@ -230,6 +236,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             strat_config: strategy_config,
             desired_depth,
             max_nodes,
+            visuals
         };
 
         if let Some(cmd) = cmd {
@@ -459,6 +466,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             self.goal_pos,
             self.desired_depth,
             self.max_nodes,
+            self.visuals
         )
     }
 }

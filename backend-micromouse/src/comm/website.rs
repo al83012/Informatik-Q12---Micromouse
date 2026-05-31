@@ -21,7 +21,7 @@ use crate::{
     map::map::{CellDiscovery, WallDiscovery},
     strategy::{
         dyn_strategy_tree::StrategyChangeCommand, strategy::StrategyEndState,
-        strategy_tree::StrategyTreeError,
+        strategy_tree::StrategyTreeError, visuals::TreeVisualEvent,
     },
     utils::{hyperlink_logging::process_span, nonempty::PotentiallyNonEmpty},
 };
@@ -38,6 +38,7 @@ pub enum FrontendMessage {
     StrategyTreeError(StrategyTreeError),
     StrategyEnd(StrategyEndState),
     MicromouseConnectionEvent(WsChannelConnInfo),
+    VisualEvent(TreeVisualEvent),
     Debug(String),
     ConfirmLastChange,
 }
