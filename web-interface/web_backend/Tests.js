@@ -1,6 +1,7 @@
 const WebsocketClient  = require('websocket').client;
 const backport = 8090;
 const host = '127.0.0.1';
+const timeout = 200;
 const client = new WebsocketClient();
 
 function connect_backend() {
@@ -60,9 +61,9 @@ function input(string) {
 
                 async function send_path_change() {
                     while (true) {
-                        await sleep(200);
+                        await sleep(timeout);
                         conn.sendUTF(JSON.stringify(obj1));
-                        await sleep(200);
+                        await sleep(timeout);
                         conn.sendUTF(JSON.stringify(obj2));
                     }
                 };
