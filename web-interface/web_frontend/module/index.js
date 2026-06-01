@@ -278,6 +278,7 @@ function discoverTile(x, y, directions, x_other, y_other) {
     Index.animHandler.addImmediate(group);
 }
 
+
 function flip_nswe_directions(directions) {
     let new_directions = [];
     for (let i = 0; i < directions.length; i++) {
