@@ -1,0 +1,534 @@
+use std::{io::Write, ops::RangeInclusive};
+
+use console::Style;
+use tracing::{debug, error, trace};
+
+use crate::{
+    map::map::{CellDiscoveryStatus, Map, WallDiscoveryStatus},
+    transform::{
+        direction::Direction,
+        position::{Position, PositionOffset},
+    },
+};
+
+pub struct MapDisplay {
+    cell_width: usize,
+    cell_height: usize,
+    // ordered as [row/line][col]
+    lines: Vec<Vec<char>>,
+    paint: Vec<Vec<Style>>,
+    map_size: usize,
+}
+
+/// ONLY the inner part of the cell, not the walls
+pub struct CellReference<'a> {
+    map: &'a mut MapDisplay,
+    position: Position,
+}
+
+pub struct WallReference<'a> {
+    map: &'a mut MapDisplay,
+    position: Position,
+    direction: Direction,
+}
+
+pub struct CharRangeReference<'a> {
+    map: &'a mut MapDisplay,
+    range: CharRange,
+}
+
+#[derive(Debug)]
+pub struct CharRange {
+    pub range_row: RangeInclusive<usize>,
+    pub range_col: RangeInclusive<usize>,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct CharPos {
+    pub row: usize,
+    pub col: usize,
+}
+
+pub trait MapDisplayWrite {
+    fn apply_style(&mut self, style: Style);
+    fn set_char(&mut self, c: char);
+}
+
+impl MapDisplay {
+    pub fn new(map_size: usize, cell_width: usize, cell_height: usize) -> Self {
+        let char_width = (cell_width - 1) * map_size + 1;
+        let char_height = (cell_height - 1) * map_size + 1;
+        let mut lines = Vec::with_capacity(char_width);
+        let mut paint = Vec::with_capacity(char_width);
+        for _row in 0..char_height {
+            let mut line = Vec::with_capacity(char_width);
+            let mut paint_line = Vec::with_capacity(char_width);
+            for _col in 0..char_width {
+                line.push(' ');
+                paint_line.push(Style::default());
+            }
+            lines.push(line);
+            paint.push(paint_line);
+        }
+        Self {
+            lines,
+            map_size,
+            cell_width,
+            cell_height,
+            paint,
+        }
+    }
+
+    pub fn map_size(&self) -> usize {
+        self.map_size
+    }
+
+    fn upper_left_wall_corner(&self, position: Position) -> Option<CharPos> {
+        if self.pos_invalid(position) {
+            return None;
+        }
+        Some(CharPos {
+            row: (self.cell_height - 1) * position.y as usize,
+            col: (self.cell_width - 1) * position.x as usize,
+        })
+    }
+
+    fn pos_invalid(&self, position: Position) -> bool {
+        position.x as usize > self.map_size + 1 || position.y as usize > self.map_size + 1
+    }
+    fn char_pos_invalid(&self, position: CharPos) -> bool {
+        position.row + 1 > self.lines.len()
+            || position.col + 1
+                > self
+                    .lines
+                    .first()
+                    .expect("Should have at least 1 row")
+                    .len()
+    }
+
+    pub fn inner_cell_char_range(&self, position: Position) -> Option<CharRange> {
+        let upper_left_wall_corner = self.upper_left_wall_corner(position)?;
+        let upper_left_inner_cell_corner = CharPos {
+            row: upper_left_wall_corner.row + 1,
+            col: upper_left_wall_corner.col + 1,
+        };
+        let lower_right_inner_cell_corner = CharPos {
+            row: upper_left_wall_corner.row + self.cell_height - 2,
+            col: upper_left_wall_corner.col + self.cell_width - 2,
+        };
+
+        let char_range = CharRange {
+            range_row: upper_left_inner_cell_corner.row..=lower_right_inner_cell_corner.row,
+            range_col: upper_left_inner_cell_corner.col..=lower_right_inner_cell_corner.col,
+        };
+
+        trace!(target: "tests/map/display", "Inner cell &({char_range:?})");
+        Some(char_range)
+    }
+
+    pub fn cell_mut<'a>(&'a mut self, position: Position) -> Option<CellReference<'a>> {
+        if self.pos_invalid(position) {
+            return None;
+        }
+        trace!(target: "tests/map/display", "Cell &({position:?})");
+        Some(CellReference {
+            map: self,
+            position,
+        })
+    }
+
+    pub fn wall_mut<'a>(
+        &'a mut self,
+        position: Position,
+        direction: Direction,
+    ) -> Option<WallReference<'a>> {
+        if self.pos_invalid(position) {
+            return None;
+        }
+        trace!(target: "tests/map/display", "Wall &({position:?} {direction:?})");
+        Some(WallReference {
+            map: self,
+            position,
+            direction,
+        })
+    }
+
+    pub fn apply_style(&mut self, char_row: usize, char_col: usize, style: Style) {
+        if !(char_row < self.lines.len() && char_col < self.lines[0].len()) {
+            return;
+        }
+
+        self.paint[char_row][char_col] = style;
+    }
+    pub fn set_char(&mut self, char_row: usize, char_col: usize, c: char) {
+        if !(char_row < self.lines.len() && char_col < self.lines[0].len()) {
+            return;
+        }
+
+        self.lines[char_row][char_col] = c;
+    }
+
+    pub fn line<'a>(&'a mut self, start: CharPos, end: CharPos) -> Option<CharLineReference<'a>> {
+        if self.char_pos_invalid(start) || self.char_pos_invalid(end) {
+            error!(target: "test/display", "Invalid char pos");
+            return None;
+        }
+
+        let new_start = CharPos {
+            row: start.row.min(end.row),
+            col: start.col.min(end.col),
+        };
+        let new_end = CharPos {
+            row: start.row.max(end.row),
+            col: start.col.max(end.col),
+        };
+
+        Some(CharLineReference {
+            map: self,
+            start: new_start,
+            end: new_end,
+        })
+    }
+}
+
+impl<'b> CellReference<'b> {
+    pub fn all<'a>(&'a mut self) -> CharRangeReference<'a> {
+        let range = self
+            .map
+            .inner_cell_char_range(self.position)
+            .expect("Already checked at construction");
+        CharRangeReference {
+            map: self.map,
+            range,
+        }
+    }
+    pub fn center<'a>(&'a mut self) -> CharRangeReference<'a> {
+        let range = self
+            .map
+            .inner_cell_char_range(self.position)
+            .expect("Already checked at construction");
+        let range_row = range.range_row;
+        let range_col = range.range_col;
+        let center_row = (range_row.start() + range_row.end()) / 2;
+        let center_col = (range_col.start() + range_col.end()) / 2;
+        CharRangeReference {
+            map: self.map,
+            range: CharRange {
+                range_row: center_row..=center_row,
+                range_col: center_col..=center_col,
+            },
+        }
+    }
+}
+
+impl<'b> WallReference<'b> {
+    pub fn full<'a>(&'a mut self) -> CharRangeReference<'a> {
+        let inner_range = self
+            .map
+            .inner_cell_char_range(self.position)
+            .expect("Already checked at construction");
+        let (range_row, range_col) = match self.direction {
+            Direction::PosY => {
+                // down --> row-
+                let wall_row = inner_range.range_row.end() + 1;
+                let extended_col =
+                    inner_range.range_col.start() - 1..=inner_range.range_col.end() + 1;
+                ((wall_row..=wall_row), extended_col)
+            }
+            Direction::NegX => {
+                // left --> col-
+                let wall_col = inner_range.range_col.start() - 1;
+                let extended_row =
+                    inner_range.range_row.start() - 1..=inner_range.range_row.end() + 1;
+                (extended_row, (wall_col..=wall_col))
+            }
+            Direction::NegY => {
+                // up --> row+
+                let wall_row = inner_range.range_row.start() - 1;
+                let extended_col =
+                    inner_range.range_col.start() - 1..=inner_range.range_col.end() + 1;
+                ((wall_row..=wall_row), extended_col)
+            }
+            Direction::PosX => {
+                // right --> col+
+                let wall_col = inner_range.range_col.end() + 1;
+                let extended_row =
+                    inner_range.range_row.start() - 1..=inner_range.range_row.end() + 1;
+                (extended_row, (wall_col..=wall_col))
+            }
+        };
+        CharRangeReference {
+            map: self.map,
+            range: CharRange {
+                range_row,
+                range_col,
+            },
+        }
+    }
+    pub fn inner<'a>(&'a mut self) -> CharRangeReference<'a> {
+        let direction = self.direction;
+        let full = self.full();
+        match direction {
+            Direction::PosX | Direction::NegX => {
+                //Wall is vertical --> reduce row
+                let range_row = full.range.range_row;
+                trace!(target: "tests/map/display", "Range row reduction row = {range_row:?}, col = {:?}", full.range.range_col);
+                CharRangeReference {
+                    map: full.map,
+                    range: CharRange {
+                        range_row: range_row.start() + 1..=range_row.end() - 1,
+                        range_col: full.range.range_col,
+                    },
+                }
+            }
+            Direction::PosY | Direction::NegY => {
+                //Wall is horizontal --> reduce col
+                let range_col = full.range.range_col;
+                trace!(target: "tests/map/display", "Range row reduction row = {:?}, col = {range_col:?}", full.range.range_row);
+                CharRangeReference {
+                    map: full.map,
+                    range: CharRange {
+                        range_row: full.range.range_row,
+                        range_col: range_col.start() + 1..=range_col.end() - 1,
+                    },
+                }
+            }
+        }
+    }
+}
+
+impl<'a> MapDisplayWrite for WallReference<'a> {
+    fn apply_style(&mut self, style: Style) {
+        self.full().apply_style(style);
+    }
+
+    fn set_char(&mut self, c: char) {
+        self.full().set_char(c);
+    }
+}
+
+impl<'a> MapDisplayWrite for CharRangeReference<'a> {
+    fn set_char(&mut self, c: char) {
+        for row in self.range.range_row.clone() {
+            for col in self.range.range_col.clone() {
+                self.map.set_char(row, col, c);
+            }
+        }
+    }
+
+    fn apply_style(&mut self, style: Style) {
+        for row in self.range.range_row.clone() {
+            for col in self.range.range_col.clone() {
+                self.map.apply_style(row, col, style.clone());
+            }
+        }
+    }
+}
+
+impl<'a> MapDisplayWrite for CellReference<'a> {
+    fn apply_style(&mut self, style: Style) {
+        self.all().apply_style(style);
+    }
+
+    fn set_char(&mut self, c: char) {
+        self.all().set_char(c);
+    }
+}
+
+impl std::fmt::Display for MapDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        debug!(target: "tests/map/display", "Displaying MapDisplay");
+        for (row_num, row) in self.lines.iter().enumerate() {
+            let mut row_str = "".to_string();
+            for (col_num, c) in row.iter().enumerate() {
+                let style = &self.paint[row_num][col_num];
+                row_str.push_str(style.apply_to(c).to_string().as_str());
+
+            }
+            f.write_str(&row_str)?;
+
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+impl<const N: usize> From<&Map<N>> for MapDisplay {
+    fn from(value: &Map<N>) -> Self {
+        let dim = N;
+        let mut display = MapDisplay::new(dim, 9, 5);
+
+        let discovered_style = Style::new().on_black().on_bright().white();
+        let visited_style = Style::new().on_white().black();
+
+        for x in 0..dim {
+            let pos = Position { x: x as u32, y: 0 };
+            let dir = Direction::NegY;
+            let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
+            wall.full().set_char('+');
+            wall.inner().set_char('-');
+            wall.full().apply_style(discovered_style.clone().red());
+        }
+        for y in 0..dim {
+            let pos = Position { x: 0, y: y as u32 };
+            let dir = Direction::NegX;
+            let mut wall = display.wall_mut(pos, dir).expect("Wall should exist");
+            wall.full().set_char('+');
+            wall.inner().set_char('|');
+            wall.full().apply_style(discovered_style.clone().red());
+        }
+
+        for x in 0..dim {
+            for y in 0..dim {
+                let pos = Position {
+                    x: x as u32,
+                    y: y as u32,
+                };
+                let dir_right = Direction::PosX;
+                let dir_down = Direction::PosY;
+
+                let right_wall = value.wall(&pos, &dir_right).expect("Wall should exist");
+                match right_wall {
+                    WallDiscoveryStatus::Undiscovered => {}
+                    WallDiscoveryStatus::Visited => {
+                        let mut wall = display.wall_mut(pos, dir_right).expect("Wall should exist");
+                        wall.inner().apply_style(visited_style.clone());
+                    }
+                    WallDiscoveryStatus::Exists(exists) => {
+                        let mut wall = display.wall_mut(pos, dir_right).expect("Wall should exist");
+                        if *exists {
+                            wall.full().set_char('+');
+                            wall.inner().set_char('|');
+                            wall.full().apply_style(discovered_style.clone().red());
+                        } else {
+                            wall.inner().apply_style(discovered_style.clone());
+                        }
+                    }
+                }
+                let lower_wall = value.wall(&pos, &dir_down).expect("Wall should exist");
+                match lower_wall {
+                    WallDiscoveryStatus::Undiscovered => {}
+                    WallDiscoveryStatus::Visited => {
+                        let mut wall = display.wall_mut(pos, dir_down).expect("Wall should exist");
+                        wall.inner().apply_style(visited_style.clone());
+                    }
+                    WallDiscoveryStatus::Exists(exists) => {
+                        let mut wall = display.wall_mut(pos, dir_down).expect("Wall should exist");
+                        if *exists {
+                            wall.full().set_char('+');
+                            wall.inner().set_char('-');
+                            wall.full().apply_style(discovered_style.clone().red());
+                        } else {
+                            wall.inner().apply_style(discovered_style.clone());
+                        }
+                    }
+                }
+                let cell = value.cell(&pos).expect("Cell should exist");
+                let mut cell_vis = display.cell_mut(pos).expect("Cell should exist");
+
+                match cell {
+                    CellDiscoveryStatus::Undiscovered => {
+                    }
+                    CellDiscoveryStatus::Discovered => {
+                        cell_vis.apply_style(discovered_style.clone());
+                    }
+                    CellDiscoveryStatus::Visited => {
+                        cell_vis.apply_style(visited_style.clone());
+                    }
+                }
+            }
+        }
+        display
+    }
+}
+
+impl<'a> CharRangeReference<'a> {
+    pub fn center(self) -> Self {
+        let range = self.range;
+        let range_col = range.range_col;
+        let range_row = range.range_row;
+        let center_col = (range_col.start() + range_col.end()) / 2;
+        let center_row = (range_row.start() + range_row.end()) / 2;
+        Self {
+            map: self.map,
+            range: CharRange {
+                range_row: center_row..=center_row,
+                range_col: center_col..=center_col,
+            },
+        }
+    }
+
+    pub fn center_point(self) -> CharPos {
+        self.range.center_point()
+    }
+
+    pub fn shift(self, d_c_row: isize, d_c_col: isize) -> Option<Self> {
+        let row_range = self.range.range_row.clone();
+        let col_range = self.range.range_col.clone();
+
+        debug!(target: "test/op", "shifting {:?} by {{row = {d_c_row}, col = {d_c_col}}}", self.range);
+
+        if d_c_row < 0 && *row_range.start() < d_c_row.unsigned_abs() {
+            error!(target: "test/op", "Underflow row");
+            return None;
+        }
+
+        if d_c_col < 0 && *col_range.start() < d_c_col.unsigned_abs() {
+            error!(target: "test/op", "Underflow col");
+            return None;
+        }
+
+        Some(CharRangeReference {
+            map: self.map,
+            range: CharRange {
+                range_row: (*row_range.start() as isize + d_c_row) as usize
+                    ..=(*row_range.end() as isize + d_c_row) as usize,
+                range_col: (*col_range.start() as isize + d_c_col) as usize
+                    ..=(*col_range.end() as isize + d_c_col) as usize,
+            },
+        })
+    }
+}
+
+impl CharRange {
+    pub fn center_point(self) -> CharPos {
+        let range_col = self.range_col;
+        let range_row = self.range_row;
+        let center_col = (range_col.start() + range_col.end()) / 2;
+        let center_row = (range_row.start() + range_row.end()) / 2;
+        CharPos {
+            row: center_row,
+            col: center_col,
+        }
+    }
+}
+
+pub struct CharLineReference<'a> {
+    map: &'a mut MapDisplay,
+    start: CharPos,
+    end: CharPos,
+}
+
+impl<'a> MapDisplayWrite for CharLineReference<'a> {
+    fn apply_style(&mut self, style: Style) {
+        for c_row in self.start.row..=self.end.row {
+            for c_col in self.start.col..=self.end.col {
+                self.map.apply_style(c_row, c_col, style.clone());
+            }
+        }
+    }
+
+    fn set_char(&mut self, c: char) {
+        for c_row in self.start.row..=self.end.row {
+            for c_col in self.start.col..=self.end.col {
+                self.map.set_char(c_row, c_col, c);
+            }
+        }
+    }
+}
+
+impl<'a> CharLineReference<'a> {
+    pub fn line_display(&self) -> String {
+        format!("{:?} -> {:?}", self.start, self.end)
+    }
+}

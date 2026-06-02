@@ -1,0 +1,153 @@
+use serde::{Deserialize, Serialize};
+use tracing::{trace, warn};
+
+use crate::{
+    comm::micromouse_message::MovementType,
+    transform::direction::{Direction, DirectionNormalizedVector},
+};
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct Position {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PositionOffset {
+    pub d_x: i32,
+    pub d_y: i32,
+}
+
+impl From<DirectionNormalizedVector> for PositionOffset {
+    fn from(value: DirectionNormalizedVector) -> Self {
+        Self {
+            d_x: value.x as i32,
+            d_y: value.y as i32,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MouseTransform {
+    pub pos: Position,
+    pub dir: Direction,
+}
+
+impl Default for MouseTransform {
+    fn default() -> Self {
+        Self {
+            pos: Position { x: 0, y: 0 },
+            dir: Direction::PosX,
+        }
+    }
+}
+
+impl std::ops::Add<PositionOffset> for Position {
+    type Output = Option<Position>;
+    fn add(self, rhs: PositionOffset) -> Self::Output {
+        let x = self.x as i32 + rhs.d_x;
+        let y = self.y as i32 + rhs.d_y;
+        if x >= 0 && y >= 0 {
+            Some(Position {
+                x: x as u32,
+                y: y as u32,
+            })
+        } else {
+            warn!(target: "tests/op", "Addition underflowed: ({x}, {y})");
+            None
+        }
+    }
+}
+
+impl MouseTransform {
+    pub fn rotated(self, intervals_counter_clockwise: i8) -> Self {
+        let old_dir = self.dir;
+        let new_dir = self.dir.rotated(intervals_counter_clockwise);
+        trace!(target: "tests/op", "ROTATED: {intervals_counter_clockwise} & {old_dir} --> {new_dir}");
+        MouseTransform {
+            pos: self.pos,
+            dir: new_dir,
+        }
+    }
+    pub fn moved(self, fwd_steps: u8) -> Option<Self> {
+        let old_pos = self.pos;
+        let new_pos = (old_pos + self.dir.steps_in_dir(fwd_steps))?;
+        trace!(target: "tests/op", "MOVED: {fwd_steps} & {old_pos} --> {new_pos}");
+        Some(MouseTransform {
+            pos: new_pos,
+            dir: self.dir,
+        })
+    }
+    pub fn step_once(self, movement: MovementType) -> Option<Self> {
+        match movement {
+            MovementType::Turn(i) => Some(self.rotated(i.signum())),
+            MovementType::Move(_) => self.moved(1),
+        }
+    }
+}
+
+impl std::fmt::Display for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
+impl Position {
+    pub fn direction_straight_line(&self, to: Self) -> Option<Direction> {
+        if self.x == to.x || self.y == to.y {
+            Some(if self.x > to.x {
+                Direction::NegX
+            } else if self.x < to.x {
+                Direction::PosX
+            } else if self.y > to.y {
+                Direction::NegY
+            } else {
+                Direction::PosY
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn distance_straight_line(&self, to: Self) -> Option<u32> {
+        if self.x == to.x || self.y == to.y {
+            Some(self.x.abs_diff(to.x) + self.y.abs_diff(to.y))
+        } else {
+            None
+        }
+    }
+}
+
+
+/// WARN: THE RAY ITERATOR DOES NOT START AT THE CELL; THE FIRST ELEMENT IS THE ONE OUTSIDE THE
+/// CELL
+#[derive(Clone)]
+pub struct RayIterator<const N: usize> {
+    pub current_transf: MouseTransform,
+}
+
+
+impl<const N: usize> RayIterator<N> {
+   pub fn new(from_cell: Position, in_direction: Direction) -> Self{
+        Self {
+            current_transf: MouseTransform { pos: from_cell, dir: in_direction },
+        }
+    } 
+}
+
+
+impl<const N: usize> Iterator for RayIterator<N> {
+    type Item = MouseTransform;
+    fn next(&mut self) -> Option<Self::Item> {
+        if (self.current_transf.dir == Direction::NegX && self.current_transf.pos.x == 0)
+        || (self.current_transf.dir == Direction::NegY && self.current_transf.pos.y == 0)
+        || (self.current_transf.dir == Direction::PosX && self.current_transf.pos.x as usize + 1 >= N)
+        || (self.current_transf.dir == Direction::PosY && self.current_transf.pos.y as usize + 1 >= N)
+        {
+            None
+        } else {
+            self.current_transf = self.current_transf.moved(1).expect("Checked");
+            Some(self.current_transf)
+        }
+    }
+}

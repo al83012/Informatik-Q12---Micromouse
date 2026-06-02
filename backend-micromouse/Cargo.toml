@@ -5,9 +5,28 @@ edition = "2024"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-tungstenite = "0.28.0"
+tungstenite = "0.29.0"
 tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = "0.28.0"
+tokio-tungstenite = "0.29.0"
 futures-util = "0.3"
-log = "*"
-env_logger = "*"
+# log = "*"
+# env_logger = "*"
+tokio-util = "*"
+incr_stats = "*"
+# log4rs 
+tracing = "0.1.44"
+tracing-subscriber = { version = "*", features = ["fmt", "env-filter"] }
+tracing-log = "0.2"
+tracing-appender = "0.2"
+console = "*"
+rand = "*"
+serde_json = "*"
+chrono = "*"
+pathdiff = "*"
+ansi-to-html = "*"
+thiserror = "2.0.18"
+
+[features]
+comm_stats = []
+hyperlink_logging = []
+default = ["comm_stats", "hyperlink_logging"]

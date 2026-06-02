@@ -1,0 +1,32 @@
+
+use serde::{Deserialize, Serialize};
+
+use crate::strategy::strategy::{FromConfig, Strategy};
+
+#[derive(Clone, Debug)]
+pub struct RandomMove<const N: usize>;
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct RandomMoveConfig;
+
+impl<const N: usize> FromConfig<N> for RandomMove<N> {
+    type Config = RandomMoveConfig;
+
+    fn from_config(
+        config: &Self::Config,
+        starting_state: &crate::map::world_data::WorldData<N>,
+    ) -> Self {
+        todo!()
+    }
+}
+
+
+impl<const N: usize> Strategy<N> for RandomMove<N> {
+    fn next_cmd(
+        &self,
+        world: &crate::map::world_data::PartialWorldData<N>,
+        goal: &crate::strategy::strategy::GoalPosition,
+    ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
+        todo!()
+    }
+}

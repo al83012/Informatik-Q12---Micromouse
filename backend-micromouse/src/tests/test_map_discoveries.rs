@@ -1,8 +1,8 @@
 use crate::{
-    direction::Direction,
-    map::{Map, MapInconsistencyError, WallDiscoveryStatus},
-    measurement::{Measurement, MeasurementValue},
-    position::Position,
+    transform::direction::Direction,
+    map::map::{Map, MapInconsistencyError, WallDiscoveryStatus},
+    map::measurement::{Measurement, MeasurementValue},
+    transform::position::Position,
 };
 
 type TestMap = Map<4>;
@@ -17,7 +17,7 @@ fn detect_wall_one_cell_ahead() {
         value: MeasurementValue::Value { cells: 1 },
     };
 
-    map.update_discovery(&m).unwrap();
+    map.apply_measurement(&m).unwrap();
 
     assert_eq!(
         map.wall(&Position { x: 0, y: 0 }, &Direction::PosX),
@@ -40,7 +40,7 @@ fn outside_range_marks_no_walls() {
         value: MeasurementValue::OutsideRange { at_least_cells: 3 },
     };
 
-    map.update_discovery(&m).unwrap();
+    map.apply_measurement(&m).unwrap();
 
     for i in 0..3 {
         assert_eq!(
@@ -60,7 +60,7 @@ fn multiple_empty_then_wall() {
         value: MeasurementValue::Value { cells: 2 },
     };
 
-    map.update_discovery(&m).unwrap();
+    map.apply_measurement(&m).unwrap();
 
     assert_eq!(
         map.wall(&Position { x: 0, y: 0 }, &Direction::PosY),
@@ -88,7 +88,7 @@ fn conflicting_measurements_detected() {
         value: MeasurementValue::Value { cells: 1 },
     };
 
-    map.update_discovery(&m1).unwrap();
+    map.apply_measurement(&m1).unwrap();
 
     let m2 = Measurement {
         position: Position { x: 0, y: 0 },
@@ -96,7 +96,7 @@ fn conflicting_measurements_detected() {
         value: MeasurementValue::OutsideRange { at_least_cells: 2 },
     };
 
-    let result = map.update_discovery(&m2);
+    let result = map.apply_measurement(&m2);
 
     assert!(matches!(
         result,
@@ -114,8 +114,8 @@ fn repeated_same_measurement_ok() {
         value: MeasurementValue::Value { cells: 1 },
     };
 
-    map.update_discovery(&m).unwrap();
-    map.update_discovery(&m).unwrap();
+    map.apply_measurement(&m).unwrap();
+    map.apply_measurement(&m).unwrap();
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn outside_bounds_error() {
         value: MeasurementValue::OutsideRange { at_least_cells: 5 },
     };
 
-    let result = map.update_discovery(&m);
+    let result = map.apply_measurement(&m);
 
     assert!(matches!(
         result,
@@ -146,7 +146,7 @@ fn negative_direction_update() {
         value: MeasurementValue::Value { cells: 1 },
     };
 
-    map.update_discovery(&m).unwrap();
+    map.apply_measurement(&m).unwrap();
 
     assert_eq!(
         map.wall(&Position { x: 2, y: 0 }, &Direction::NegX),
