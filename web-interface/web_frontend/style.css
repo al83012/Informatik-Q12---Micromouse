@@ -715,6 +715,33 @@ body {
     box-shadow: 0 0 10px var(--arm-glow), 0 0 20px rgba(0,207,255,0.25);
 }
 
+
+/**
+ * Wall system, similar to arm system
+ */
+
+.sys-wall_container {
+    position: absolute;
+    width: calc(100%/16);
+    height: calc(100%/16);
+    z-index: 25; /*the wall system operates on 25 and above, but the containers can't block clicks*/
+    pointer-events: none;
+}
+
+.sys-wall_wall-right {
+    z-index: 26;
+    position: absolute;
+    background: blue;
+    height: 90%;
+    width: 4px;
+    top: 5%;
+    right: 0;
+    transform: translateX(2px);
+    pointer-events: none;
+}
+
+
+
 /**
  * Mouse system in each direction
  */

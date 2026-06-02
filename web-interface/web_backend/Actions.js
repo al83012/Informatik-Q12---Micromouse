@@ -116,6 +116,10 @@ export class Actions {
         return new Action("rotate_mouse", new Map([["dir", '"' + direction + '"'], ["dir_new", '"' + direction_new + '"']]));
     }
 
+    static test_dt(discovered_tiles, x,y,no_others) {
+        return Actions.discover_tile(x, y, discovered_tiles, no_others);
+    }
+
     static discover_tile(x, y, discovered_tiles, no_others) {
         let directions = [];
         let other_tiles = [];

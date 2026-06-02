@@ -278,6 +278,7 @@ function discoverTile(x, y, directions, x_other, y_other) {
     Index.animHandler.addImmediate(group);
 }
 
+
 function flip_nswe_directions(directions) {
     let new_directions = [];
     for (let i = 0; i < directions.length; i++) {
@@ -341,6 +342,19 @@ function init_maze() {
             arm_right.id = "sys-arm_arm-e_" + i;
             arm_container.appendChild(arm_right);
         }
+
+        let wall_container = document.createElement("div");
+        wall_container.className = "sys-wall_container";
+        wall_container.id = "sys-wall_container_" + i;
+        wall_container.style.top = ((100/16)*coords[1]) + "%";
+        wall_container.style.left = ((100/16)*coords[0]) + "%";
+
+        let wall_right = document.createElement("div");
+        wall_right.className = "sys-wall_wall-right";
+        wall_right.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" + (coords[0] + 1) + ":" + coords[1];
+
+        wall_container.appendChild(wall_right);
+        document.getElementById("maze_square_main").appendChild(wall_container);
     }
 
     //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);

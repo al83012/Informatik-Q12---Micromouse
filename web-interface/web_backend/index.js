@@ -304,6 +304,10 @@ function input(string) {
                             manager.f_sync.push(Actions.add_message(parts[2]));
                         }
                         break;
+                    case "send":
+                        if (parts.length === 4) {
+                            manager.f_sync.push(Actions[parts[2]](manager.in_maze.discovered,...parts[3].split(",")));
+                        }
                 }
             }
             break;
