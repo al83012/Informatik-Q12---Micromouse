@@ -12,7 +12,11 @@ import {
     AnimFadeOut,
     AnimBackgroundColor,
     AnimSlideColor,
-    AnimGroup
+    AnimGroup,
+    AnimCssChange,
+    AnimMoveMultiples,
+    AnimRotate,
+    generatePathAnimGroup
 } from "./Animation.js"
 import { StyleAdder } from "./style_adder.js";
 
@@ -23,6 +27,26 @@ export class Index {
     static algorithms = [];
 
     static eventLoad() {
+        //creating error feedback to backend
+        window.onerror = function (e) {
+            let request = new XMLHttpRequest();
+            request.open("POST", document.location.origin + "/error");
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify({
+                error: e,
+                stack: e.stack,
+            }));
+        }
+
+        //move info-link_pill to respective position
+        let info_link_pill = document.getElementsByClassName("link-info_pill")[0];
+        info_link_pill.style.top = (document.getElementsByClassName("header_container")[0].clientHeight + 10) + "px";
+        info_link_pill.onclick = function () {
+            document.location.replace(document.location.origin + "/info/info.html");
+            //document.location.reload();
+        }
+
+
         let squares = document.getElementsByClassName("maze_tile");
 
         for (let i = 0; i < squares.length; i++) {
@@ -56,15 +80,15 @@ export class Index {
 
         //creating the AnimationHandler
         Index.animHandler = new AnimationHandler();
-        window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
         window.setInterval(() => {
             let request = new XMLHttpRequest();
             request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
             request.open("GET", document.location.origin + "/update", true);
             request.send();
         }, 100);
-
-
+        window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
+        
+        //window.setTimeout(() => init_maze(), 1000); //the timeout is only for the test animation which had a bug
         init_maze();
 
 
@@ -72,7 +96,7 @@ export class Index {
         //Index.animHandler.add(borderAnim);
 
         let request = new XMLHttpRequest();
-        request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
+        request.addEventListener("load", function () {console.log(this.responseText);Index.handleUpdate(JSON.parse(this.responseText));});
         request.open("GET", document.location.origin + "/update_full");
         request.send();
     }
@@ -105,12 +129,36 @@ export class Index {
                 case "reset_maze":
                     reset_maze(data["animation"] === "true");
                     break;
+                case "update_path":
+                    Index.animHandler.addImmediate(displayPathChange(data["path"]));
+                    break;
+                case "discover_tile":
+                    if (data["others"] === true) {
+                        discoverTile(data["x"], data["y"], data["directions"], data.other_tiles_x, data.other_tiles_y);
+                    } else {
+                        discoverTile(data["x"], data["y"], data["directions"]);
+                    }
+                    break;
+                case "move_mouse":
+                    let card_move = document.getElementById("sys-mouse_card");
+                    Index.animHandler.addImmediate(new AnimMoveMultiples(20, card_move, 34, data["x"], data["x_new"], data["y"], data["y_new"]));
+                    break;
+                case "rotate_mouse":
+                    let card_rotate = document.getElementById("sys-mouse_card");
+                    Index.animHandler.addImmediate(new AnimRotate(7, card_rotate, data["dir"], data["dir_new"]));
+                    break;
+                case "show_loading":
+                    Index.show_loading_animation();
+                    break;
+                case "hide_loading":
+                    Index.hide_loading_animation();
+                    break;
             }
         });
     }
 
     static buttonStartStop() {
-        play_reset_animation();
+        //play_reset_animation();
 
         let request = new XMLHttpRequest();
         request.open("POST", document.location.origin + "/action");
@@ -162,8 +210,94 @@ export class Index {
         let obj = document.getElementsByClassName("pop_window_algorithm_group")[0];
         Index.animHandler.add(new AnimFadeOut(20, obj, (o) => {o.style.display = "none";}));
     }
+
+    static show_loading_animation() {
+        document.getElementById("loading-container").style.display = "block";
+
+        let main_group = new AnimGroup(5);
+
+        for (let i = 0; i < 24; i++) { //cycle through all 24 elements
+            let part = document.getElementById("loading_animation_" + i);
+            let group = new AnimGroup(-1);
+            group.add(new AnimCssChange(10, part, ["undiscovered"], "discovered"));
+            group.add(new AnimCssChange(65, part, ["repl"], "highlight"));
+            group.add(new AnimCssChange(30, part, ["highlight"], "repl"));
+            group.add(new AnimCssChange(15, part, ["discovered"], "undiscovered"));
+            main_group.add(group);
+        }
+
+        Index.animHandler.addRepeating(main_group, "loading_animation");
+    }
+
+    static hide_loading_animation() {
+        document.getElementById("loading-container").style.display = "none";
+        Index.animHandler.removeRepeating("loading_animation");
+    }
 }
 
+function discoverTile(x, y, directions, x_other, y_other) {
+    let index = co_crds_i([x, y]);
+    let group = new AnimGroup(0);
+    group.add(new AnimCssChange(10, document.getElementById("sys-arm_node_" + index),
+        ["undiscovered"], "discovered"));
+    for (let i = 0; i < directions.length; i++) {
+        group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-" + directions[i] + "_" + index),
+            ["undiscovered"], "discovered"));
+    }
+
+    if (!(x_other === null || x_other === undefined)) {
+        for (let i = 0; i < x_other.length; i++) {
+
+            switch (x_other[i]-x) {
+                case 1:
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-e_" + co_crds_i([x+1, y])),
+                        ["undiscovered"], "discovered"));
+                break;
+
+                case -1:
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-w_" + co_crds_i([x-1, y])),
+                        ["undiscovered"], "discovered"));
+                break;
+
+                case 0:
+                    switch (y_other[i]-y) {
+                        case 1:
+                            group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-n_" + co_crds_i([x, y+1])),
+                                ["undiscovered"], "discovered"));
+                        break;
+
+                        case -1:
+                            group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-s_" + co_crds_i([x, y-1])),
+                                ["undiscovered"], "discovered"));
+                        break;
+                    }
+                break;
+            }
+        }
+    }
+    Index.animHandler.addImmediate(group);
+}
+
+function flip_nswe_directions(directions) {
+    let new_directions = [];
+    for (let i = 0; i < directions.length; i++) {
+        switch (directions[i]) {
+            case "n":
+                new_directions.push("s");
+                break;
+            case "s":
+                new_directions.push("n");
+                break;
+            case "e":
+                new_directions.push("w");
+                break;
+            case "w":
+                new_directions.push("e");
+                break;
+        }
+    }
+    return new_directions;
+}
 
 //new function for initializing using the arm system
 function init_maze() {
@@ -176,36 +310,185 @@ function init_maze() {
         tile.appendChild(arm_container);
 
         let node = document.createElement("div");
-        node.className = "sys-arm_node";
+        node.className = "sys-arm_node repl undiscovered";
         node.id = "sys-arm_node_" + i;
         arm_container.appendChild(node);
 
         if (!(coords[1] === 0)) {
             let arm_up = document.createElement("div");
-            arm_up.className = "sys-arm_arm sys-arm_arm-n";
+            arm_up.className = "sys-arm_arm sys-arm_arm-n repl undiscovered";
             arm_up.id = "sys-arm_arm-n_" + i;
             arm_container.appendChild(arm_up);
         }
 
         if (!(coords[1] === 15)) {
             let arm_down = document.createElement("div");
-            arm_down.className = "sys-arm_arm sys-arm_arm-s";
+            arm_down.className = "sys-arm_arm sys-arm_arm-s repl undiscovered";
             arm_down.id = "sys-arm_arm-s_" + i;
             arm_container.appendChild(arm_down);
         }
 
         if (!(coords[0] === 0)) {
             let arm_left = document.createElement("div");
-            arm_left.className = "sys-arm_arm sys-arm_arm-w";
+            arm_left.className = "sys-arm_arm sys-arm_arm-w repl undiscovered";
             arm_left.id = "sys-arm_arm-w_" + i;
             arm_container.appendChild(arm_left);
         }
 
         if (!(coords[0] === 15)) {
             let arm_right = document.createElement("div");
-            arm_right.className = "sys-arm_arm sys-arm_arm-e";
+            arm_right.className = "sys-arm_arm sys-arm_arm-e repl undiscovered";
             arm_right.id = "sys-arm_arm-e_" + i;
             arm_container.appendChild(arm_right);
+        }
+    }
+
+    //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
+    /*let path = [
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1],
+        [9, 9, 9, 10, 10, 10, 0]
+    ];
+    let animation = displayPathChange(path);
+    let path_second = [
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 9, 9, 9, 10, 10, 10, -1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 5, 10, 5, 11, 6, 11, 7, 11, 8, 11, 9, 11, 10, 11, 1]
+    ];
+    let animation_second = displayPathChange(path_second);
+    Index.animHandler.add(animation);
+    Index.animHandler.add(animation_second);*/
+}
+
+function displayPathChange(changed_path) {
+    let tiles = [];
+    let group_points = [];
+    for (let g = 0; g < changed_path.length; g++) {
+        group_points.push([changed_path[g][0], changed_path[g][1], changed_path[g][changed_path[g].length-1]]);
+        group_points.push([changed_path[g][changed_path[g].length-3], changed_path[g][changed_path[g].length-2],
+            changed_path[g][changed_path[g].length-1]]);
+
+        let group = changed_path[g];
+        let prev = [group[0], group[1]];
+        tiles[[prev[0], prev[1]]] = [document.getElementById("sys-arm_node_" + co_crds_i([prev[0], prev[1]]))];
+        for (let i = 2; i < group.length -1; i+=2) { //-1 to skip the group type
+            if (prev[0] < group[i]) {
+                tiles[[prev[0], prev[1]]].push(document.getElementById("sys-arm_arm-e_" + co_crds_i([prev[0], prev[1]])));
+                tiles[[group[i], group[i+1]]] = [
+                    document.getElementById("sys-arm_arm-w_" + co_crds_i([group[i], group[i+1]])),
+                    document.getElementById("sys-arm_node_" + co_crds_i([group[i], group[i+1]]))
+                ];
+            }
+            else if (prev[0] > group[i]) {
+                tiles[[prev[0], prev[1]]].push(document.getElementById("sys-arm_arm-w_" + co_crds_i([prev[0], prev[1]])));
+                tiles[[group[i], group[i+1]]] = [
+                    document.getElementById("sys-arm_arm-e_" + co_crds_i([group[i], group[i+1]])),
+                    document.getElementById("sys-arm_node_" + co_crds_i([group[i], group[i+1]]))
+                ];
+            }
+            else if (prev[1] < group[i+1]) {
+                tiles[[prev[0], prev[1]]].push(document.getElementById("sys-arm_arm-s_" + co_crds_i([prev[0], prev[1]])));
+                tiles[[group[i], group[i+1]]] = [
+                    document.getElementById("sys-arm_arm-n_" + co_crds_i([group[i], group[i+1]])),
+                    document.getElementById("sys-arm_node_" + co_crds_i([group[i], group[i+1]]))
+                ];
+            }
+            else if (prev[1] > group[i+1]) {
+                tiles[[prev[0], prev[1]]].push(document.getElementById("sys-arm_arm-n_" + co_crds_i([prev[0], prev[1]])));
+                tiles[[group[i], group[i+1]]] = [
+                    document.getElementById("sys-arm_arm-s_" + co_crds_i([group[i], group[i+1]])),
+                    document.getElementById("sys-arm_node_" + co_crds_i([group[i], group[i+1]]))
+                ];
+            }
+            prev[0] = group[i];
+            prev[1] = group[i+1];
+        }
+    }
+
+    for (let i = 0; i < group_points.length; i++) {
+        for (let j = i+1; j < group_points.length; j++) {
+            if (math_pos(group_points[i][0]-group_points[j][0]) <= 1 &&
+                math_pos(group_points[i][1]-group_points[j][1]) <= 1 &&
+                !(math_pos(group_points[i][0]-group_points[j][0]) === 1 &&
+                    math_pos(group_points[i][1]-group_points[j][1]) === 1)) {
+
+                let prev = [group_points[i][0], group_points[i][1]];
+
+                if (prev[0] < group_points[j][0]) {
+                    if (group_points[j][2] === 0) {
+                        tiles[prev].push(document.getElementById("sys-arm_arm-e_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[prev].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    } else {
+                        tiles[[group_points[j][0], group_points[j][1]]]
+                            .push(document.getElementById("sys-arm_arm-e_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[[group_points[j][0], group_points[j][1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    }
+                }
+                else if (prev[0] > group_points[j][0]) {
+                    if (group_points[j][2] === 0) {
+                        tiles[prev].push(document.getElementById("sys-arm_arm-w_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[prev].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    } else {
+                        tiles[[group_points[j][0], group_points[j][1]]]
+                            .push(document.getElementById("sys-arm_arm-w_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[[group_points[j][0], group_points[j][1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    }
+                }
+                else if (prev[1] < group_points[j][1]) {
+                    if (group_points[j][2] === 0) {
+                        tiles[prev].push(document.getElementById("sys-arm_arm-s_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[prev].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    } else {
+                        tiles[[group_points[j][0], group_points[j][1]]]
+                            .push(document.getElementById("sys-arm_arm-s_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[[group_points[j][0], group_points[j][1]]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    }
+                }
+                else if (prev[1] > group_points[j][1]) {
+                    if (group_points[j][2] === 0) {
+                        tiles[prev].push(document.getElementById("sys-arm_arm-n_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[prev].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    } else {
+                        tiles[[group_points[j][0], group_points[j][1]]]
+                            .push(document.getElementById("sys-arm_arm-n_" + co_crds_i([prev[0], prev[1]])));
+                        tiles[[group_points[j][0], group_points[j][1]]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([group_points[j][0], group_points[j][1]])));
+                    }
+                }
+            }
+        }
+    }
+
+    return generatePathAnimGroup(changed_path, tiles);
+}
+
+//deprecated function
+//moved function to backend and awaiting server protocol to rewrite the function
+//according to data received from server
+function dep_displayPathChange(path_old, path_new) {
+    let groups = [];
+    let c_group = [];
+    let type = -2;
+    for (let i = 0; i < path_old.length; i+=2) {
+        if (path_old[i] === path_new[i] && path_old[i+1] === path_new[i+1]) {
+            if (!(type === -2 || type === 0)) {
+                c_group.push(type);
+                groups.push(c_group);
+                c_group = [];
+            }
+            c_group.push(path_new[i]);
+            c_group.push(path_new[i+1]);
+            type = 0;
+        } else if (path_old[i] !== path_new[i] || path_old[i+1] !== path_new[i+1]) {
+            if (!(type === -2 || type === -1 || type === 1)) {}
         }
     }
 }
@@ -334,6 +617,8 @@ function convert_index_to_coords(i) {
     return [x,y];
 }
 
+//just an alias function
+function co_crds_i(i) {return convert_coords_to_index(i);}
 function convert_coords_to_index(i) {
     return i[1]*16+i[0];
 }
@@ -430,4 +715,8 @@ function add_algorithm(algorithm) {
         Index.closePopAlgo();
     });
     document.getElementById("algo_content").appendChild(algorithm_ele);
+}
+
+function math_pos(x) {
+    return x*(x<0?-1:1);
 }

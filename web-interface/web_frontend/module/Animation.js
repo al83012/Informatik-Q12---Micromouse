@@ -27,6 +27,10 @@ export class Animation {
     }
 
     execute() {};
+    reset() {
+        this.finished = false;
+        this.remaining_duration = this.duration;
+    }
 }
 
 export class AnimFadeOut extends Animation {
@@ -292,10 +296,148 @@ export class AnimBorderColor extends Animation {
     }
 }
 
+export class AnimCssChange extends Animation {
+    constructor(duration, object, items, replacement) {
+        super(duration, object);
+        this.log_name = object.className;
+        //console.log(this.log_name);
+        this.items = items;
+        this.replacement = replacement;
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+
+        try {
+            if (this.duration === this.remaining_duration) {
+                for (let i = 0; i < this.items.length; i++) {
+                    if (this.object.className.includes(" " + this.items[i])) {
+                        this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
+                        break;
+                    }
+                }
+
+            }
+        } catch (e) {
+            console.log("Error in AnimCssChange of tile: " + this.log_name);
+        }
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration < 0) {
+            this.finished = true;
+        }
+    }
+}
+
+export class AnimMoveMultiples extends Animation {
+    constructor(duration, object, multiples, x_factor_start, x_factor_end, y_factor_start, y_factor_end) {
+        super(duration, object);
+        this.multiples = multiples
+        this.x_factor_start = x_factor_start;
+        this.x_factor_end = x_factor_end;
+        this.y_factor_start = y_factor_start;
+        this.y_factor_end = y_factor_end;
+        this.cur_factor_x = x_factor_start;
+        this.cur_factor_y = y_factor_start;
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+        if (this.remaining_duration === this.duration) {
+            /*this.object.style = this.object.style.replace(new RegExp("\\/\\*AnimMoveMultiples_start\\*\\/.*\\/\\*AnimMoveMultiples_end\\*\\/"), "")
+                + "/*AnimMoveMultiples_start*//*AnimMoveMultiples_end*/           /*";*/
+        }
+
+        this.cur_factor_x = this.x_factor_start + (this.x_factor_end - this.x_factor_start) * (1-(this.remaining_duration / this.duration));
+        this.cur_factor_y = this.y_factor_start + (this.y_factor_end - this.y_factor_start) * (1-(this.remaining_duration / this.duration));
+
+        this.object.style.left = "calc(" + this.multiples + "px*" + this.cur_factor_x + ")";
+        this.object.style.top = "calc(" + this.multiples + "px*" + this.cur_factor_y + ")";
+
+       // this.object.style = this.object.style.replace(new RegExp("\\/\\*AnimMoveMultiples_start\\*\\/.*\\/\\*AnimMoveMultiples_end\\*\\/"),
+       //     "/*AnimMoveMultiples_start*/left: calc(" + this.multiples + "px*" + this.cur_factor_x + "); " +
+       //     "right: calc(" + this.multiples + "px*" + this.cur_factor_y + ");/*AnimMoveMultiples_end*/")
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration < 0) {
+            this.finished = true;
+            this.object.style.left = "calc(" + this.multiples + "px*" + this.x_factor_end + ")";
+            this.object.style.top = "calc(" + this.multiples + "px*" + this.y_factor_end + ")";
+            //this.object.style = this.object.style.replace(new RegExp("\\/\\*AnimMoveMultiples_start\\*\\/.*\\/\\*AnimMoveMultiples_end\\*\\/"),
+            //    "/*AnimMoveMultiples_start*/left: calc(" + this.multiples + "px*" + this.x_factor_end + "); " +
+            //    "right: calc(" + this.multiples + "px*" + this.y_factor_end + ");/*AnimMoveMultiples_end*/");
+        }
+    }
+}
+
+export class AnimRotate extends Animation {
+    constructor(duration, object, angle_start, angle_end) {
+        super(duration, object);
+
+        this.angle_start = angle_start;
+        this.angle_end = angle_end;
+
+        if (typeof angle_start === "string") {
+            switch (angle_start) {
+                case "n":
+                    this.angle_start = 0;
+                    break;
+                case "s":
+                    this.angle_start = 180;
+                    break;
+                case "w":
+                    this.angle_start = 270;
+                    break;
+                case "e":
+                    this.angle_start = 90;
+                    break;
+            }
+        }
+
+        if (typeof angle_end === "string") {
+            switch (angle_end) {
+                case "n":
+                    this.angle_end = 0;
+                    break;
+                case "s":
+                    this.angle_end = 180;
+                    break;
+                case "w":
+                    this.angle_end = 270;
+                    break;
+                case "e":
+                    this.angle_end = 90;
+                    break;
+            }
+        }
+
+    }
+
+    execute() {
+        if (this.finished) {
+            return;
+        }
+
+        this.object.style.transform = "rotate(" + ((this.angle_end-this.angle_start)*(1-(this.remaining_duration / this.duration))) + "deg)";
+
+        this.remaining_duration--;
+
+        if (this.remaining_duration < 0) {
+            this.object.style.transform = "rotate(" + this.angle_end + "deg)";
+        }
+    }
+}
+
 export class AnimationHandler {
     animations = [];
     rep_animations = [];
-    rep_durations = [];
+    //rep_durations = [];
     imm_animations = [];
     constructor() {}
 
@@ -303,9 +445,19 @@ export class AnimationHandler {
         this.animations.push(animation);
     }
 
-    addRepeating(animation) {
-        this.rep_animations.push(animation);
-        this.rep_durations.push(animation.duration);
+    addRepeating(animation, id) {
+        if (!this.rep_animations.includes(id)) {
+            animation.rep_remove = false;
+            this.rep_animations[id] = animation;
+            this.rep_animations.push(id);
+        }
+        //this.rep_durations.push(animation.duration);
+    }
+
+    removeRepeating(id) {
+        if (this.rep_animations.includes(id)) {
+            this.rep_animations[id].rep_remove = true;
+        }
     }
 
     addImmediate(animation) {
@@ -313,22 +465,45 @@ export class AnimationHandler {
     }
 
     nextFrame() {
-        for (let i = 0; i < this.rep_animations.length; i++) {
+        /*for (let i = 0; i < this.rep_animations.length; i++) {
             this.rep_animations[i].execute();
             if (this.rep_animations[i].finished) {
-                this.rep_animations[i].finished = false;
-                this.rep_animations[i].remaining_duration = this.rep_durations[i];
+                this.rep_animations[i].reset();
+                /*this.rep_animations[i].finished = false;
+                this.rep_animations[i].remaining_duration = this.rep_durations[i];*/
+        //    }
+        //}
+        for (let id of this.rep_animations) {
+            this.rep_animations[id].execute();
+            if (this.rep_animations[id].finished) {
+                this.rep_animations[id].reset();
+                if (this.rep_animations[id].rep_remove) {
+                    delete this.rep_animations[id];
+                    this.rep_animations.splice(this.rep_animations.indexOf(id), 1);
+                }
             }
         }
 
-        let shift = 0;
+        //let shift = 0;
+        let remove = [];
         for (let i = 0; i < this.imm_animations.length; i++) {
-            this.imm_animations[i-shift].execute();
-            if (this.imm_animations[i-shift].finished) {
-                shift++;
-                this.imm_animations.splice(i-shift, 1);
+            //this.imm_animations[i-shift].execute();
+            this.imm_animations[i].execute();
+            //if (this.imm_animations[i-shift].finished) {
+            if (this.imm_animations[i].finished) {
+                //shift++;
+                //this.imm_animations.splice(i-shift, 1);
+                remove.push(i);
             }
         }
+        let new_imm_animations = [];
+        for (let i = 0; i < this.imm_animations.length; i++) {
+            if (!(remove.includes(i))) {
+                new_imm_animations.push(this.imm_animations[i]);
+            }
+        }
+        this.imm_animations = new_imm_animations;
+
 
         if (this.animations.length === 0) return;
         this.animations[0].execute();
@@ -340,6 +515,7 @@ export class AnimationHandler {
 
 export class AnimGroup extends Animation {
     animations = [];
+    rem_animations = [];
 
     constructor(delay) {
         super(-1, null); //ignore
@@ -351,7 +527,26 @@ export class AnimGroup extends Animation {
         this.animations.push(animation);
     }
 
+    reset() {
+        for (let anim of this.rem_animations) {
+            this.animations.push(anim);
+        }
+        this.rem_animations = [];
+
+        for (let i = 0; i < this.animations.length; i++) {
+            this.animations[i].reset();
+        }
+
+        this.current_delay = 0;
+
+        super.reset();
+    }
+
     execute() {
+        if (this.finished) {
+            return;
+        }
+
         if (this.delay === -1) {
             if (this.animations.length === 0) {
                 this.finished = true;
@@ -360,7 +555,7 @@ export class AnimGroup extends Animation {
 
             this.animations[0].execute();
             if (this.animations[0].finished) {
-                this.animations.shift();
+                this.rem_animations.push(this.animations.shift());
             }
 
             return;
@@ -377,7 +572,7 @@ export class AnimGroup extends Animation {
         }
 
         let amount = Math.min(Math.floor(this.current_delay/this.delay), this.animations.length);
-        let all_finished = (amount >= this.animations.length - 1);
+        let all_finished = (amount >= this.animations.length);
 
         for (let i = 0; i < amount; i++) {
             if (!(this.animations[i].finished)) {
@@ -392,4 +587,117 @@ export class AnimGroup extends Animation {
 
         this.current_delay++;
     }
+}
+
+export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are all arms tied to respective coords
+    const anim_time = 5;
+    let complete_group = -1, complete_time = 0;
+    for (let doub = 0; doub < 2; doub++) {
+        let path = path_in.map(inner => [...inner]);
+        let c_group = new AnimGroup(0);
+        let was_change = false;
+        let changed_group;
+        let changed_group_time = 0;
+
+        for (let i = path.length - 1; i >= 0; i--) {
+            let part = structuredClone(path[i]);
+            let type = part.pop() //0: same ; -1: remove ; +1: add
+
+            let duration = 0; //add 5 to the end to make it seamless
+            for (let j = 0; j < part.length; j += 2) {
+                duration += tiles[[part[j], part[j + 1]]].length * anim_time;
+            }
+            duration /= 3;
+            duration -= 10; //remove the last few child_times
+            complete_time += duration;
+
+            /*console.log("type:" + type)
+            console.log("duration:" + duration)
+            console.log(part)*/
+
+            let group = new AnimGroup(anim_time / 3);
+            let n_group;
+
+            switch (type) {
+                case 0:
+                    for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
+                        for (let k = 0; k < tiles[[part[j], part[j + 1]]].length; k++) {//for all arms in tiles for the coords
+                            group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
+                                (doub === 0 ? ["on", "repl"] : ["highlight", "repl"]),
+                                (doub === 0 ? "highlight" : "on")));
+                            //tiles[[part[j], part[j+1]]][k].style.opacity = 0;
+                            //FIXED: Bug where the last for animations are created but not executed
+                            //fix: cant be displayed on page load, only with a timeout of 1000
+                        }
+                    }
+                    n_group = new AnimGroup(duration);
+                    n_group.add(group);
+                    n_group.add(c_group);
+                    c_group = n_group;
+                    break;
+                case 1:
+                    for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
+                        for (let k = 0; k < tiles[[part[j], part[j + 1]]].length; k++) {//for all arms in tiles for the coords
+                            group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
+                                (doub === 0 ? ["on", "repl"] : ["add", "repl"]),
+                                (doub === 0 ? "add" : "on")));
+                        }
+                    }
+                    if (!was_change) {
+                        changed_group = group;
+                        changed_group_time = duration;
+                        was_change = true;
+                    } else {
+                        let adder_group = new AnimGroup(0);
+                        adder_group.add(group);
+                        adder_group.add(changed_group);
+                        n_group = new AnimGroup(Math.max(changed_group_time, duration));
+                        n_group.add(adder_group);
+                        n_group.add(c_group);
+                        c_group = n_group;
+                        was_change = false;
+                    }
+                    break;
+                case -1:
+                    for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
+                        for (let k = 0; k < tiles[[part[j], part[j + 1]]].length; k++) {//for all arms in tiles for the coords
+                            group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
+                                (doub === 0 ? ["on", "repl"] : ["remove", "repl"]),
+                                (doub === 0 ? "remove" : "repl")));
+                        }
+                    }
+                    if (!was_change) {
+                        changed_group = group;
+                        changed_group_time = duration;
+                        was_change = true;
+                    } else {
+                        let adder_group = new AnimGroup(0);
+                        adder_group.add(group);
+                        adder_group.add(changed_group);
+                        n_group = new AnimGroup(Math.max(changed_group_time, duration));
+                        n_group.add(adder_group);
+                        n_group.add(c_group);
+                        c_group = n_group;
+                        was_change = false;
+                    }
+                    break;
+            }
+
+
+        }
+
+        if (was_change) {
+            let n_group = new AnimGroup(changed_group_time);
+            n_group.add(changed_group);
+            n_group.add(c_group);
+            c_group = n_group;
+        }
+
+        if (complete_group === -1) {
+            complete_group = new AnimGroup((complete_time-30 < 10 ? complete_time : complete_time-20));
+        }
+        complete_group.add(c_group);
+    }
+
+    return complete_group;
 }
