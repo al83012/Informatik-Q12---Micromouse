@@ -364,17 +364,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             description = "Clear the entire strategy state and make it assume the default starting position (Does not reset command queue of the micromouse); Restarts current strategy"
         )
     )]
-    pub fn set_pos_to_start_and_restart(&mut self) -> Result<(), StrategyTreeError> {
-        // self.
-        self.modify(StrategyChangeCommand {
-            set_postion: Some(MouseTransform {
-                pos: Position { x: 0, y: 0 },
-                dir: crate::transform::direction::Direction::PosX,
-            }),
-            reset_map: true,
-            set_strategy: Some(self.strat_config.clone()),
-            set_goal: Some(self.goal_pos),
-        })
+    pub fn set_pos_to_origin_and_restart(&mut self) -> Result<(), StrategyTreeError> {
+        let (visuals, _erased) = unsafe{self.erase_strat()};
+        *self = Self::new_starting_cond(WorldData::default(), self.strat_config.clone(), self.goal_pos, self.desired_depth, self.max_nodes,visuals)?;
+        Ok(())
     }
 
     #[instrument(
