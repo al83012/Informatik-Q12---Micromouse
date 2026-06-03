@@ -56,14 +56,14 @@ impl FrontendSimulator {
             .expect("Connection failed");
         info!(target: "test/sim", " < Connection Response = {response:?}");
 
-        let msg = StrategyChangeCommand {
+        let msg = FrontendResponse::StrategyChange(StrategyChangeCommand {
             set_goal: None,
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::<10>::FollowWall(FollowWallConfig {
                 follow_wall: WallDirection::Right,
                 measure_all: false,
             })),
-        };
+        });
 
         ws_stream
             .send(Message::Text(Utf8Bytes::from(

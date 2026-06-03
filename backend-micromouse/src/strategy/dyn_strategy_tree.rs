@@ -158,6 +158,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         max_nodes: usize,
         visuals: FrontendVisuals,
     ) -> Result<(), StrategyTreeError> {
+        info!(target: "strat", "SET STARTING CONDITION for {strategy_config:?}");
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
                 match strategy_config {
@@ -172,7 +173,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                         (DynStrategyTree::<N>::$variant(tree), origin_command)
                     })+
                     DynStrategyConfig::Closed => {
-                    (DynStrategyTree::Closed, None)
+                        (DynStrategyTree::Closed, None)
                     }
                 }
             };
@@ -232,6 +233,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         &mut self,
         map: &Map<N>,
     ) -> Result</*Vec<Command>*/ (), StrategyTreeError> {
+        info!(target: "strat", "UPDATE FILTER");
         macro_rules! update_filter {
             ([$($variant:ident),+]) => {
 
@@ -241,7 +243,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                             tree.handle_map_update(map)
                             // tree.prune_not_potentially_eq(&partial)
                         },)+
-                        DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
+                        DynStrategyTree::Closed => {
+                            info!(target: "strat", "Updating closed tree");
+                            return Ok(());
+                        },
                     };
                 prune_result
                 }
@@ -274,6 +279,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         &mut self,
         rejected: &RejectedOutcomes,
     ) -> Result</*Vec<Command>*/ (), StrategyTreeError> {
+        info!(target: "strat", "PRUNE REJECTED {rejected:?}");
         macro_rules! prune_current {
             ([$($variant:ident),+]) => {
 
@@ -282,7 +288,11 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                         $(DynStrategyTree::$variant(ref mut tree) => {
                             tree.handle_cmd_rejection(rejected)
                         },)+
-                        DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
+                        DynStrategyTree::Closed => {
+                            info!(target: "strat", "Pruning closed tree");
+                            return Ok(())
+                        }
+                ,
                     };
                 prune_result
                 }
@@ -314,7 +324,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         )
     )]
     pub fn set_pos_to_origin_and_restart(&mut self) -> Result<(), StrategyTreeError> {
+        info!(target: "strat", "RESTART STRATEGY MANAGER");
         let (visuals, _erased) = unsafe { self.erase_strat() };
+        let strat_config = self.strat_config.clone();
+        let goal_pos = self.goal_pos.clone();
         *self = Self::new(
             WorldData::default(),
             self.goal_pos,
@@ -324,8 +337,8 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         );
         self.modify(StrategyChangeCommand {
             reset_map: false,
-            set_strategy: Some(self.strat_config.clone()),
-            set_goal: Some(self.goal_pos),
+            set_strategy: Some(strat_config),
+            set_goal: Some(goal_pos),
         })?;
         Ok(())
     }
@@ -336,6 +349,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         fields(description = "React to command completion (assume root to be finished)")
     )]
     pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, StrategyTreeError> {
+        info!(target: "strat", "CHANGE CURRENT COMMAND");
         macro_rules! finish_current_cmd {
             ([$($variant:ident),+]) => {
 
@@ -383,11 +397,14 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         fields(description = "Freely change the current strategy (erasing old one)")
     )]
     pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<(), StrategyTreeError> {
+        info!(target: "strat", "MODIFY {change:?}");
         let StrategyChangeCommand {
             reset_map,
             set_strategy,
             set_goal,
         } = change;
+
+        self.strat_config = set_strategy.clone().unwrap_or(self.strat_config.clone());
 
         // let current_mouse = set_postion.unwrap_or(self.current_world.mouse);
 
@@ -399,8 +416,6 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             after_cmds: erased,
             reset_world: reset_map,
         };
-
-        self.strat_config = set_strategy.clone().unwrap_or(self.strat_config.clone());
 
         self.set_starting_cond(
             strategy_start,
