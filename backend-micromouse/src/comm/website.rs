@@ -55,6 +55,7 @@ pub struct BatchedFrontendMessage(pub Vec<FrontendMessage>);
 
 impl Into<Message> for BatchedFrontendMessage {
     fn into(self) -> Message {
+        info!(target: "webs/parse", "Parsing msg: {self:?}");
         let msg = serde_json::to_string_pretty(&self).expect("SERIALIZATION FAILED");
         Message::Text(Utf8Bytes::from(msg))
     }

@@ -169,7 +169,7 @@ impl<const N: usize> Process<N> {
             info!(target: "proc", "Sending queued command: {cmd_from_blocked:?}");
             self.send_micromouse_cmd(cmd_from_blocked).await;
         } else {
-            info!(target: "proc", "Command queue has a space, but there is no new command to send");
+            // info!(target: "proc", "Command queue has a space, but there is no new command to send");
         };
     }
 

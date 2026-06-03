@@ -2,7 +2,7 @@ use std::{
     clone,
     collections::HashMap,
     hash::Hash,
-    ops::{Add, Sub},
+    ops::{Add, Deref, Sub},
 };
 
 use serde::{Deserialize, Serialize};
@@ -359,7 +359,7 @@ where
         skip(self)
     )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
-            // println!("Expand fully (highest_full_layer = {:?}, first_layer = {:?})", self.highest_full_layer, self.first_layer_absolute_id);
+        info!(target: "strat", "EXPAND FULLY");
         info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
         info!(target: "strat", "max_nodes = {:?}; node_count = {:?}", self.config.max_nodes, self.node_count);
 
@@ -381,6 +381,7 @@ where
         // Once a layer in-between was not fully expanded, that layer and all layers after that
         // will not incr the fully_expanded_layer-counter
         let mut skipped_layer = false;
+        let mut expanded = false;
         // Iterating through all the layers that are still to be expanded
         'expansion: for i in 0..layer_budget {
             // println!("Layerexpansion {i}/{layer_budget}");
@@ -400,6 +401,7 @@ where
                 MarkerLayerId::NotExistant => self.first_layer_absolute_id + RelativeLayerId(i),
                 MarkerLayerId::AtLayer(l) => l + RelativeLayerId(i),
             };
+            info!(target: "strat", "Expanding layer {layer_to_expand:?}");
             let _s = span!(
                 Level::INFO,
                 "expand_layer",
@@ -460,6 +462,7 @@ where
                         // visited
                     }
                     NodeExpansionResult::Expanded(num_of_nodes) => {
+                        expanded = true;
                         nodes_created += num_of_nodes;
                     }
                 }
@@ -477,8 +480,11 @@ where
             } else {
                 layers_fully_expanded += 1;
                 // The highest full layer is the layer after one in which all nodes were expanded
-                self.highest_full_layer =
-                    MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
+                if expanded {
+                    self.highest_full_layer =
+                        MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
+                    expanded = false;
+                }
                 info!(target: "strat", "Increase full layers to {:?}", self.highest_full_layer);
 
                 // Could be none since layer-expansion could fail completely
@@ -496,7 +502,12 @@ where
     fn full_layer_count(&self) -> usize {
         match self.highest_full_layer {
             MarkerLayerId::NotExistant => 0,
-            MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).0 + 1,
+            MarkerLayerId::AtLayer(l) => {
+                (l - self.first_layer_absolute_id)
+                    .expect("Highest full layer should not be smaller than first layer")
+                    .0
+                    + 1
+            }
         }
     }
 
@@ -530,11 +541,11 @@ where
                 }
             }
         }
-        if node.applied_strategy.is_some() {
-            // The node already is fully expanded
-            info!(target: "strat", "Alreay Expanded");
-            return NodeExpansionResult::AlreadyExpanded;
-        }
+        // if node.applied_strategy.is_some() {
+        //     // The node already is fully expanded
+        //     info!(target: "strat", "Alreay Expanded");
+        //     return NodeExpansionResult::AlreadyExpanded;
+        // }
 
         let basis_world = &node.on_basis_of_world;
         info!(target: "strat", "BASED ON WORLD: \n{basis_world}");
@@ -560,6 +571,7 @@ where
             Err(e) => {
                 info!(target: "strat", "=> Expanded to EndState");
                 // Only trigger this error if this node is reached
+                // The node expansion has shown that the node we expanded is not expandable
                 node.applied_strategy = Some(Err(e.clone()));
                 return NodeExpansionResult::EndState(e);
             }
@@ -724,7 +736,7 @@ where
 
     fn relative_layer(&self, layer_id: AbsoluteLayerId) -> Option<RelativeLayerId> {
         if self.valid_layer_id(layer_id) {
-            Some(layer_id - self.first_layer_absolute_id)
+            Some((layer_id - self.first_layer_absolute_id)?)
         } else {
             None
         }
@@ -827,7 +839,6 @@ where
                 let new_first_layer = self.layers.first_mut().expect("Has Successor");
                 self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
 
-
                 return Err(FinishRootError::SuccessorIsEnd(s));
             }
             NodeExpansionResult::Expanded(_) => {
@@ -840,9 +851,6 @@ where
                 ));
             }
         }
-
-        // let successor_node = self.node_mut(successor).expect("Successor has to exist");
-        // successor_node.
 
         self.layers.remove(0);
         self.node_count -= 1;
@@ -1038,7 +1046,9 @@ where
             }
             MarkerLayerId::AtLayer(l) => {
                 info!(target: "strat", "highest_full_layer = {highest_full_layer:?}");
-                (l - self.first_layer_absolute_id).0 as i32
+                (l - self.first_layer_absolute_id)
+                    .expect("highest_full_layer should be >= first layer")
+                    .0 as i32
             }
         };
         let highest_eq_layer_offset = match self.highest_eq_layer {
@@ -1052,7 +1062,9 @@ where
             }
             MarkerLayerId::AtLayer(l) => {
                 info!(target: "strat", "highest_eq_layer = {highest_eq_layer:?}");
-                (l - self.first_layer_absolute_id).0 as i32
+                (l - self.first_layer_absolute_id)
+                    .expect("highest_eq_layer should be >= first layer")
+                    .0 as i32
             }
         };
 
@@ -1271,6 +1283,7 @@ where
         skip(self)
     )]
     pub fn handle_map_update(&mut self, map: &Map<N>) -> Result<Vec<Command>, StrategyTreeError> {
+        info!(target: "strat", "HANDLE CMD MAP UPDATE");
         if self
             .node(self.root_node())
             .expect("Index should be valid")
@@ -1299,6 +1312,7 @@ where
         &mut self,
         rejections: &RejectedOutcomes,
     ) -> Result<Vec<Command>, StrategyTreeError> {
+        info!(target: "strat", "HANDLE CMD REJECTION");
         self.prune_current_command_by_rejection(rejections)?;
         let _ = self.expand_fully()?;
         self.update_equal_layers();
@@ -1313,13 +1327,27 @@ where
         skip(self)
     )]
     pub fn close(self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
+        info!(target: "strat", "CLOSE");
         let highest_sent_layer = self.highest_sent_layer;
 
         //INFO: We also need to include the last layer which was not yet sent, but was expanded
         //from the last sent layer; it is our grafting-point
         let highest_sent_layer_and_exp = match highest_sent_layer {
             MarkerLayerId::NotExistant => 0,
-            MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).0 + 1,
+            MarkerLayerId::AtLayer(l) if l < self.first_layer_absolute_id => {
+                let root_world = self
+                    .node(self.root_node())
+                    .as_ref()
+                    .expect("Root must exist")
+                    .on_basis_of_world
+                    .deref()
+                    .clone();
+                return (
+                    self.visuals,
+                    SentUnfinishedCommands::HasBlockingRoot { world: root_world },
+                );
+            }
+            MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).expect("Checked").0 + 1,
         };
 
         if highest_sent_layer <= MarkerLayerId::AtLayer(self.first_layer_absolute_id)
@@ -1420,9 +1448,13 @@ pub enum SentUnfinishedCommands<const N: usize> {
 }
 
 impl Sub for AbsoluteLayerId {
-    type Output = RelativeLayerId;
+    type Output = Option<RelativeLayerId>;
     fn sub(self, rhs: Self) -> Self::Output {
-        RelativeLayerId(self.0 - rhs.0)
+        if self.0 < rhs.0 {
+            None
+        } else {
+            Some(RelativeLayerId(self.0 - rhs.0))
+        }
     }
 }
 
