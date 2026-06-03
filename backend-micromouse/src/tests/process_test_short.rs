@@ -35,16 +35,11 @@ pub fn process_test_short() {
         }
         .instrument(process_span("process")),
     );
-    let p_handle = rt.spawn_blocking(|| {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(
-            async {
-                let process: Process<N> = Process::new().await.expect("Process creation failed");
-                process.run().await;
-            }
-            .instrument(process_span("process")),
-        )
-    });
+    let p_handle = rt.spawn( async {
+        let process: Process<N> = Process::new().await.expect("Process creation failed");
+        process.run().await
+    }
+    );
 
     rt.block_on(async {
         tokio::select! {

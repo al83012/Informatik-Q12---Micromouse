@@ -553,9 +553,10 @@ pub fn init_tree_logger() {
 
     #[cfg(feature = "hyperlink_logging")]
     {
+        let console_layer = console_subscriber::spawn();
         tracing_subscriber::registry()
-            .with(EnvFilter::new("info"))
-            .with(RoutingLayer::new())
+            .with(console_layer)
+            // .with(RoutingLayer::new().with_filter(EnvFilter::new("info")))
             .init();
     }
     #[cfg(not(feature = "hyperlink_logging"))]

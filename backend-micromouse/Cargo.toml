@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 tungstenite = "0.29.0"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "tracing"] }
 tokio-tungstenite = "0.29.0"
 futures-util = "0.3"
 # log = "*"
@@ -27,6 +27,7 @@ ansi-to-html = "0.2.3"
 thiserror = "2.0.18"
 derive_more = {git = "https://github.com/JelteF/derive_more", branch = "master", features = ["from"]}
 macroquad = "0.4.15"
+console-subscriber = "0.5.0"
 
 [features]
 comm_stats = []
