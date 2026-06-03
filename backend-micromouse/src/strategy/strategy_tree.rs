@@ -773,6 +773,7 @@ where
                     let map = &node.on_basis_of_world;
                     error!(target: "strat", "SUCCESSOR {path_id:?}\n{map}");
                 }
+                panic!("Multiple successors");
             }
             Ok(cmds) => {
                 let root_id = self.root_node();
