@@ -860,6 +860,7 @@ where
                     }
                 })
                 .collect::<Vec<_>>();
+            info!(target: "strat", "Pruning layer = {layer_id:?}, nodes = {prune_nodes:?}");
 
             for node_id in prune_nodes {
                 let abs_node_id = AbsoluteNodeId { layer_id, node_id };
@@ -1058,7 +1059,7 @@ where
         // todo!("Need to make the exact condition more clear");
 
         if self.highest_eq_layer <= self.highest_sent_layer {
-            error!(target: "strat", "Only eq layer is smaller than sent layer");
+            info!(target: "strat", "Only eq layer is smaller than sent layer");
             return vec![];
         }
 
