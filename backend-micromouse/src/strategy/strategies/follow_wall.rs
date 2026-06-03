@@ -150,7 +150,11 @@ impl<const N: usize> FollowWall<N> {
             // Escape from turning point
             Command {
                 ty: MovementType::Move(1),
-                interrupts: vec![],
+                interrupts: vec![MeasurementInterrupt {
+                    direction: RelativeDirection::Forward,
+                    at_step: InterruptStep::Each,
+                    action: InterruptAction::StopIfBlocked,
+                }],
             },
         ];
 
