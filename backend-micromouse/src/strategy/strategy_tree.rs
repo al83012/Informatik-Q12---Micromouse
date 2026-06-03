@@ -809,6 +809,7 @@ where
                 }
                 2.. => {
                     error!(target: "strat", link_node_id = root_id.link(), "ROOT has multiple successors");
+                    // TODO: print out all the possibilities
                     return Err(FinishRootError::MultipleSuccessors(
                         potential_outcomes.clone(),
                     ));
