@@ -359,7 +359,7 @@ where
         skip(self)
     )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
-            println!("Expand fully (highest_full_layer = {:?}, first_layer = {:?})", self.highest_full_layer, self.first_layer_absolute_id);
+            // println!("Expand fully (highest_full_layer = {:?}, first_layer = {:?})", self.highest_full_layer, self.first_layer_absolute_id);
         info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
         info!(target: "strat", "max_nodes = {:?}; node_count = {:?}", self.config.max_nodes, self.node_count);
 
@@ -383,7 +383,7 @@ where
         let mut skipped_layer = false;
         // Iterating through all the layers that are still to be expanded
         'expansion: for i in 0..layer_budget {
-            println!("Layerexpansion {i}/{layer_budget}");
+            // println!("Layerexpansion {i}/{layer_budget}");
             info!(target: "strat", "Layerexpansion {i}/{layer_budget}");
             // INFO: Can only break via node-budget if there are enough layers; otherwise, it will
             // keep trying to create new layers
@@ -406,7 +406,7 @@ where
                 link_layer_id = layer_to_expand.link()
             );
             let non_expanded_node_ids = {
-                println!("Layer to expand: {layer_to_expand:?}");
+                // println!("Layer to expand: {layer_to_expand:?}");
                 let layer = self
                     .layer_mut(layer_to_expand)
                     .expect("ID should be in bounds");
@@ -753,7 +753,7 @@ where
         skip(self)
     )]
     pub fn finish_root(&mut self) -> Result<Vec<Command>, FinishRootError> {
-        println!("Finish root");
+        // println!("Finish root");
         let (_outcome_id, successor) = {
             let root_id = self.root_node();
             info!(target: "strat", link_node_id = root_id.link(), "FINISHING NODE {root_id:?}");
@@ -869,7 +869,7 @@ where
         skip(self)
     )]
     pub fn prune_not_potentially_eq(&mut self, filter: &Map<N>) -> Result<(), PruneError> {
-        println!("Prune");
+        // println!("Prune");
         for layer_offset in 1..self.layers.len() {
             let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset);
             let Some(layer) = self.layer_mut(layer_id) else {

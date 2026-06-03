@@ -551,26 +551,29 @@ fn link_str(to: impl Into<String>, content: impl Into<String>) -> String {
 pub fn init_tree_logger() {
     use tracing_subscriber::prelude::*;
 
-    #[cfg(feature = "hyperlink_logging")]
-    {
+    let tracing_reg = tracing_subscriber::registry();
+
+    #[cfg(feature = "tokio_console")]
+    let tracing_reg = {
         let console_layer = console_subscriber::spawn();
-        tracing_subscriber::registry()
-            .with(console_layer)
-            // .with(RoutingLayer::new().with_filter(EnvFilter::new("info")))
-            .init();
-    }
-    #[cfg(not(feature = "hyperlink_logging"))]
-    {
+        tracing_reg = tracing_reg.with(console_layer);
+    };
+
+    #[cfg(feature = "hyperlink_logging")]
+    let tracing_reg = { tracing_reg.with(RoutingLayer::new().with_filter(EnvFilter::new("info"))) };
+
+    #[cfg(feature = "term_logging")]
+    let tracing_reg = {
         let warn_fmt_layer = fmt::layer()
             .with_file(true)
             .with_target(true)
             .with_ansi(true)
             .event_format(TestFormatter::new());
 
-        tracing_subscriber::registry()
-            .with(EnvFilter::new("warn"))
-            .with(warn_fmt_layer);
-    }
+        tracing_reg.with(warn_fmt_layer.with_filter(EnvFilter::new("info")))
+    };
+
+    tracing_reg.init();
 }
 
 pub fn enter_process(span_name: impl Into<String>) -> EnteredSpan {

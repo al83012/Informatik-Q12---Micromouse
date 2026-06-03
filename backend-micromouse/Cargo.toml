@@ -32,4 +32,6 @@ console-subscriber = "0.5.0"
 [features]
 comm_stats = []
 hyperlink_logging = []
-default = ["comm_stats", "hyperlink_logging"]
+term_logging = []
+tokio_console = []
+default = ["comm_stats", "term_logging"]
