@@ -210,7 +210,7 @@ where
         name = "new StrategyTree",
         fields(
             description = "Creates new strategy tree, potentially on the basis of a number of commands that was sent and cannot be taken back"
-        ),
+        )
     )]
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
@@ -477,15 +477,11 @@ where
                 self.highest_full_layer =
                     MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
                 info!(target: "strat", "Increase full layers to {:?}", self.highest_full_layer);
-                // self.highest_full_layer = match self.highest_full_layer {
-                //     MarkerLayerId::NotExistant => {
-                //         MarkerLayerId::AtLayer(self.first_layer_absolute_id)
-                //     }
-                //     MarkerLayerId::AtLayer(l) => MarkerLayerId::AtLayer(l + RelativeLayerId(1)),
-                // };
-                self.layer_mut(layer_to_expand + RelativeLayerId(1))
-                    .expect("ID should be in bounds")
-                    .is_full = true;
+
+                // Could be none since layer-expansion could fail completely
+                if let Some(child_layer) = self.layer_mut(layer_to_expand + RelativeLayerId(1)) {
+                    child_layer.is_full = true;
+                }
             }
         }
         Ok(TreeExpansionSuccess {
@@ -837,39 +833,37 @@ where
         skip(self)
     )]
     pub fn prune_not_potentially_eq(&mut self, filter: &Map<N>) -> Result<(), PruneError> {
-        let node_indices = self
-            .layers
-            .iter_mut()
-            .flat_map(|l| {
-                l.nodes.iter_mut().filter_map(|(k, v)| {
-                    let node_id = AbsoluteNodeId {
-                            layer_id: l.absolute_layer_id,
-                            node_id: *k,
-                        };
-                    if !v.on_basis_of_world.map.potentially_eq(filter) {
-                        Some(node_id)
-                    } else {
-                        // Only apply the map-update for those nodes, that are not yet expanded,
-                        // but can be
-                        if v.applied_strategy.is_none() && v.on_basis_of_state.is_some() {
-                            debug!(target: "strat/tree/prune", link_node_id = node_id.link(), "Expandable node union with current measurements");
-                            v.on_basis_of_world.map = v
+        for layer_offset in 0..self.layers.len() {
+            let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset);
+            let Some(layer) = self.layer_mut(layer_id) else {
+                return Err(PruneError::UnknownNode(AbsoluteNodeId {
+                    layer_id,
+                    node_id: RelativeNodeId(0),
+                }));
+            };
+            let prune_nodes = layer
+                .nodes
+                .iter_mut()
+                .filter_map(|(node_id, node)| {
+                    if node.on_basis_of_world.map.potentially_eq(filter) {
+                        if node.on_basis_of_state.is_some() && node.applied_strategy.is_none() {
+                            // It is worth expanding the map (the node is expandable, but not expanded)
+                            node.on_basis_of_world.map = node
                                 .on_basis_of_world
                                 .map
                                 .union(filter)
-                                .expect("Should be potentially_eq");
+                                .expect("Is potentially_eq");
                         }
                         None
+                    } else {
+                        Some(*node_id)
                     }
                 })
-            })
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>();
 
-        for node in node_indices.into_iter() {
-            match self.prune_node(node) {
-                Ok(_) => {}
-                Err(PruneError::UnknownNode(_)) => {}
-                Err(e) => return Err(e),
+            for node_id in prune_nodes {
+                let abs_node_id = AbsoluteNodeId { layer_id, node_id };
+                self.prune_node(abs_node_id)?;
             }
         }
 
