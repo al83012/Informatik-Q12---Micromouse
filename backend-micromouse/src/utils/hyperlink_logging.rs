@@ -564,13 +564,19 @@ pub fn init_tree_logger() {
 
     #[cfg(feature = "term_logging")]
     let tracing_reg = {
+        use tracing_subscriber::filter::FilterFn;
+
         let warn_fmt_layer = fmt::layer()
             .with_file(true)
             .with_target(true)
             .with_ansi(true)
             .event_format(TestFormatter::new());
 
-        tracing_reg.with(warn_fmt_layer.with_filter(EnvFilter::new("info")))
+        tracing_reg.with(
+            warn_fmt_layer
+                .with_filter(EnvFilter::new("info"))
+                .with_filter(FilterFn::new(|meta| !meta.target().ends_with("apl"))),
+        )
     };
 
     tracing_reg.init();

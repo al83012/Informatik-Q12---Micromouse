@@ -1,6 +1,6 @@
 use std::{
     clone,
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     hash::Hash,
     ops::{Add, Deref, Sub},
 };
@@ -360,6 +360,7 @@ where
     )]
     fn expand_fully(&mut self) -> Result<TreeExpansionSuccess, TreeExpansionError> {
         info!(target: "strat", "EXPAND FULLY");
+        info!(target: "strat", "At start: \n{}", self.tree_structure_str());
         info!(target: "strat", "highest_full_layer = {:?}", self.highest_full_layer);
         info!(target: "strat", "max_nodes = {:?}; node_count = {:?}", self.config.max_nodes, self.node_count);
 
@@ -493,6 +494,7 @@ where
                 }
             }
         }
+        info!(target: "strat", "At end: \n{}", self.tree_structure_str());
         Ok(TreeExpansionSuccess {
             nodes: nodes_created,
             layers: layers_fully_expanded,
@@ -750,9 +752,21 @@ where
         skip(self)
     )]
     pub fn handle_finish_root(&mut self) -> Result<Vec<Command>, StrategyTreeError> {
-        let commands = self.finish_root()?;
+        let root_id = self.root_node();
+        let root_node = self.node(root_id).expect("Root has to exist");
+        info!(target: "strat", "FINISHING ROOT {root_id:?}: \n{}", root_node.on_basis_of_world);
+        let commands = self.finish_root();
+
+        if let Err(FinishRootError::MultipleSuccessors(successors)) = commands.as_ref() {
+            error!(target: "strat", "SUCCESSOR LIST:");
+            for (path_id, node_id) in successors {
+                let node = self.node(*node_id).expect("Node should exist");
+                let map = &node.on_basis_of_world;
+                error!(target: "strat", "SUCCESSOR {path_id:?}\n{map}");
+            }
+        }
         self.expand_fully()?;
-        Ok(commands)
+        commands.map_err(StrategyTreeError::from)
     }
 
     // removes the root, making its successor the new root; if the successor was not yet expanded
@@ -877,6 +891,24 @@ where
         ),
         skip(self)
     )]
+    fn tree_structure_str(&self) -> String {
+        let mut nodes = VecDeque::new();
+        let mut res = "".to_string();
+        nodes.push_front(self.root_node());
+        while let Some(node_id) = nodes.pop_front() {
+            let children = self.node(node_id).expect("Should exist").children();
+            if let Some(children) = children {
+                for child in children.values() {
+                    nodes.push_front(*child);
+                }
+            }
+
+            let depth = node_id.layer_id - self.first_layer_absolute_id;
+            let indent = " ".repeat(depth.map(|d| d.0).unwrap_or(0) * 4);
+            res = format!("{res}\n{indent}> {node_id:?}");
+        }
+        res
+    }
     pub fn prune_not_potentially_eq(&mut self, filter: &Map<N>) -> Result<(), PruneError> {
         // println!("Prune");
         for layer_offset in 1..self.layers.len() {

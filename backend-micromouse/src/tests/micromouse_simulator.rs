@@ -21,6 +21,7 @@ use crate::{
 
 pub struct MicromouseSimulator<const N: usize> {
     full_map: WorldData<N>,
+    is_restarting: bool,
 }
 
 impl<const N: usize> MicromouseSimulator<N> {
@@ -30,6 +31,7 @@ impl<const N: usize> MicromouseSimulator<N> {
                 map: full_map,
                 mouse: MouseTransform::default(),
             },
+            is_restarting: false,
         }
     }
     #[instrument(skip(self), name = "run")]
@@ -43,6 +45,7 @@ impl<const N: usize> MicromouseSimulator<N> {
             .send(Message::Text(Utf8Bytes::from("RESTART".to_string())))
             .await
             .expect("Error sending opening msg");
+        self.is_restarting = true;
         ws_stream
             .send(Message::Text(Utf8Bytes::from("CONTINUE".to_string())))
             .await
@@ -57,10 +60,17 @@ impl<const N: usize> MicromouseSimulator<N> {
                 }
             };
 
+
             let Message::Text(msg) = msg else {
                 error!(target: "test/sim", "Got non-text message: {msg}");
                 continue;
             };
+            if self.is_restarting {
+                if msg == "RESTART-CONFIRM" {
+                    self.is_restarting = false;
+                }
+                continue;
+            }
             let msg = CommandMessage::try_from(msg.to_string());
             if let Err(e) = &msg {
                 warn!(target: "test/sim", "Got non-cmd message: {e}");

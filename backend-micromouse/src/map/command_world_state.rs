@@ -39,7 +39,6 @@ use crate::{
     utils::nonempty::{NonEmpty, PotentiallyNonEmpty},
 };
 
-
 impl<const N: usize> std::fmt::Debug for FilteredCommandApplication<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         #[derive(Debug)]
@@ -50,7 +49,7 @@ impl<const N: usize> std::fmt::Debug for FilteredCommandApplication<N> {
 
         let t = FCDisplay {
             command: &self.command,
-            transformed_move: &self.transformed_move
+            transformed_move: &self.transformed_move,
         };
 
         fmt::Debug::fmt(&t, f)
@@ -209,7 +208,9 @@ impl<const N: usize> FilteredCommandApplication<N> {
         debug!(target: "map/cmd/apl", "  >> Could reach {max_step_count}?");
         for i in 0..=max_step_count {
             debug!(target: "map/cmd/apl", "     >> Processing step {i}");
-            let transform_at_step = transformed_move.at_step(i).expect("step in range");
+            let transform_at_step = transformed_move
+                .at_step(i)
+                .unwrap_or_else(|| panic!("Error at step {i} (for: {transformed_move:?}"));
             debug!(target: "map/cmd/apl", "     >> Transform at step = {transform_at_step:?}");
 
             // Mark current cell as visited
@@ -366,7 +367,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
         &self.command
     }
 
-
     pub fn command_unfiltered_max_step(&self) -> usize {
         self.command.max_step_count()
     }
@@ -417,7 +417,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
                 .expect("Step 0 is always valid"),
         };
         let old_outcomes = self.potential_outcome_ids();
-
 
         *self = Self::new(Some(new_filter), self.command.clone());
         let new_outcomes = self.potential_outcome_ids();
@@ -618,7 +617,6 @@ impl<const N: usize> FilteredCommandApplication<N> {
             }
             PartialWorldData::new(map_continued.into(), mouse_transf_at_step)
         })
-
     }
 
     #[instrument(
@@ -887,7 +885,6 @@ impl PathLocalInterruptId {
         }
     }
 }
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RejectedOutcomes {

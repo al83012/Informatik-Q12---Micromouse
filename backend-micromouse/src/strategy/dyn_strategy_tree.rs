@@ -329,7 +329,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         let strat_config = self.strat_config.clone();
         let goal_pos = self.goal_pos.clone();
         *self = Self::new(
-            WorldData::default(),
+            WorldData::default().only_pos(),
             self.goal_pos,
             self.desired_depth,
             self.max_nodes,
