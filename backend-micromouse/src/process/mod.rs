@@ -149,7 +149,10 @@ impl<const N: usize> Process<N> {
                     self.handle_frontend_command(frontend_msg).await;
                 }
                 visual_event_count = visual_events => {
-                    for event in visual_event_buffer[0..visual_event_count] {
+                    for (i, event) in visual_event_buffer.into_iter().enumerate() {
+                        if i >= visual_event_count {
+                            break;
+                        }
                         self.frontend_manager.send(FrontendMessage::VisualEvent(event)).await;
                     }
                 }

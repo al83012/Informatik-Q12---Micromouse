@@ -73,7 +73,6 @@ impl FrontendVisuals {
                     path,
                 },
             }))
-            .await
             .expect("Should be open during execution");
     }
 
@@ -86,7 +85,6 @@ impl FrontendVisuals {
                 }
                 .into(),
             )
-            .await
             .expect("Should be open during execution");
     }
 }

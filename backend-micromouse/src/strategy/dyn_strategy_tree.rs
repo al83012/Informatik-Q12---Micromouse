@@ -59,7 +59,7 @@ pub struct DynStrategyTreeManager<const N: usize> {
     desired_depth: usize,
     max_nodes: usize,
 
-    visuals: FrontendVisuals
+    // visuals: FrontendVisuals
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
@@ -82,6 +82,7 @@ pub struct StrategyChangeCommand<const N: usize> {
 
 impl<const N: usize> DynStrategyTreeManager<N> {
     #[instrument(
+        skip(visuals),
         name = "new DynStrategyTreeManager",
         fields(description = "Create new Strategy Tree Manager")
     )]
@@ -109,7 +110,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "erase_strat",
         fields(description = "Erase the last strategy, enabling the application of a new one")
     )]
-    unsafe fn erase_strat(&mut self) -> SentUnfinishedCommands<N> {
+    unsafe fn erase_strat(&mut self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
         macro_rules! erase_strat {
             ([$($variant:ident),+]) => {
                 {
@@ -138,7 +139,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     }
 
     #[instrument(
-        skip(self),
+        skip(self, visuals),
         name = "set_starting_cond",
         fields(description = "Set new strategy start (given an already running strat manager)")
     )]
@@ -187,6 +188,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     }
 
     #[instrument(
+        skip(visuals),
         name = "new_starting_cond",
         fields(description = "Create entirely new Strategy Manager with given conditions")
     )]
@@ -235,8 +237,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             goal_pos: goal_position,
             strat_config: strategy_config,
             desired_depth,
-            max_nodes,
-            visuals
+            max_nodes
         };
 
         if let Some(cmd) = cmd {
@@ -451,7 +452,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
         self.goal_pos = set_goal.unwrap_or(self.goal_pos);
 
-        let erased = unsafe { self.erase_strat() };
+        let (visuals, erased) = unsafe { self.erase_strat() };
 
         let strategy_start = StrategyStart::ContinueAfterDoing {
             after_cmds: erased,
@@ -466,7 +467,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             self.goal_pos,
             self.desired_depth,
             self.max_nodes,
-            self.visuals
+            visuals
         )
     }
 }

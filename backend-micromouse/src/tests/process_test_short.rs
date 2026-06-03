@@ -11,8 +11,8 @@ use crate::{
     utils::{hyperlink_logging::{init_tree_logger, process_span}, logging::init_logging},
 };
 
-// #[test]
-// #[ignore]
+#[test]
+#[ignore]
 pub fn process_test_short() {
     const N: usize = super::TEST_MAP_SIZE;
     let world = super::test_map(0.5);

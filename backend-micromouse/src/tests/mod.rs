@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use rand::{Rng, RngExt};
+use rand::Rng;
 use tracing::debug;
 
 use crate::{
@@ -18,11 +18,11 @@ mod frontend_msg_parsing;
 pub mod frontend_simulator;
 pub mod micromouse_simulator;
 mod path;
+pub mod process_test_short;
 mod random_move;
 mod spans;
 mod test_map_discoveries;
 mod visual_tests;
-pub mod process_test_short;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
@@ -72,13 +72,13 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
 
     debug!(target: "tests/map/gen", "Initialized: All blocked...\n{map}");
 
-    let mut rand = rand::rng();
+    let mut rand = rand::thread_rng();
     while !possible_connections.is_empty() {
         let num_of_conn_sources = possible_connections.len();
         debug!(target: "tests/map/gen", "Sources left = {num_of_conn_sources}");
         let rand_key = {
             let mut keys = possible_connections.keys();
-            keys.nth(rand.random_range(0..num_of_conn_sources))
+            keys.nth(rand.gen_range(0..num_of_conn_sources))
                 .expect("should exist")
                 .clone()
         };
@@ -91,7 +91,7 @@ pub fn test_map(loopiness: f32) -> Map<TEST_MAP_SIZE> {
             let conn_dir = {
                 conn_options
                     .iter()
-                    .nth(rand.random_range(0..conn_options.len()))
+                    .nth(rand.gen_range(0..conn_options.len()))
                     .expect("should exist")
                     .clone()
             };

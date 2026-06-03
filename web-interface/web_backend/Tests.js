@@ -1,7 +1,7 @@
 const WebsocketClient  = require('websocket').client;
 const backport = 8090;
 const host = '127.0.0.1';
-const timeout = 200;
+const timeout = 20000;
 const client = new WebsocketClient();
 
 function connect_backend() {

@@ -19,10 +19,13 @@ use crate::{
         map_set_op::Union,
         world_data::{PartialWorldData, WorldData},
     },
-    strategy::{strategy::{
-        ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult,
-        StrategyEndState,
-    }, visuals::FrontendVisuals},
+    strategy::{
+        strategy::{
+            ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult,
+            StrategyEndState,
+        },
+        visuals::FrontendVisuals,
+    },
     utils::{
         hyperlink_logging::LinkFileName,
         nonempty::{NonEmpty, PotentiallyNonEmpty},
@@ -203,11 +206,11 @@ where
     S: Strategy<N> + Clone + std::fmt::Debug + FromConfig<N>,
 {
     #[instrument(
+        skip(starting_condition, visuals),
         name = "new StrategyTree",
         fields(
             description = "Creates new strategy tree, potentially on the basis of a number of commands that was sent and cannot be taken back"
         ),
-        skip(starting_condition)
     )]
     #[allow(clippy::new_ret_no_self)]
     pub fn new(
@@ -266,7 +269,7 @@ where
                     first_layer_absolute_id,
                     node_count,
                     goal_position,
-                    visuals
+                    visuals,
                 };
 
                 Ok(TreeCreationSuccess {
@@ -305,7 +308,7 @@ where
                     first_layer_absolute_id: AbsoluteLayerId(0),
                     node_count: 0,
                     goal_position,
-                    visuals
+                    visuals,
                 };
 
                 let first_node_id = res.add_node(
@@ -1235,10 +1238,7 @@ where
         fields(description = "Prune, expand, send",),
         skip(self)
     )]
-    pub fn handle_map_update(
-        &mut self,
-        map: &Map<N>,
-    ) -> Result<Vec<Command>, StrategyTreeError> {
+    pub fn handle_map_update(&mut self, map: &Map<N>) -> Result<Vec<Command>, StrategyTreeError> {
         if self
             .node(self.root_node())
             .expect("Index should be valid")
@@ -1280,7 +1280,7 @@ where
         ),
         skip(self)
     )]
-    pub fn close(self) -> SentUnfinishedCommands<N> {
+    pub fn close(self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
         let highest_sent_layer = self.highest_sent_layer;
 
         //INFO: We also need to include the last layer which was not yet sent, but was expanded
@@ -1301,14 +1301,17 @@ where
             //INFO: The current root is blocking; it appears to be sent, but  it is not / cannot be
             //(A blocking root is the only root that is not sendable)
 
-            return SentUnfinishedCommands::HasBlockingRoot {
-                world: self
-                    .node(self.root_node())
-                    .expect("Checked")
-                    .on_basis_of_world
-                    .clone()
-                    .into(),
-            };
+            let world = self
+                .node(self.root_node())
+                .expect("Checked")
+                .on_basis_of_world
+                .clone()
+                .into();
+
+            return (
+                self.visuals,
+                SentUnfinishedCommands::HasBlockingRoot { world },
+            );
         }
 
         let mut layers = vec![];
@@ -1322,9 +1325,12 @@ where
             ))
         }
 
-        SentUnfinishedCommands::HasQueue {
-            layers: layers.non_empty().expect("Root layer has to have been sent; meaning that it and its children can form highest_sent + exp"),
-        }
+        (
+            self.visuals,
+            SentUnfinishedCommands::HasQueue {
+                layers: layers.non_empty().expect("Root layer has to have been sent; meaning that it and its children can form highest_sent + exp"),
+            }
+        )
     }
 }
 
