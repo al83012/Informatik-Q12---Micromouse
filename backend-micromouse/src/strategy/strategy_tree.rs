@@ -515,6 +515,18 @@ where
             .node_mut(node_id)
             .expect("Passed inside the tree; should be valid");
         // INFO: ############# Checking that it isn't already expanded ##############################
+        if let Some(applied_strategy) = node.applied_strategy.as_ref() {
+            match applied_strategy {
+                Err(strategy_end) => {
+                    info!(target: "strat", "Precomputed EndState {strategy_end:?}");
+                    return NodeExpansionResult::EndState(strategy_end.clone());
+                }
+                _ => {
+                    info!(target: "strat", "Already Expanded");
+                    return NodeExpansionResult::AlreadyExpanded;
+                }
+            }
+        }
         if node.applied_strategy.is_some() {
             // The node already is fully expanded
             info!(target: "strat", "Alreay Expanded");
@@ -715,6 +727,19 @@ where
         }
     }
 
+    #[instrument(
+        name = "handle_finish_root",
+        fields(
+            description = "Treat the current root as finished, removing it from the tree and replacing it with its 1 (!!!) successor; THEN: Expand",
+        ),
+        skip(self)
+    )]
+    pub fn handle_finish_root(&mut self) -> Result<Vec<Command>, StrategyTreeError> {
+        let commands = self.finish_root()?;
+        self.expand_fully()?;
+        Ok(commands)
+    }
+
     // removes the root, making its successor the new root; if the successor was not yet expanded
     // into a command, it will do so at this point, returning its NodeAction
     #[instrument(
@@ -792,6 +817,13 @@ where
             }
             NodeExpansionResult::EndState(s) => {
                 info!(target: "strat", link_node_id = successor.link(), "Successor marks end of strategy_execution; Will need new strategy");
+                self.layers.remove(0);
+                self.node_count -= 1;
+
+                let new_first_layer = self.layers.first_mut().expect("Has Successor");
+                self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
+
+
                 return Err(FinishRootError::SuccessorIsEnd(s));
             }
             NodeExpansionResult::Expanded(_) => {
@@ -833,7 +865,7 @@ where
         skip(self)
     )]
     pub fn prune_not_potentially_eq(&mut self, filter: &Map<N>) -> Result<(), PruneError> {
-        for layer_offset in 0..self.layers.len() {
+        for layer_offset in 1..self.layers.len() {
             let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset);
             let Some(layer) = self.layer_mut(layer_id) else {
                 return Err(PruneError::UnknownNode(AbsoluteNodeId {
@@ -1285,7 +1317,7 @@ where
             MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).0 + 1,
         };
 
-        if highest_sent_layer == MarkerLayerId::AtLayer(self.first_layer_absolute_id)
+        if highest_sent_layer <= MarkerLayerId::AtLayer(self.first_layer_absolute_id)
             && self
                 .node(self.root_node())
                 .expect("HAS TO EXIST")

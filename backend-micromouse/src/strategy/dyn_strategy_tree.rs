@@ -22,7 +22,8 @@ use crate::{
         strategy_tree::{
             FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
             StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationSuccess,
-        }, visuals::FrontendVisuals,
+        },
+        visuals::FrontendVisuals,
     },
     transform::position::{MouseTransform, Position},
 };
@@ -58,7 +59,6 @@ pub struct DynStrategyTreeManager<const N: usize> {
 
     desired_depth: usize,
     max_nodes: usize,
-
     // visuals: FrontendVisuals
 }
 
@@ -100,7 +100,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             goal_position,
             desired_depth,
             max_nodes,
-            visuals
+            visuals,
         )
     }
 
@@ -150,7 +150,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
-        visuals: FrontendVisuals
+        visuals: FrontendVisuals,
     ) -> Result<(), StrategyTreeError> {
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
@@ -237,7 +237,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             goal_pos: goal_position,
             strat_config: strategy_config,
             desired_depth,
-            max_nodes
+            max_nodes,
         };
 
         if let Some(cmd) = cmd {
@@ -395,14 +395,14 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "finish_current_cmd",
         fields(description = "React to command completion (assume root to be finished)")
     )]
-    pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, FinishRootError> {
+    pub fn finish_current_cmd(&mut self) -> Result<Option<StrategyEndState>, StrategyTreeError> {
         macro_rules! finish_current_cmd {
             ([$($variant:ident),+]) => {
 
                 {
                 let finish_root_result = match self.strategy_tree {
                         $(DynStrategyTree::$variant(ref mut tree) => {
-                            tree.finish_root()
+                            tree.handle_finish_root()
                         },)+
                         DynStrategyTree::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
                     };
@@ -427,7 +427,9 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                 Ok(None)
             }
             Err(e) => match e {
-                FinishRootError::SuccessorIsEnd(end_state) => Ok(Some(end_state)),
+                StrategyTreeError::WhileFinishingCommand(FinishRootError::SuccessorIsEnd(
+                    end_state,
+                )) => Ok(Some(end_state)),
                 _ => Err(e),
             },
         }
@@ -467,7 +469,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             self.goal_pos,
             self.desired_depth,
             self.max_nodes,
-            visuals
+            visuals,
         )
     }
 }

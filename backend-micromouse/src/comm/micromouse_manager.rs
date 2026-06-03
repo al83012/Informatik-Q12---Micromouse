@@ -353,7 +353,7 @@ impl<const N: usize> MicromouseManager<N> {
             let world_at_step = current_cmd_application.at_start_certain_step(step_number);
             let world_at_step = match world_at_step {
                 Ok(world_at_step) => {
-                    info!(target: "comm/mng/map", "AT START OF MEASUREMENT: \n{world_at_step}");
+                    // info!(target: "comm/mng/map", "AT START OF MEASUREMENT: \n{world_at_step}");
                     world_at_step
                 }
                 Err(e) => {
@@ -387,7 +387,7 @@ impl<const N: usize> MicromouseManager<N> {
                     .at_start_certain_step(step_number)
                     .map_err(MicromouseManagerError::from)?;
 
-                info!(target: "comm/mng/map", "WORLD AFTER MEASUREMENT: \n{new_map}");
+                // info!(target: "comm/mng/map", "WORLD AFTER MEASUREMENT: \n{new_map}");
                 let mut current_world = self.current_world.write().await;
                 *current_world = new_map.clone().into();
 
@@ -403,12 +403,12 @@ impl<const N: usize> MicromouseManager<N> {
                 }
             };
 
-            if let Some(rej) = &filter_update.rejections {
-                for rej in rej.deref().rejected_outcome_ids.iter() {
-                    let style = Style::new().strikethrough();
-                    debug!(target: "comm/mng/cmd", "REJECTED = {}", style.apply_to( format!("{rej:?}")));
-                }
-            }
+            // if let Some(rej) = &filter_update.rejections {
+            //     for rej in rej.deref().rejected_outcome_ids.iter() {
+            //         let style = Style::new().strikethrough();
+            //         debug!(target: "comm/mng/cmd", "REJECTED = {}", style.apply_to( format!("{rej:?}")));
+            //     }
+            // }
 
             let internal_map_update = InternalMapUpdate {
                 rejected_outcomes: filter_update.rejections,
@@ -458,7 +458,7 @@ impl<const N: usize> MicromouseManager<N> {
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
     ) -> Option<FilteredCommandApplication<N>> {
         debug!(target: "comm/mng/cmd", "CLEARING CURRENT COMMAND");
-        debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
+        // debug!(target: "comm/mng/cmd", "UNCONFIRMEND CMD EMPTY");
         // let mut current_cmd = self.current_command.lock().await;
         let old_cmd = current_cmd.take();
         info!(target: "comm/mng/cmd", link_cmd_id = old_cmd.as_ref().map(|x| x.1.link()).unwrap_or("".to_string()), "Cleared current command");
@@ -504,7 +504,7 @@ impl<const N: usize> MicromouseManager<N> {
             );
             debug!(target: "comm/mng/cmd", "CONFIRMATION: STARTED NEW CMD");
             for outcome in new_cmd.potential_outcome_ids().potential_outcome_ids {
-                debug!(target: "comm/mng/cmd", "POT. OUTCOME = {outcome:?}");
+                // debug!(target: "comm/mng/cmd", "POT. OUTCOME = {outcome:?}");
             }
             **current_cmd = Some((new_cmd, response_cmd_id));
 
