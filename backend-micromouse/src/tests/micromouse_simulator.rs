@@ -60,7 +60,6 @@ impl<const N: usize> MicromouseSimulator<N> {
                 }
             };
 
-
             let Message::Text(msg) = msg else {
                 error!(target: "test/sim", "Got non-text message: {msg}");
                 continue;
@@ -77,6 +76,8 @@ impl<const N: usize> MicromouseSimulator<N> {
                 continue;
             }
             let msg = msg.expect("Checked");
+
+            let mut interrupted = false;
 
             let continue_next_cmd: bool = async {
                 let current_cmd = msg.cmd;
@@ -125,16 +126,18 @@ impl<const N: usize> MicromouseSimulator<N> {
                             if (interrupt.action == InterruptAction::StopIfBlocked && depth == 0)
                                 || (interrupt.action == InterruptAction::StopIfOpen && depth != 0)
                             {
-                                ws_stream
-                                    .send(Message::Text(Utf8Bytes::from(format!(
-                                        "CMD-FINISHED {}",
-                                        msg.cmd_id
-                                    ))))
-                                    .await
-                                    .expect("Panic on sendinc cmd_finished");
-                                // continue 'next_cmd;
-                                return true;
+                                interrupted = true;
                             }
+                        }
+                        if interrupted {
+                            ws_stream
+                                .send(Message::Text(Utf8Bytes::from(format!(
+                                    "CMD-FINISHED {}",
+                                    msg.cmd_id
+                                ))))
+                                .await
+                                .expect("Panic on sending cmd_finished");
+                            return true;
                         }
                         false
                     }
@@ -168,6 +171,5 @@ impl<const N: usize> MicromouseSimulator<N> {
                 continue 'next_cmd;
             }
         }
-
     }
 }

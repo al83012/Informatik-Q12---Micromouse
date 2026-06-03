@@ -754,16 +754,32 @@ where
     pub fn handle_finish_root(&mut self) -> Result<Vec<Command>, StrategyTreeError> {
         let root_id = self.root_node();
         let root_node = self.node(root_id).expect("Root has to exist");
-        info!(target: "strat", "FINISHING ROOT {root_id:?}: \n{}", root_node.on_basis_of_world);
+        let root_cmd = root_node
+            .applied_strategy
+            .as_ref()
+            .expect("Checked")
+            .as_ref()
+            .expect("Cannot be an end-state")
+            .command
+            .command();
+        info!(target: "strat", "FINISHING ROOT {root_id:?} with command {root_cmd:?}: \n{}", root_node.on_basis_of_world);
         let commands = self.finish_root();
 
-        if let Err(FinishRootError::MultipleSuccessors(successors)) = commands.as_ref() {
-            error!(target: "strat", "SUCCESSOR LIST:");
-            for (path_id, node_id) in successors {
-                let node = self.node(*node_id).expect("Node should exist");
-                let map = &node.on_basis_of_world;
-                error!(target: "strat", "SUCCESSOR {path_id:?}\n{map}");
+        match commands.as_ref() {
+            Err(FinishRootError::MultipleSuccessors(successors)) => {
+                error!(target: "strat", "SUCCESSOR LIST:");
+                for (path_id, node_id) in successors {
+                    let node = self.node(*node_id).expect("Node should exist");
+                    let map = &node.on_basis_of_world;
+                    error!(target: "strat", "SUCCESSOR {path_id:?}\n{map}");
+                }
             }
+            Ok(cmds) => {
+                let root_id = self.root_node();
+                let root_node = self.node(root_id).expect("Root has to exist");
+                info!(target: "strat", "NEW ROOT {root_id:?}: \n{}", root_node.on_basis_of_world);
+            }
+            o => info!(target: "strat", "RES: {o:?}"),
         }
         self.expand_fully()?;
         commands.map_err(StrategyTreeError::from)
@@ -1316,7 +1332,7 @@ where
         skip(self)
     )]
     pub fn handle_map_update(&mut self, map: &Map<N>) -> Result<Vec<Command>, StrategyTreeError> {
-        info!(target: "strat", "HANDLE CMD MAP UPDATE");
+        info!(target: "strat", "HANDLE CMD MAP UPDATE\n{map}");
         if self
             .node(self.root_node())
             .expect("Index should be valid")
