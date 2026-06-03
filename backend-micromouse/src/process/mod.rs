@@ -77,10 +77,6 @@ impl<const N: usize> Process<N> {
 
         let strategy_tree_manager = DynStrategyTreeManager::new(
             WorldData::default().only_pos(),
-            DynStrategyConfig::FollowWall(FollowWallConfig {
-                follow_wall: WallDirection::Right,
-                measure_all: false,
-            }),
             GoalPosition(Position {
                 x: N as u32 - 1,
                 y: N as u32 - 1,
@@ -88,7 +84,7 @@ impl<const N: usize> Process<N> {
             4,
             100,
             tree_visuals,
-        )?;
+        );
 
         Ok(Self {
             frontend_manager,
@@ -259,7 +255,7 @@ impl<const N: usize> Process<N> {
                 }
             }
             MicromouseEvent::Restart => {
-                if let Err(e) = self.strategy_tree_manager.set_pos_to_start_and_restart() {
+                if let Err(e) = self.strategy_tree_manager.set_pos_to_origin_and_restart() {
                     self.frontend_manager
                         .send(FrontendMessage::StrategyTreeError(e))
                         .await;

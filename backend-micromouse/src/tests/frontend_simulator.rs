@@ -1,4 +1,7 @@
-use std::{collections::{HashMap, hash_map}, time::Duration};
+use std::{
+    collections::{hash_map, HashMap},
+    time::Duration,
+};
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
@@ -25,19 +28,18 @@ use crate::{
             depth_first::DepthFirstConfig,
             follow_wall::{FollowWallConfig, WallDirection},
         },
-        strategy::GoalPosition, strategy_tree::AbsolutePathId, visuals::{PathSegment, TreeVisualEvent},
+        strategy::GoalPosition,
+        strategy_tree::AbsolutePathId,
+        visuals::{PathSegment, TreeVisualEvent},
     },
     transform::position::{MouseTransform, Position},
-    utils::hyperlink_logging::{LinkFileName, enter_process, process_span},
+    utils::hyperlink_logging::{enter_process, process_span, LinkFileName},
 };
 
 pub struct FrontendSimulator {
     current_strat_id: usize,
-    paths: HashMap<AbsolutePathId, PathSegment>
+    paths: HashMap<AbsolutePathId, PathSegment>,
 }
-
-
-
 
 impl FrontendSimulator {
     #[instrument(name = "new FrontendSimulator")]
@@ -54,10 +56,20 @@ impl FrontendSimulator {
             .expect("Connection failed");
         info!(target: "test/sim", " < Connection Response = {response:?}");
 
+        let msg = StrategyChangeCommand {
+            set_goal: None,
+            reset_map: true,
+            set_strategy: Some(DynStrategyConfig::<10>::FollowWall(FollowWallConfig {
+                follow_wall: WallDirection::Right,
+                measure_all: false,
+            })),
+        };
+
         ws_stream
-            .send(Message::Text(Utf8Bytes::from("RESTART".to_string())))
-            .await
-            .expect("Error sending opening msg");
+            .send(Message::Text(Utf8Bytes::from(
+                serde_json::ser::to_string_pretty(&msg).expect("Shoudl be parseable"),
+            )))
+            .await;
 
         while let Some(frontend_msg_batch) = ws_stream.next().await {
             let Ok(frontend_msg_batch) = frontend_msg_batch else {
@@ -160,7 +172,6 @@ impl FrontendSimulator {
         self.current_strat_id = current_strat_id + 1;
 
         let strat_change = StrategyChangeCommand {
-            set_postion: None,
             set_strategy: Some(next.clone()),
             reset_map: true,
             set_goal: Some(GoalPosition(next_pos)),

@@ -38,7 +38,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: false,
             set_strategy: None,
             set_goal: None
@@ -56,7 +55,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: None,
             set_goal: None
@@ -68,14 +66,12 @@ fn test_parse_frontend_msg() {
     {
         "StrategyChange" : {
             "reset_map": true,
-            "set_position": null
         }
     }
     "#
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: None,
             set_goal: None
@@ -87,7 +83,6 @@ fn test_parse_frontend_msg() {
     {
         "StrategyChange" : {
             "reset_map": true,
-            "set_position": null,
             "set_strategy": null,
             "set_goal": null
         }
@@ -96,7 +91,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: None,
             set_goal: None
@@ -115,7 +109,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: None,
             set_goal: Some(GoalPosition(Position { x: 1, y: 2 }))
@@ -138,7 +131,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 forward_first: true
@@ -163,7 +155,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::DbgKnownPath(DbgKnownPathConfig)),
             set_goal: None
@@ -186,7 +177,6 @@ fn test_parse_frontend_msg() {
         )
         .unwrap(),
         FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_postion: None,
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::BreadthFirst(BreadthFirstConfig)),
             set_goal: None

@@ -20,7 +20,7 @@ use crate::{
         },
         strategy::{FromConfig, GoalPosition, Strategy, StrategyEndState},
         strategy_tree::{
-            FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
+            self, FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
             StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationSuccess,
         },
         visuals::FrontendVisuals,
@@ -59,7 +59,7 @@ pub struct DynStrategyTreeManager<const N: usize> {
 
     desired_depth: usize,
     max_nodes: usize,
-    // visuals: FrontendVisuals
+    visuals: Option<FrontendVisuals>, // visuals: FrontendVisuals
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
@@ -70,11 +70,11 @@ pub enum DynStrategyConfig<const N: usize> {
     FloodFill(<FloodFill<N> as FromConfig<N>>::Config),
     RandomMove(<RandomMove<N> as FromConfig<N>>::Config),
     DbgKnownPath(<DbgKnownPath<N> as FromConfig<N>>::Config),
+    Closed,
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
 pub struct StrategyChangeCommand<const N: usize> {
-    pub set_postion: Option<MouseTransform>,
     pub reset_map: bool,
     pub set_strategy: Option<DynStrategyConfig<N>>,
     pub set_goal: Option<GoalPosition>,
@@ -88,20 +88,26 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     )]
     pub fn new(
         starting_condition: WorldData<N>,
-        strategy_config: DynStrategyConfig<N>,
         goal_position: GoalPosition,
         desired_depth: usize,
         max_nodes: usize,
         visuals: FrontendVisuals,
-    ) -> Result<Self, StrategyTreeError> {
-        Self::new_starting_cond(
-            starting_condition,
-            strategy_config,
-            goal_position,
+    ) -> Self {
+        // WARN: Will only become active once .modify is called the first time
+        let strategy_tree = DynStrategyTree::Closed;
+
+        let (command_sender, command_receiver) = tokio::sync::mpsc::unbounded_channel();
+        Self {
+            strategy_tree,
+            command_sender,
+            command_receiver,
+            current_world: starting_condition,
+            goal_pos: goal_position,
+            strat_config: DynStrategyConfig::Closed,
             desired_depth,
             max_nodes,
-            visuals,
-        )
+            visuals: Some(visuals),
+        }
     }
 
     ///  WARN: Leaves self.strategy_tree in the Closed-Variant
@@ -122,7 +128,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                                 val.close()
                             }
                         )*
-                        DynStrategyTree::<N>::Closed => panic!("Closed is not a proper state; It should only appear in operations and not be constructable")
+                        DynStrategyTree::<N>::Closed => (self.visuals.take().expect("Visuals are here if there is no tree"), SentUnfinishedCommands::HasBlockingRoot{world: self.current_world.clone()})
                     }
                 }
             };
@@ -165,6 +171,9 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                         let TreeCreationSuccess{tree, origin_command} = tree;
                         (DynStrategyTree::<N>::$variant(tree), origin_command)
                     })+
+                    DynStrategyConfig::Closed => {
+                    (DynStrategyTree::Closed, None)
+                    }
                 }
             };
         }
@@ -185,66 +194,6 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         }
 
         Ok(())
-    }
-
-    #[instrument(
-        skip(visuals),
-        name = "new_starting_cond",
-        fields(description = "Create entirely new Strategy Manager with given conditions")
-    )]
-    fn new_starting_cond(
-        starting_condition: WorldData<N>,
-        strategy_config: DynStrategyConfig<N>,
-        goal_position: GoalPosition,
-        desired_depth: usize,
-        max_nodes: usize,
-        visuals: FrontendVisuals,
-    ) -> Result<Self, StrategyTreeError> {
-        macro_rules! new_tree {
-            ([$($variant:ident),+]) => {
-                match strategy_config.clone() {
-                    $(DynStrategyConfig::$variant(val) => {
-                        let strat_conf = StrategyTreeConfig{
-                            strategy_config: val,
-                            desired_depth,
-                            max_nodes
-                        };
-                        let tree = StrategyTree::new(StrategyStart::DirectlyAtState(starting_condition.clone()), strat_conf, goal_position, visuals)?;
-                        let TreeCreationSuccess{tree, origin_command} = tree;
-                        (DynStrategyTree::<N>::$variant(tree), origin_command)
-                    })+
-                }
-            };
-        }
-
-        let (new_tree, cmd) = new_tree!([
-            DepthFirst,
-            BreadthFirst,
-            FollowWall,
-            FloodFill,
-            RandomMove,
-            DbgKnownPath
-        ]);
-
-        // let (command_sender, command_receiver) = tokio::sync::broadcast::channel(16);
-        let (command_sender, command_receiver) = tokio::sync::mpsc::unbounded_channel();
-
-        let mut res = Self {
-            strategy_tree: new_tree,
-            command_sender,
-            command_receiver,
-            current_world: starting_condition,
-            goal_pos: goal_position,
-            strat_config: strategy_config,
-            desired_depth,
-            max_nodes,
-        };
-
-        if let Some(cmd) = cmd {
-            res.send_cmd(cmd);
-        }
-
-        Ok(res)
     }
 
     #[instrument(
@@ -365,23 +314,20 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         )
     )]
     pub fn set_pos_to_origin_and_restart(&mut self) -> Result<(), StrategyTreeError> {
-        let (visuals, _erased) = unsafe{self.erase_strat()};
-        *self = Self::new_starting_cond(WorldData::default(), self.strat_config.clone(), self.goal_pos, self.desired_depth, self.max_nodes,visuals)?;
-        Ok(())
-    }
-
-    #[instrument(
-        skip(self),
-        name = "update_pos",
-        fields(description = "Overwrite the postion that is assumed; Restarts current strategy")
-    )]
-    pub fn update_pos(&mut self, transform: MouseTransform) -> Result<(), StrategyTreeError> {
+        let (visuals, _erased) = unsafe { self.erase_strat() };
+        *self = Self::new(
+            WorldData::default(),
+            self.goal_pos,
+            self.desired_depth,
+            self.max_nodes,
+            visuals,
+        );
         self.modify(StrategyChangeCommand {
-            set_postion: Some(transform),
             reset_map: false,
             set_strategy: Some(self.strat_config.clone()),
             set_goal: Some(self.goal_pos),
-        })
+        })?;
+        Ok(())
     }
 
     #[instrument(
@@ -438,7 +384,6 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     )]
     pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<(), StrategyTreeError> {
         let StrategyChangeCommand {
-            set_postion,
             reset_map,
             set_strategy,
             set_goal,
