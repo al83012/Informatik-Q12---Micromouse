@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tokio::{sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, watch}, time};
 use tracing::{debug, error, info, instrument, span, warn, Instrument, Level};
-use tungstenite::Message;
+use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     comm::{
@@ -307,6 +307,7 @@ impl<const N: usize> MicromouseManager<N> {
         *self.unconfirmed_cmd.lock().await = HashMap::new();
         self.start_marker
             .store(true, std::sync::atomic::Ordering::SeqCst);
+        self.channel.send(Message::Text(Utf8Bytes::from("RESTART-CONFIRM"))).await;
         // self.notify_empty_queue.notify_waiters();
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }

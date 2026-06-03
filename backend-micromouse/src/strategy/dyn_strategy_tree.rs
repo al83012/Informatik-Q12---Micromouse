@@ -365,6 +365,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         )
     )]
     pub fn set_pos_to_start_and_restart(&mut self) -> Result<(), StrategyTreeError> {
+        // self.
         self.modify(StrategyChangeCommand {
             set_postion: Some(MouseTransform {
                 pos: Position { x: 0, y: 0 },

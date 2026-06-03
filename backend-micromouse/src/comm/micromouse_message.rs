@@ -219,6 +219,7 @@ impl From<&CommandMessage> for Message {
     }
 }
 
+
 impl From<&CommandMessage> for String {
     fn from(value: &CommandMessage) -> Self {
         let cmd = &value.cmd;
