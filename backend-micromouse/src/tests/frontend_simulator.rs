@@ -158,9 +158,13 @@ impl FrontendSimulator {
         let current_strat_id = self.current_strat_id % 2;
 
         let next: &DynStrategyConfig<10> = &[
-            DynStrategyConfig::DepthFirst(DepthFirstConfig {
-                forward_first: true,
+            DynStrategyConfig::FollowWall(FollowWallConfig {
+                follow_wall: WallDirection::Right,
+                measure_all: true,
             }),
+            // DynStrategyConfig::DepthFirst(DepthFirstConfig {
+            //     forward_first: true,
+            // }),
             DynStrategyConfig::FollowWall(FollowWallConfig {
                 follow_wall: WallDirection::Right,
                 measure_all: false,

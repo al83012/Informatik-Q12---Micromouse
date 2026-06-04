@@ -71,7 +71,6 @@ pub enum StrategyTreeError {
     WhileFinishingCommand(#[from] FinishRootError),
     #[error("The given map_update cannot be valid for the internal map")]
     MapConflictsWithMapUpdate,
-    // MeasureDoesNotMatchInner,
 }
 
 pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> {
@@ -410,9 +409,10 @@ where
             );
             let non_expanded_node_ids = {
                 // println!("Layer to expand: {layer_to_expand:?}");
-                let layer = self
-                    .layer_mut(layer_to_expand)
-                    .expect("ID should be in bounds");
+                let Some(layer) = self
+                    .layer_mut(layer_to_expand) else {
+                    break 'expansion;
+                };
 
                 layer
                     .nodes
