@@ -8,7 +8,10 @@ use crate::{
         frontend_simulator::{self, FrontendSimulator},
         micromouse_simulator::{self, MicromouseSimulator},
     },
-    utils::{hyperlink_logging::{init_tree_logger, process_span}, logging::init_logging},
+    utils::{
+        hyperlink_logging::{init_tree_logger, process_span},
+        logging::init_logging,
+    },
 };
 
 #[test]
@@ -26,19 +29,21 @@ pub fn process_test_short() {
             let mut micromouse_simulator = MicromouseSimulator::new(world);
             micromouse_simulator.run(3).await;
         }
-        .instrument(process_span("process")),
+        .instrument(process_span("micromouse_sim")),
     );
     let f_handle = rt.spawn(
         async {
             let mut frontend_simulator = FrontendSimulator::new();
             frontend_simulator.run().await;
         }
-        .instrument(process_span("process")),
+        .instrument(process_span("frontend_sim")),
     );
-    let p_handle = rt.spawn( async {
-        let process: Process<N> = Process::new().await.expect("Process creation failed");
-        process.run().await
-    }
+    let p_handle = rt.spawn(
+        async {
+            let process: Process<N> = Process::new().await.expect("Process creation failed");
+            process.run().await
+        }
+        .instrument(process_span("process")),
     );
 
     rt.block_on(async {

@@ -2,14 +2,14 @@ use std::{collections::VecDeque, time::Duration};
 
 use thiserror::Error;
 use tokio::{sync::mpsc::*, task::spawn_blocking, time};
-use tracing::{error, info, instrument, Instrument};
+use tracing::{error, info, instrument, warn, Instrument};
 
 use crate::{
     comm::{
         micromouse_manager::{
             self, MicromouseEvent, MicromouseManager, MicromouseManagerError, MicromouseMode,
         },
-        micromouse_message::{Command, MicromouseMessage},
+        micromouse_message::{Command, NonIndexMicromouseMessage},
         website::{FrontendConnectionConfig, FrontendManager, FrontendMessage, FrontendResponse},
         websocket::{WsChannelConfig, WsChannelConnError, WsChannelConnInfo},
     },
@@ -29,7 +29,7 @@ pub struct Process<const N: usize> {
     micromouse_manager: MicromouseManager<N>,
     frontend_manager: FrontendManager<N>,
     strategy_tree_manager: DynStrategyTreeManager<N>,
-    blocked_cmd_queue: VecDeque<Command>,
+    blocked_cmd_queue: VecDeque<NonIndexMicromouseMessage>,
     tree_visual_recv: UnboundedReceiver<TreeVisualEvent>,
 }
 
@@ -115,7 +115,7 @@ impl<const N: usize> Process<N> {
 
             tokio::select! {
                 cmd = sendable_cmd => {
-                    info!(target: "proc", "SENDABLE CMD");
+                    info!(target: "proc", "SENDABLE CMD {cmd:?}");
                     self.handle_sendable_cmd(cmd).await;
                 }
                 _ = space_in_send_queue => {
@@ -123,11 +123,11 @@ impl<const N: usize> Process<N> {
                     self.handle_space_in_queue().await;
                 }
                 micromouse_conn_event = micromouse_conn_event => {
-                    info!(target: "proc", "M CONN EVENT");
+                    info!(target: "proc", "M CONN EVENT {micromouse_conn_event:?}");
                     self.handle_micromouse_conn_event(micromouse_conn_event).await;
                 }
                 micromouse_msg = micromouse_response => {
-                    info!(target: "proc", "M RESPONSE");
+                    info!(target: "proc", "M RESPONSE {micromouse_msg:?}");
                     let micromouse_event = self.micromouse_manager.process_next_read(micromouse_msg).await;
                     match micromouse_event {
                         Ok(events) => {
@@ -141,7 +141,7 @@ impl<const N: usize> Process<N> {
                     }
                 }
                 frontend_msg = frontend_response => {
-                    info!(target: "proc", "F RESPONSE");
+                    info!(target: "proc", "F RESPONSE {frontend_msg:?}");
                     self.handle_frontend_command(frontend_msg).await;
                 }
                 visual_event_count = visual_events => {
@@ -169,7 +169,7 @@ impl<const N: usize> Process<N> {
         };
     }
 
-    async fn handle_sendable_cmd(&mut self, cmd: Command) {
+    async fn handle_sendable_cmd(&mut self, cmd: NonIndexMicromouseMessage) {
         info!(target: "proc", "New sendable cmd ({cmd:?}) (Added to queue)");
         tokio::select! {
             _ = self.micromouse_manager.await_space_in_queue() => {
@@ -222,15 +222,29 @@ impl<const N: usize> Process<N> {
         name = "send_micromouse_cmd",
         fields(description = "Send command into command queue")
     )]
-    pub async fn send_micromouse_cmd(&mut self, cmd: Command) {
-        let cmd_id = self.micromouse_manager.send_command(cmd.clone()).await;
+    pub async fn send_micromouse_cmd(&mut self, cmd: NonIndexMicromouseMessage) {
+        match cmd {
+            NonIndexMicromouseMessage::Command(cmd) => {
+                let Some(cmd_id) = self.micromouse_manager.send_command(cmd.clone()).await else {
+                    warn!(target: "proc", "SENT CMD WHILE RESTARTING");
+                    return;
+                };
 
-        self.frontend_manager
-            .send(FrontendMessage::Debug(format!(
-                "SENT COMMAND {cmd_id} {cmd:?}"
-            )))
-            .await;
-        info!(target: "proc", link_cmd_id = cmd_id.link(), "SENT COMMAND ({cmd:?}) with id {cmd_id}");
+                self.frontend_manager
+                    .send(FrontendMessage::Debug(format!(
+                        "SENT COMMAND {cmd_id} {cmd:?}"
+                    )))
+                    .await;
+                info!(target: "proc", link_cmd_id = cmd_id.link(), "SENT COMMAND ({cmd:?}) with id {cmd_id}");
+            }
+            NonIndexMicromouseMessage::RestartConfirm => {
+                self.micromouse_manager.restart_confirm().await;
+                self.frontend_manager
+                    .send(FrontendMessage::Debug(format!("SENT RestartConfirm")))
+                    .await;
+                info!(target: "proc", "SENT RestartConfirm")
+            }
+        }
     }
 
     #[instrument(

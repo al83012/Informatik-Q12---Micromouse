@@ -8,7 +8,7 @@ use tokio::sync::{
 use tracing::{info, instrument};
 
 use crate::{
-    comm::micromouse_message::Command,
+    comm::micromouse_message::{Command, NonIndexMicromouseMessage},
     map::{
         command_world_state::RejectedOutcomes, map::Map, measurement::Measurement,
         world_data::WorldData,
@@ -35,19 +35,13 @@ pub enum DynStrategyTree<const N: usize> {
     FloodFill(StrategyTree<N, FloodFill<N>>),
     RandomMove(StrategyTree<N, RandomMove<N>>),
     DbgKnownPath(StrategyTree<N, DbgKnownPath<N>>),
-    /// Value used to move out of self temporarily; Immediately panic if it ever comes up in
-    /// "common" use
     Closed(Option<FrontendVisuals>),
 }
 
-// pub enum FinishCommandResult {
-//     Expanded
-// }
-
 pub struct DynStrategyTreeManager<const N: usize> {
     strategy_tree: DynStrategyTree<N>,
-    command_sender: UnboundedSender<Command>,
-    command_receiver: UnboundedReceiver<Command>,
+    command_sender: UnboundedSender<NonIndexMicromouseMessage>,
+    command_receiver: UnboundedReceiver<NonIndexMicromouseMessage>,
 
     // We are separately storing the current world in order to be able to plug it into the
     // StartingState if necessary; The strategy tree itself only stores the world where interrupts
@@ -203,9 +197,13 @@ impl<const N: usize> DynStrategyTreeManager<N> {
     )]
     fn send_cmd(&mut self, cmd: Command) {
         self.command_sender
-            .send(cmd.clone())
+            .send(NonIndexMicromouseMessage::Command(cmd.clone()))
             .expect("Channel should not be closed");
         info!(target: "strat", "Queued dyn strategy cmd {cmd:?}");
+    }
+    fn send_restart_confirm(&mut self) {
+        self.command_sender.send(NonIndexMicromouseMessage::RestartConfirm).expect("Channel should not be closed");
+        info!(target: "strat", "Sent Restart-Confirm");
     }
 
     #[instrument(
@@ -213,7 +211,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "await_cmd",
         fields(description = "Wait for new command from the queue")
     )]
-    pub async fn await_cmd(&mut self) -> Command {
+    pub async fn await_cmd(&mut self) -> NonIndexMicromouseMessage {
         self.command_receiver
             .recv()
             .await
@@ -317,6 +315,13 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
     #[instrument(
         skip(self),
+        name = "reset_queue",
+        fields(description = "Clear the internal cmd queue")
+    )]
+    pub fn reset_queue(&mut self) {}
+
+    #[instrument(
+        skip(self),
         name = "set_pos_to_start_and_restart",
         fields(
             description = "Clear the entire strategy state and make it assume the default starting position (Does not reset command queue of the micromouse); Restarts current strategy"
@@ -334,6 +339,9 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             self.max_nodes,
             visuals,
         );
+        // Putting in the restart-marker before the new commands --> Making the non-sent commands
+        // inside the queue invalid
+        self.send_restart_confirm();
         self.modify(StrategyChangeCommand {
             reset_map: false,
             set_strategy: Some(strat_config),

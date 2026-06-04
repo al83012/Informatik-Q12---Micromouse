@@ -22,9 +22,16 @@ type Depth = u32;
 
 pub type StepNum = u32;
 
+#[derive(Debug, Clone)]
 pub enum MicromouseMessage {
-    MicromouseCommand(CommandMessage),
-    MicromouseResponse(MicromouseResponse),
+    Command(CommandMessage),
+    RestartConfirm,
+}
+
+#[derive(Debug, Clone)]
+pub enum NonIndexMicromouseMessage {
+    Command(Command),
+    RestartConfirm
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -219,7 +226,6 @@ impl From<&CommandMessage> for Message {
     }
 }
 
-
 impl From<&CommandMessage> for String {
     fn from(value: &CommandMessage) -> Self {
         let cmd = &value.cmd;
@@ -243,6 +249,22 @@ impl From<&CommandMessage> for String {
     }
 }
 
+impl From<&MicromouseMessage> for String {
+    fn from(value: &MicromouseMessage) -> Self {
+        match value {
+            MicromouseMessage::Command(command_msg) => command_msg.into(),
+            MicromouseMessage::RestartConfirm => "RESTART-CONFIRM".to_string(),
+        }
+    }
+}
+
+impl From<&MicromouseMessage> for Message {
+    fn from(value: &MicromouseMessage) -> Self {
+        Message::Text(Utf8Bytes::from(String::from(value)))
+    }
+}
+
+
 impl From<MeasurementMessage> for String {
     fn from(value: MeasurementMessage) -> Self {
         let cmd_id = value.from_cmd;
@@ -256,6 +278,7 @@ impl From<MeasurementMessage> for String {
         )
     }
 }
+
 
 impl std::fmt::Display for MeasurementInterrupt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -699,6 +722,16 @@ impl TryFrom<String> for CommandMessage {
     }
 }
 
+impl TryFrom<String> for MicromouseMessage {
+    type Error = FormatError<MicromouseMessage>;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        if value.eq("COMMAND-CONFIRM") {
+            return Ok(MicromouseMessage::RestartConfirm);
+        }
+        Ok(MicromouseMessage::Command(CommandMessage::try_from(value)?))
+    }
+}
+
 impl TryFrom<String> for InterruptStep {
     type Error = FormatError<InterruptStep>;
 
@@ -724,7 +757,6 @@ impl TryFrom<String> for RelativeDirection {
     }
 }
 
-
 impl From<FormatError<InterruptStep>> for FormatError<CommandMessage> {
     fn from(value: FormatError<InterruptStep>) -> Self {
         Self::new(value.faulty_text)
@@ -742,6 +774,13 @@ impl From<FormatError<CommandId>> for FormatError<CommandMessage> {
         Self::new(value.faulty_text)
     }
 }
+
+impl From<FormatError<CommandMessage>> for FormatError<MicromouseMessage> {
+    fn from(value: FormatError<CommandMessage>) -> Self {
+        Self::new(value.faulty_text)
+    }
+}
+
 impl From<FormatError<InterruptAction>> for FormatError<CommandMessage> {
     fn from(value: FormatError<InterruptAction>) -> Self {
         Self::new(value.faulty_text)

@@ -1,21 +1,25 @@
 use std::{
     collections::HashMap,
     ops::Deref,
-    sync::atomic::{AtomicBool, AtomicU32}, time::Duration,
+    sync::atomic::{AtomicBool, AtomicU32, Ordering},
+    time::Duration,
 };
 
 use console::Style;
 use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use tokio::{sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, watch}, time};
+use tokio::{
+    sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard},
+    time,
+};
 use tracing::{debug, error, info, instrument, span, warn, Instrument, Level};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
     comm::{
         micromouse_message::{
-            Command, CommandId, CommandMessage, FormatError, MeasurementMessage,
+            Command, CommandId, CommandMessage, FormatError, MeasurementMessage, MicromouseMessage,
             MicromouseResponse, StepNum,
         },
         website::DiscoveryMessage,
@@ -48,6 +52,7 @@ pub struct MicromouseManager<const N: usize> {
     target_queue_length: usize,
     battery: Mutex<f32>,
     start_marker: AtomicBool,
+    restarting: AtomicBool,
 }
 #[derive(Debug)]
 pub struct InternalMapUpdate {
@@ -80,11 +85,23 @@ impl<const N: usize> MicromouseManager<N> {
             queue_length_sender,
             queue_length_receiver: Mutex::new(queue_length_receiver),
             target_queue_length: 3,
+            restarting: AtomicBool::from(false),
         })
     }
 
+    #[instrument(skip(self), name = "restart_confirm")]
+    pub async fn restart_confirm(&self) {
+        self.restarting.store(false, Ordering::SeqCst);
+        self.channel
+            .send(Message::from(&MicromouseMessage::RestartConfirm))
+            .await
+    }
+
     #[instrument(skip(self), name = "send_command")]
-    pub async fn send_command(&self, cmd: Command) -> CommandId {
+    pub async fn send_command(&self, cmd: Command) -> Option<CommandId> {
+        if self.restarting.load(Ordering::SeqCst) {
+            return None;
+        }
         debug!(target: "comm/mng/cmd", "Adding cmd to queue {cmd:?}");
         let cmd_id = CommandId(
             self.next_cmd_send_id
@@ -115,7 +132,7 @@ impl<const N: usize> MicromouseManager<N> {
         ))
         .await;
         //Ok(cmd_id)
-        cmd_id
+        Some(cmd_id)
     }
 
     // Returns boolean --> true = was resent, false = already finished, exited queue
@@ -299,6 +316,7 @@ impl<const N: usize> MicromouseManager<N> {
     #[instrument(skip(self), name = "restart")]
     pub async fn restart(&self) {
         debug!(target: "comm/mng", "Doing Restart...");
+        self.restarting.store(true, Ordering::SeqCst);
         self.next_cmd_send_id
             .store(0, std::sync::atomic::Ordering::SeqCst);
         *self.mode.lock().await = MicromouseMode::Stopped;
@@ -307,7 +325,6 @@ impl<const N: usize> MicromouseManager<N> {
         *self.unconfirmed_cmd.lock().await = HashMap::new();
         self.start_marker
             .store(true, std::sync::atomic::Ordering::SeqCst);
-        self.channel.send(Message::Text(Utf8Bytes::from("RESTART-CONFIRM"))).await;
         // self.notify_empty_queue.notify_waiters();
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }
