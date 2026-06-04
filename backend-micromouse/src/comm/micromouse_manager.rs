@@ -91,6 +91,7 @@ impl<const N: usize> MicromouseManager<N> {
 
     #[instrument(skip(self), name = "restart_confirm")]
     pub async fn restart_confirm(&self) {
+        info!(target: "comm/mng", "Restarting signal sent");
         self.restarting.store(false, Ordering::SeqCst);
         self.channel
             .send(Message::from(&MicromouseMessage::RestartConfirm))

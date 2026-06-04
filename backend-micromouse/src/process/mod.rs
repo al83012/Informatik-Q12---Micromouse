@@ -170,18 +170,9 @@ impl<const N: usize> Process<N> {
     }
 
     async fn handle_sendable_cmd(&mut self, cmd: NonIndexMicromouseMessage) {
+        self.blocked_cmd_queue.push_back(cmd);
         info!(target: "proc", "New sendable cmd ({cmd:?}) (Added to queue)");
-        tokio::select! {
-            _ = self.micromouse_manager.await_space_in_queue() => {
                 info!(target: "proc", "    ~> Sent directly");
-                self.send_micromouse_cmd(cmd).await;
-            }
-            _ = tokio::time::sleep(Duration::from_millis(1)) => {
-                info!(target: "proc", "    ~> Placed in queue");
-                self.blocked_cmd_queue.push_back(cmd);
-                info!(target: "proc", "QUEUE: \n{:#?}", self.blocked_cmd_queue);
-            }
-        }
     }
 
     #[instrument(
