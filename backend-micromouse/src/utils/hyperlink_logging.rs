@@ -566,17 +566,19 @@ pub fn init_tree_logger() {
     let tracing_reg = {
         use tracing_subscriber::filter::FilterFn;
 
+        use crate::utils::logging::MyFormatter;
+
         let warn_fmt_layer = fmt::layer()
             .with_file(true)
             .with_target(true)
             .with_ansi(true)
-            .event_format(TestFormatter::new());
+            .event_format(MyFormatter::new());
 
         tracing_reg.with(
             warn_fmt_layer
                 .with_filter(EnvFilter::new("info"))
-                .with_filter(FilterFn::new(|meta| !meta.target().ends_with("apl")))
-                .with_filter(FilterFn::new(|meta| !meta.target().eq("strat"))),
+                .with_filter(FilterFn::new(|meta| !meta.target().ends_with("apl"))),
+            // .with_filter(FilterFn::new(|meta| !meta.target().eq("strat"))),
         )
     };
 

@@ -178,7 +178,12 @@ where
         let mut visitor = MessageVisitor { msg: None };
         event.record(&mut visitor);
         let msg = visitor.msg.unwrap_or_default();
-        let module = meta.module_path().unwrap_or("");
+        let module = meta
+            .module_path()
+            .unwrap_or("")
+            .rsplit("::")
+            .next()
+            .unwrap_or("");
 
         let _level_color = level_color(level);
         let level_bg_color = level_bg_color(level);
@@ -186,10 +191,10 @@ where
         let level = format!("{level_bg_color} {level:<6} {STD_BG}");
 
         let info =
-            format!("[{elapsed:>8.2}] [{BLACK} {level} {module:<10} {target:<6} {RESET_COLOR}]");
+            format!("[{elapsed:>8.2}] [{BLACK} {level} {module:<10} {target:<6} {RESET_COLOR}");
 
         // header
-        write!(writer, "{info} {msg} ",)?;
+        write!(writer, "{info:<40}] {msg} ",)?;
 
         writeln!(writer)
     }

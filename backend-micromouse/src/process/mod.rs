@@ -1,7 +1,11 @@
 use std::{collections::VecDeque, time::Duration};
 
 use thiserror::Error;
-use tokio::{sync::mpsc::*, task::spawn_blocking, time};
+use tokio::{
+    sync::mpsc::*,
+    task::spawn_blocking,
+    time::{self, Instant, Sleep},
+};
 use tracing::{error, info, instrument, warn, Instrument};
 
 use crate::{
@@ -31,6 +35,7 @@ pub struct Process<const N: usize> {
     strategy_tree_manager: DynStrategyTreeManager<N>,
     blocked_cmd_queue: VecDeque<NonIndexMicromouseMessage>,
     tree_visual_recv: UnboundedReceiver<TreeVisualEvent>,
+    queue_space_timeout_until: Instant,
 }
 
 #[derive(Error, Debug)]
@@ -92,6 +97,7 @@ impl<const N: usize> Process<N> {
             strategy_tree_manager,
             blocked_cmd_queue: VecDeque::new(),
             tree_visual_recv,
+            queue_space_timeout_until: Instant::now(),
         })
     }
 
@@ -107,7 +113,10 @@ impl<const N: usize> Process<N> {
             let micromouse_conn_event = self.micromouse_manager.await_next_conn_event();
             let frontend_response = self.frontend_manager.next_read();
             let sendable_cmd = self.strategy_tree_manager.await_cmd();
-            let space_in_send_queue = self.micromouse_manager.await_space_in_queue();
+            let space_in_send_queue = async {
+                tokio::time::sleep_until(self.queue_space_timeout_until).await;
+                self.micromouse_manager.await_space_in_queue().await;
+            };
             let mut visual_event_buffer = vec![];
             let visual_events = self
                 .tree_visual_recv
@@ -164,15 +173,17 @@ impl<const N: usize> Process<N> {
         if let Some(cmd_from_blocked) = cmd_from_blocked {
             info!(target: "proc", "Sending queued command: {cmd_from_blocked:?}");
             self.send_micromouse_cmd(cmd_from_blocked).await;
+            // Reset the timer if it was successful --> Maybe indicates a row of sends
+            self.queue_space_timeout_until = Instant::now();
         } else {
-            // info!(target: "proc", "Command queue has a space, but there is no new command to send");
+            self.queue_space_timeout_until = Instant::now() + Duration::from_millis(20);
         };
     }
 
     async fn handle_sendable_cmd(&mut self, cmd: NonIndexMicromouseMessage) {
-        self.blocked_cmd_queue.push_back(cmd);
         info!(target: "proc", "New sendable cmd ({cmd:?}) (Added to queue)");
-                info!(target: "proc", "    ~> Sent directly");
+        self.blocked_cmd_queue.push_back(cmd);
+        info!(target: "proc", "    ~> Sent directly");
     }
 
     #[instrument(
