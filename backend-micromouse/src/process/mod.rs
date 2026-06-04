@@ -242,9 +242,12 @@ impl<const N: usize> Process<N> {
             NonIndexMicromouseMessage::RestartConfirm => {
                 self.micromouse_manager.restart_confirm().await;
                 self.frontend_manager
-                    .send(FrontendMessage::Debug(format!("SENT RestartConfirm")))
+                    .send(FrontendMessage::Debug("SENT RestartConfirm".to_string()))
                     .await;
                 info!(target: "proc", "SENT RestartConfirm")
+            }
+            NonIndexMicromouseMessage::ResetMapAndPos => {
+                self.micromouse_manager.queue_reset_map().await;
             }
         }
     }

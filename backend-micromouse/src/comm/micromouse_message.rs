@@ -10,7 +10,7 @@ use crate::{
         measurement::{Measurement, MeasurementValue},
         world_data::{PartialWorldData, WorldData},
     },
-    transform::{direction::RelativeDirection, position::MouseTransform},
+    transform::{direction::RelativeDirection, position::{MouseTransform, Position}},
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
@@ -31,7 +31,9 @@ pub enum MicromouseMessage {
 #[derive(Debug, Clone)]
 pub enum NonIndexMicromouseMessage {
     Command(Command),
-    RestartConfirm
+    RestartConfirm,
+    // Signal to set everything (besides the current tile) to undiscovered
+    ResetMapAndPos,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -202,7 +202,15 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         info!(target: "strat", "Queued dyn strategy cmd {cmd:?}");
     }
     fn send_restart_confirm(&mut self) {
-        self.command_sender.send(NonIndexMicromouseMessage::RestartConfirm).expect("Channel should not be closed");
+        self.command_sender
+            .send(NonIndexMicromouseMessage::RestartConfirm)
+            .expect("Channel should not be closed");
+        info!(target: "strat", "Sent Restart-Confirm");
+    }
+    fn send_reset_map(&mut self) {
+        self.command_sender
+            .send(NonIndexMicromouseMessage::ResetMapAndPos)
+            .expect("Channel should not be closed");
         info!(target: "strat", "Sent Restart-Confirm");
     }
 
@@ -332,8 +340,9 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         let (visuals, _erased) = unsafe { self.erase_strat() };
         let strat_config = self.strat_config.clone();
         let goal_pos = self.goal_pos.clone();
+        let default_world = WorldData::default().only_pos();
         *self = Self::new(
-            WorldData::default().only_pos(),
+            default_world,
             self.goal_pos,
             self.desired_depth,
             self.max_nodes,
@@ -342,6 +351,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         // Putting in the restart-marker before the new commands --> Making the non-sent commands
         // inside the queue invalid
         self.send_restart_confirm();
+        self.send_reset_map();
         self.modify(StrategyChangeCommand {
             reset_map: false,
             set_strategy: Some(strat_config),
@@ -423,6 +433,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             after_cmds: erased,
             reset_world: reset_map,
         };
+
+        if reset_map {
+            self.send_reset_map();
+        }
 
         self.set_starting_cond(
             strategy_start,

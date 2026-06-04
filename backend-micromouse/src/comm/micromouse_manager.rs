@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ops::Deref,
     sync::atomic::{AtomicBool, AtomicU32, Ordering},
     time::Duration,
@@ -43,6 +43,7 @@ pub struct MicromouseManager<const N: usize> {
     channel: WsChannel,
     next_cmd_send_id: AtomicU32,
     unconfirmed_cmd: Mutex<HashMap<CommandId, CommandMessage>>,
+    reset_map_before: Mutex<HashSet<CommandId>>,
     next_cmd_process_id: AtomicU32,
     mode: Mutex<MicromouseMode>,
     current_command: Mutex<Option<(FilteredCommandApplication<N>, CommandId)>>,
@@ -75,6 +76,7 @@ impl<const N: usize> MicromouseManager<N> {
             channel: new_channel,
             next_cmd_send_id: AtomicU32::new(0),
             unconfirmed_cmd: Mutex::new(HashMap::new()),
+            reset_map_before: Mutex::new(HashSet::new()),
             next_cmd_process_id: AtomicU32::new(0),
             mode: Mutex::new(MicromouseMode::Stopped),
             current_command: Mutex::new(None),
@@ -96,6 +98,12 @@ impl<const N: usize> MicromouseManager<N> {
         self.channel
             .send(Message::from(&MicromouseMessage::RestartConfirm))
             .await
+    }
+
+    #[instrument(skip(self), name = "queue_reset_map")] 
+    pub async fn queue_reset_map(&self) {
+        let reset_map_before_id = CommandId(self.next_cmd_send_id.load(Ordering::SeqCst));
+        self.reset_map_before.lock().await.insert(reset_map_before_id);
     }
 
     #[instrument(skip(self), name = "send_command")]
@@ -330,6 +338,12 @@ impl<const N: usize> MicromouseManager<N> {
         debug!(target: "comm/mng", "RESTART COMPLETE");
     }
 
+    #[instrument(skip(self), name = "reset_map")]
+    async fn reset_map(&self) {
+        let mut current_world = self.current_world.write().await;
+        *current_world = current_world.only_pos();
+    }
+
     #[instrument(skip(self), name = "remove_unordered", fields(link_cmd_id = cmd_to_remove.link()))]
     async fn remove_unordered(
         &self,
@@ -515,6 +529,10 @@ impl<const N: usize> MicromouseManager<N> {
                 new_cmd
             };
 
+            if self.reset_map_before.lock().await.remove(&new_cmd.cmd_id) {
+                self.reset_map().await;
+            }
+
             // Storing the starting state of the new command, so that we can easily calculate,
             // where the mouse currently is
             let new_cmd = FilteredCommandApplication::new(
@@ -558,6 +576,10 @@ impl<const N: usize> MicromouseManager<N> {
                 // Pretend, that the next cmd we expect to see is the one after that
                 self.next_cmd_process_id
                     .store(response_cmd_id.0 + 1, std::sync::atomic::Ordering::SeqCst);
+
+                if self.reset_map_before.lock().await.remove(&response_cmd_id) {
+                    self.reset_map().await;
+                }
                 // Started a new command without exiting the previous one
                 error!(target: "comm/mng/cmd", "MISSING CMD FINISH, TRIED STARTING NEW ONE");
 
