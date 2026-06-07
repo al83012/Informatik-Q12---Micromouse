@@ -239,7 +239,7 @@ app.post('/action', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.redirect("/home.html");
+    res.redirect("/home_new.html");
 });
 
 app.post('/error', (req, res) => {
@@ -255,6 +255,8 @@ const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
+
+const { Utils } = require('./Utils.ts');
 
 function input(string) {
     let parts = string.split(":");
@@ -308,8 +310,31 @@ function input(string) {
                         if (parts.length === 4) {
                             manager.f_sync.push(Actions[parts[2]](manager.in_maze.discovered,...parts[3].split(",")));
                         }
+                        break;
+
                 }
             }
+            break;
+        default:
+            Utils.is(parts, "f:path:create:random", (rest) => {
+                let path = [];
+
+                let count = Math.floor(Math.random() * 5) + 1;
+
+                for (;count > 0; count--) {
+                    let dir = Math.floor(Math.random() * 2);
+                    let amount = Math.floor(Math.random() * 10) + 1;
+                    if (dir === 0) {
+                        if (path.length > 0) {
+                            if (path[path.length - 1][path[path.length-1].length-1] === "") {//TODO: complete test path generation with walker?
+
+                            }
+                        }
+                    } else if (dir === 1) {
+
+                    }
+                }
+            });
             break;
     }
 

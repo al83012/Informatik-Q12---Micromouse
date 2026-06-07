@@ -4,6 +4,8 @@ let selected_square;
 let current_state = ["reset", "finished"];
 let goal = [15, 15]; //the coords for going somewhere (cmd point)
 
+let has_backend = true;
+
 
 import {
     AnimationHandler,
@@ -28,14 +30,16 @@ export class Index {
 
     static eventLoad() {
         //creating error feedback to backend
-        window.onerror = function (e) {
-            let request = new XMLHttpRequest();
-            request.open("POST", document.location.origin + "/error");
-            request.setRequestHeader("Content-Type", "Application/json");
-            request.send(JSON.stringify({
-                error: e,
-                stack: e.stack,
-            }));
+        if (has_backend) {
+            window.onerror = function (e) {
+                let request = new XMLHttpRequest();
+                request.open("POST", document.location.origin + "/error");
+                request.setRequestHeader("Content-Type", "Application/json");
+                request.send(JSON.stringify({
+                    error: e,
+                    stack: e.stack,
+                }));
+            }
         }
 
         //move info-link_pill to respective position
@@ -80,12 +84,16 @@ export class Index {
 
         //creating the AnimationHandler
         Index.animHandler = new AnimationHandler();
-        window.setInterval(() => {
-            let request = new XMLHttpRequest();
-            request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
-            request.open("GET", document.location.origin + "/update", true);
-            request.send();
-        }, 100);
+        if (has_backend) {
+            window.setInterval(() => {
+                let request = new XMLHttpRequest();
+                request.addEventListener("load", function () {
+                    Index.handleUpdate(JSON.parse(this.responseText));
+                });
+                request.open("GET", document.location.origin + "/update", true);
+                request.send();
+            }, 100);
+        }
         window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
         
         //window.setTimeout(() => init_maze(), 1000); //the timeout is only for the test animation which had a bug
@@ -95,10 +103,15 @@ export class Index {
         //let borderAnim = new AnimBorderColor(100, Index.squares[[5, 5]], "darkblue", "cyan");
         //Index.animHandler.add(borderAnim);
 
-        let request = new XMLHttpRequest();
-        request.addEventListener("load", function () {console.log(this.responseText);Index.handleUpdate(JSON.parse(this.responseText));});
-        request.open("GET", document.location.origin + "/update_full");
-        request.send();
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.addEventListener("load", function () {
+                console.log(this.responseText);
+                Index.handleUpdate(JSON.parse(this.responseText));
+            });
+            request.open("GET", document.location.origin + "/update_full");
+            request.send();
+        }
     }
 
     static handleUpdate(response) {
@@ -160,14 +173,17 @@ export class Index {
     static buttonStartStop() {
         //play_reset_animation();
 
-        let request = new XMLHttpRequest();
-        request.open("POST", document.location.origin + "/action");
-        request.addEventListener("load", function () {});
-        request.setRequestHeader("Content-Type", "Application/json");
-        request.send(JSON.stringify({
-            action: "button_clicked",
-            button_id: 0,
-        }));
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.open("POST", document.location.origin + "/action");
+            request.addEventListener("load", function () {
+            });
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify({
+                action: "button_clicked",
+                button_id: 0,
+            }));
+        }
 
         /*let pathGroup = new AnimGroup(5);
 
@@ -349,15 +365,29 @@ function init_maze() {
         wall_container.style.top = ((100/16)*coords[1]) + "%";
         wall_container.style.left = ((100/16)*coords[0]) + "%";
 
-        let wall_right = document.createElement("div");
-        wall_right.className = "sys-wall_wall-right";
-        wall_right.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" + (coords[0] + 1) + ":" + coords[1];
+        if (!(coords[0] === 15)) {
+            let wall_right = document.createElement("div");
+            wall_right.className = "sys-wall_wall-right off";
+            wall_right.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" +
+                (coords[0] + 1) + ":" + coords[1];
 
-        wall_container.appendChild(wall_right);
+            wall_container.appendChild(wall_right);
+        }
+
+        if (!(coords[1] === 15)) {
+            let wall_bottom = document.createElement("div");
+            wall_bottom.className = "sys-wall_wall-bottom off";
+            wall_bottom.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" +
+                coords[0] + ":" + (coords[1] + 1);
+
+            wall_container.appendChild(wall_bottom);
+        }
+
         document.getElementById("maze_square_main").appendChild(wall_container);
     }
 
-    //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
+    //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1,
+    // 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
     /*let path = [
         [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
         [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1],
@@ -641,7 +671,15 @@ function select_square(square) {
     square.style.borderColor = "orange";
 
     let borderAnim = new AnimBorderInner(20, square, 3, 1, 2, [0, 34, 34]);
-    Index.animHandler.addImmediate(borderAnim);
+    let tileAnim = new AnimSlideColor(20, square, "#0a0e1a", "#00e6ae"/*"#079eae"*/);
+    let shadowAnim = new AnimCssChange(20, square, ["unselected"], "selected");
+
+    let selectGroup = new AnimGroup(0);
+    selectGroup.add(borderAnim);
+    selectGroup.add(tileAnim);
+    selectGroup.add(shadowAnim);
+
+    Index.animHandler.addImmediate(selectGroup);
 
     current_state = ["point", "stopped"];
 }
@@ -650,7 +688,15 @@ function unselect_square(square) {
     square.style.borderColor = "black";
 
     let borderAnim = new AnimBorderInner(20, square, 1, 3, 0, [2, 30, 30]);
-    Index.animHandler.addImmediate(borderAnim);
+    let shadowAnim = new AnimCssChange(20, square, ["selected"], "unselected");
+    let tileAnim = new AnimSlideColor(20, square, "#00e6ae", "#0a0e1a");
+
+    let unselectGroup = new AnimGroup(0);
+    unselectGroup.add(borderAnim);
+    unselectGroup.add(tileAnim);
+    unselectGroup.add(shadowAnim);
+
+    Index.animHandler.addImmediate(unselectGroup);
 
     current_state = ["reset", "finished"];
 }
@@ -689,7 +735,7 @@ function updateControls(button_id, state) {
     }
 }
 
-function updateControls_disalbed() {
+function updateControls_disabled() {
     let buttonStart = document.getElementsByClassName("button_start_stop")[0];
     let buttonPause = document.getElementsByClassName("button_pause")[0];
     let buttonReset = document.getElementsByClassName("button_reset")[0];
@@ -718,19 +764,23 @@ function add_algorithm(algorithm) {
     algorithm_ele.className = "pop_window_algorithm_choice unselectable";
     algorithm_ele.innerHTML = algorithm;
     algorithm_ele.addEventListener("click", function () {
-        let request = new XMLHttpRequest();
-        request.addEventListener("load", function () {console.log(this.responseText);});
-        request.open("POST", document.location.origin + "/action");
-        request.setRequestHeader("Content-Type", "Application/json");
-        request.send(JSON.stringify({
-            action: "algorithm_selected",
-            algorithm: algorithm,
-        }));
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.addEventListener("load", function () {
+                console.log(this.responseText);
+            });
+            request.open("POST", document.location.origin + "/action");
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify({
+                action: "algorithm_selected",
+                algorithm: algorithm,
+            }));
+        }
         Index.closePopAlgo();
     });
     document.getElementById("algo_content").appendChild(algorithm_ele);
 }
 
 function math_pos(x) {
-    return x*(x<0?-1:1);
+    return (x<0?x*-1:x); //more efficient :) //x*(x<0?-1:1);
 }

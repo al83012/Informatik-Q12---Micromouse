@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html lang="de" style="height: 100%">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebInterface</title>
+    <link rel="stylesheet" href="style_new.css">
+    <link rel="stylesheet" href="style_animations.css">
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="./module/index.js" type="module"></script>
+
+    <script type="module">
+        import { Index } from './module/index.js';
+
+        let maze_square_main = document.getElementById("maze_square_main");
+        for (let i = 0; i < 16; i++) {
+            let row = document.createElement("div");
+            row.className = "maze_row";
+            for (let j = 0; j < 16; j++) {
+                let tile = document.createElement("div");
+                tile.className = "maze_tile unselected";
+                row.appendChild(tile);
+            }
+            maze_square_main.appendChild(row);
+        }
+
+        window.onload = () => Index.eventLoad();
+        window.code = Index; //only for debugging
+
+        document.getElementsByClassName("button_function_start_stop")[0].onclick = () => Index.buttonStartStop();
+        document.getElementsByClassName("algo_current")[0].onclick = () => Index.openPopAlgo();
+        document.getElementsByClassName("pop_window_algorithm_dimmer")[0].onclick = () => Index.closePopAlgo();
+    </script>
+</head>
+<body class="con_script_body">
+    <div class="loading-container" id="loading-container">
+        <div class="loading-animation_container" style="opacity: 1">
+            <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: row;">
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_node repl undiscovered" id="loading_animation_0"></div>
+                        <div class="sys-arm_arm sys-arm_arm-s repl undiscovered" id="loading_animation_23"></div>
+                        <div class="sys-arm_arm sys-arm_arm-e repl undiscovered" id="loading_animation_1"></div>
+                    </div>
+                </div>
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_3"></div>
+                        <div class="sys-arm_arm sys-arm_arm-w repl undiscovered" id="loading_animation_2"></div>
+                        <div class="sys-arm_arm sys-arm_arm-e repl undiscovered" id="loading_animation_4"></div>
+                    </div>
+                </div>
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_6"></div>
+                        <div class="sys-arm_arm sys-arm_arm-w repl undiscovered" id="loading_animation_5"></div>
+                        <div class="sys-arm_arm sys-arm_arm-s repl undiscovered" id="loading_animation_7"></div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: row;">
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_21"></div>
+                        <div class="sys-arm_arm sys-arm_arm-s repl undiscovered" id="loading_animation_20"></div>
+                        <div class="sys-arm_arm sys-arm_arm-n repl undiscovered" id="loading_animation_22"></div>
+                    </div>
+                </div>
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;"></div>
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_9"></div>
+                        <div class="sys-arm_arm sys-arm_arm-n repl undiscovered" id="loading_animation_8"></div>
+                        <div class="sys-arm_arm sys-arm_arm-s repl undiscovered" id="loading_animation_10"></div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: row;">
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_18"></div>
+                        <div class="sys-arm_arm sys-arm_arm-n repl undiscovered" id="loading_animation_19"></div>
+                        <div class="sys-arm_arm sys-arm_arm-e repl undiscovered" id="loading_animation_17"></div>
+                    </div>
+                </div>
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_15"></div>
+                        <div class="sys-arm_arm sys-arm_arm-w repl undiscovered" id="loading_animation_16"></div>
+                        <div class="sys-arm_arm sys-arm_arm-e repl undiscovered" id="loading_animation_14"></div>
+                    </div>
+                </div>
+                <div style="display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; flex-direction: column;">
+                    <div class="sys-arm_container">
+                        <div class="sys-arm_arm sys-arm_node repl undiscovered" id="loading_animation_12"></div>
+                        <div class="sys-arm_arm sys-arm_arm-w repl undiscovered" id="loading_animation_13"></div>
+                        <div class="sys-arm_arm sys-arm_arm-n repl undiscovered" id="loading_animation_11"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="pop_window_algorithm_group">
+        <div class="pop_window_algorithm_dimmer"></div>
+        <div class="pop_window_algorithm_container">
+            <div class="pop_window_algorithm_header">
+                <div class="pop_window_algorithm_header_text">Choose your algorithm</div>
+            </div>
+            <div class="pop_window_algorithm_content" id="algo_content">
+
+            </div>
+        </div>
+    </div>
+
+    <div class="header_container">
+            <h1 class="header_text">Micromouse WebInterface</h1>
+            <div class="header_status">
+                <h4 class="header_text">v1.2.1</h4>
+                <div class="header_status_pill">
+                    <div class="header_status_pill_dot" id="pill_con_dot"></div>
+                    <t23 class="header_status_pill_text" id="pill_con_text">offline</t23>
+                </div>
+                <div class="link-info_pill unselectable">Info</div>
+            </div>
+    </div>
+
+    <div class="body_container">
+        <div class="debug_console_container">
+        <div class="debug_console_header">
+            <div class="debug_console_header_dot"></div>
+            <h2 class="debug_console_header_text">Console</h2>
+        </div>
+        <div class="debug_console">
+        </div>
+    </div>
+
+        <div class="maze_container">
+
+            <div class="maze_header">
+                <h2 class="maze_header_text">Maze</h2>
+                <!--div class="maze_header_sensors">Abstände:
+                    <div class="sensor_info" id="sensor_left"> Links: 0:0</div>
+                    <div class="sensor_info" id="sensor_front"> Vorne: 0:0</div>
+                    <div class="sensor_info" id="sensor_right"> Rechts: 0:0</div>
+                </div-->
+            </div>
+            <div class="maze_square" id="maze_square_main">
+
+                <div class="sys-mouse_wrapper">
+                    <div class="sys-mouse_card" style="/*AnimMoveMultiples_start*/left: 0; top: 0;/*AnimMoveMultiples_end*/" id="sys-mouse_card">
+                        <svg width="100%" height="100%" viewBox="-1 -1 18 18" class="sys-mouse_svg" id="sys-mouse_svg">
+                            <use href="sys-mouse_card-north.svg#sys-mouse_card-north" id="sys-mouse_svg-usage"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <!--div class="sys-wall_container">
+                    <div class="sys-wall_wall-right"></div>
+                </div-->
+                <!--here were the maze rows and tiles-->
+        </div>
+        </div>
+
+        <div class="right_container">
+            <div class="algo_container">
+                <div class="algo_header">
+                    <h2 class="algo_header_text">Algoritmus</h2>
+                </div>
+                <div class="algo_container_inner">
+                    <h2 class="algo_current unselectable" id="algo_current">-> Breitensuche</h2>
+                </div>
+            </div>
+
+            <div class="sensor_container">
+                <div class="sensor_header">Sensor Data</div>
+                <div class="sensor_body">
+                    <e>Battery: 100%</e>
+                    <e>Sensor left: 0</e>
+                    <e>Sensor right: 0</e>
+                    <e>Sensor front one: 0</e>
+                    <e>Sensor front two: 0</e>
+                    <e>Something Else: ------</e>
+                </div>
+            </div>
+
+            <div class="control_container">
+                <div class="control_container_inner">
+                    <div class="control_row">
+                        <div class="button_container">
+                            <div class="button_start_stop button_function_start_stop" id="button_0">
+                                <p-button class="button_text unselectable">START</p-button>
+                            </div>
+                        </div>
+
+                        <div class="button_container">
+                            <div class="button_pause" id="button_1">
+                                <p-button class="button_text unselectable">PAUSE</p-button>
+                            </div>
+                        </div>
+
+                        <div class="button_container">
+                            <div class="button_reset" id="button_2">
+                                <p-button class="button_text unselectable">RESET</p-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
