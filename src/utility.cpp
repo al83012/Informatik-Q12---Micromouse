@@ -34,6 +34,8 @@ void Utility::restart() {
     globalVars.currCMD_ID = -1;
 
     networkVars.client.send("RESTART");
+    globalVars.wait_restart_confirm = true;
+    Serial.println("# AWAIT RSTRT CONFIRM...");
 }
     
 void Utility::finishedAll() {
@@ -75,5 +77,24 @@ void Utility::debug(string message) {
   globalVars.lastCMD_ID = -1;
   globalVars.currCMD_ID = -1;
 
-  networkVars.client.send("RESTART");
+  networkVars.client.send(("DBG " + message).c_str());
+}
+
+std::vector<string> Utility::splitString(string str, char delimiter) {
+    vector<string> tokens;
+    string token;
+    for (char c : str) {
+        if (c == delimiter) {
+            if (!token.empty()) {
+                tokens.push_back(token);
+                token.clear();
+            }
+        } else {
+            token += c;
+        }
+    }
+    if (!token.empty()) {
+        tokens.push_back(token);
+    }
+    return tokens;
 }

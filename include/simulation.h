@@ -1,5 +1,5 @@
-#ifndef simulation
-#define simulation
+#ifndef SIMULATION_H
+#define SIMULATION_H
 #include <String>
 using namespace std;
 

@@ -198,33 +198,26 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
   string message = WSmessage.data().c_str();
   Serial.println(message.c_str());
-  string arguments[handleVars.MAX_CMD_ARGS];
   int words = 0;
   vector<MeasurementTask> activeTasks;
-  //Collect words
-  int lastIndex = 0;
-  for (int i = 0; i <= message.length(); i++) {
-    if (to_string(message[i]) == " " || i == message.length()) {
-      if (words < handleVars.MAX_CMD_ARGS) {
-        arguments[words] = message.substr(lastIndex, i);
-        words++;
-      }
 
-      lastIndex = i + 1;
-    }
-  }
+  vector<string> arguments = Utility::splitString(message, ' ');
 
   //DEBUG: Print arguments with id:
-  for (int i = 0; i < words; i++) {
+  for (int i = 0; i < arguments.size(); i++) {
     string content = to_string(i) + " -> \"" + arguments[i] + "\"";
     Serial.println(content.c_str());
   }
+  
+      
 
 
-  if (!globalVars.desync_mode) {
+  if (!globalVars.desync_mode && !globalVars.wait_restart_confirm) {
     //Scanning for command type
     if (arguments[1].find("#") != string::npos) {
       Serial.println("# CMD RCV");
+
+
       arguments[1].erase(0, 1);
       globalVars.lastCMD_ID = globalVars.currCMD_ID;
       globalVars.currCMD_ID = stoi(arguments[1]);
@@ -235,7 +228,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
         //Passive movement start
-        if (words == 3 || arguments[3] == "") {
+        if (arguments.size() == 3 || arguments[3] == "") {
           if (arguments[0] == "MOVE") {
             movePassive(stoi(arguments[2]));
             Utility::finishedAll();
@@ -339,5 +332,15 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
     }
 
   } else {
+    //Handle desync or await restart-confirm
+
+
+    if(arguments[0] == "RESTART-CONFIRM") {
+        Serial.println("# RSTRT CONFIRM RCV!");
+        globalVars.wait_restart_confirm = false;
+        return;
+      }
+
+      
   }
 }

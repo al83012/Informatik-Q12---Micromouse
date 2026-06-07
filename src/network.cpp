@@ -15,7 +15,7 @@ NetworkVars networkVars;
 
 
 string Network::getWsUrl() {
-    auto url = networkVars.websockets_server + to_string(WiFi.gatewayIP()) + to_string(networkVars.port) + "/";
+    string url = networkVars.websockets_server + WiFi.gatewayIP().toString().c_str() + ":" + to_string(networkVars.port) + "/";
     return url;
 }
 
@@ -23,6 +23,7 @@ string Network::getWsUrl() {
 
 void Network::connectWS() {
   string ws_ip = getWsUrl();
+  Serial.println(ws_ip.c_str());
   Utility::printClient("#Connecting to... " + ws_ip);
 
   networkVars.client = WebsocketsClient();
@@ -30,7 +31,7 @@ void Network::connectWS() {
   networkVars.client.onMessage(Handler::handleCommand);
   networkVars.client.onEvent(Handler::handleEvent);
 
-  bool connected = networkVars.client.connect(std::string(ws_ip).c_str());
+  bool connected = networkVars.client.connect(ws_ip.c_str());
 
   if (connected) {
     Serial.println("# CN SUCC!");
@@ -88,4 +89,31 @@ void Network::initNetwork() {
   WiFi.setSleep(false);
 }
     
+void Network::checkNetwork() {
+  if (networkVars.client.available()) {
+    networkVars.client.poll();
+  } else {
+    Serial.println("# CN LOST!");
+    Serial.println("# RE-CN...");
+    Network::connectWS();
+    if (networkVars.client.available()) {
+    Serial.println("# RE-CN SUCC!");
+    Utility::printClient("CONTINUE");
+
+    }
+  }
+}
+
+void Network::setup() {
+ Serial.println("# Initializing WiFi...");
+  WiFi.mode(WIFI_STA);
+  Network::scanNetworks();
+  Network::initNetwork();
+
+  networkVars.client = websockets::WebsocketsClient();
+
+  networkVars.client.onMessage(Handler::handleCommand);
+  networkVars.client.onEvent(Handler::handleEvent);
+  Network::connectWS();
+}
         

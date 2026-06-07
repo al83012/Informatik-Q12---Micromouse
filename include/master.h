@@ -1,5 +1,5 @@
-#ifndef MASTER
-#define MASTER
+#ifndef MASTER_H
+#define MASTER_H
 #include <String>
 #include "simulation.h"
 
@@ -20,6 +20,7 @@ enum directions {
 
  struct GlobalVars {
     bool desync_mode = false;
+    bool wait_restart_confirm = false;
     int lastCMD_ID = -1;
     int currCMD_ID = -1;
     bool interrupt = false;

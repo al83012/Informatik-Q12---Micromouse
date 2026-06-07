@@ -1,5 +1,6 @@
-#ifndef handler
-#define handler
+#ifndef HANDLER_H
+#define HANDLER_H
+
 #include <String>
 #include <vector>
 using namespace std;
