@@ -13,6 +13,7 @@
 #include "Components/fan.h"
 #include "Components/iis2mdc.h"
 
+
 Pins Esp32::pins;
 HardwareConfig Esp32::hardwareConfig;
 I2CConfig Esp32::i2cConfig;
@@ -36,11 +37,13 @@ void Esp32::initSubComponents() {
     LSM6DSR::init();
     BQ76905::init();
     TMP464::init();
-    IIS2MDC:init();
+    IIS2MDC::init();
+    TPL0102::init();
     Fan::init();
 }
 
 void Esp32::initPinStates() {
+    
     pinMode(pins.PIN_FAN_EN, OUTPUT);
     pinMode(pins.PIN_IR_LED_0, OUTPUT);
     pinMode(pins.PIN_IR_LED_1, OUTPUT);
@@ -52,7 +55,6 @@ void Esp32::initPinStates() {
     pinMode(pins.PIN_VL53_1_INT, INPUT);
     pinMode(pins.PIN_VL53_2_INT, INPUT);
     pinMode(pins.PIN_BQ_ALERT, INPUT);
-
 
 }
 

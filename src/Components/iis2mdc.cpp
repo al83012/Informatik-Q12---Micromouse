@@ -2,6 +2,7 @@
 #include "Arduino.h"
 #include "Components/esp32.h"
 // 3D- Magnetometer
+IIS2MDC_Componentvars iis2mdc_componentVars;
 
 void IIS2MDC::init() {
     Wire.beginTransmission(iis2mdc_componentVars.I2C_ADDRESS);
