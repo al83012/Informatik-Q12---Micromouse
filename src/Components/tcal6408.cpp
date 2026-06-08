@@ -1,6 +1,7 @@
 #include "Components/TCAL6408.h"
 #include <TCA6408.h>
 #include <Components/esp32.h>   
+#include "i2ctool.h"
 TCAL6408_ComponentVars tcal6408_componentVars;
 
 void TCAL6408::init() {
@@ -36,19 +37,19 @@ void TCAL6408::write_init_states() {
 }
 
 uint8_t TCAL6408::read_register_driver(uint8_t reg) {
-  return Esp32::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_0, reg);
+  return I2CTOOL::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_0, reg);
 }
 
 uint8_t TCAL6408::read_register_sensor(uint8_t reg) {
-  return Esp32::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_1, reg);
+  return I2CTOOL::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_1, reg);
 }
 
 void TCAL6408::write_register_driver(uint8_t reg, uint8_t value) {
-  Esp32::i2c_writeRegister(tcal6408_componentVars.I2C_ADDRESS_0, reg, value);
+  I2CTOOL::i2c_writeRegister(tcal6408_componentVars.I2C_ADDRESS_0, reg, value);
 }
 
 void TCAL6408::write_register_sensor(uint8_t reg, uint8_t value) {
-  Esp32::i2c_writeRegister(tcal6408_componentVars.I2C_ADDRESS_1, reg, value);
+  I2CTOOL::i2c_writeRegister(tcal6408_componentVars.I2C_ADDRESS_1, reg, value);
 }
 
 
@@ -97,8 +98,8 @@ void TCAL6408::setDriverAwake(bool state) {
 }
 
 void TCAL6408::handleInterruptDriver() {
-    uint8_t intStatus = Esp32::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_0, tcal6408_componentVars.REG_INT_STATUS);
-    uint8_t pinStates = Esp32::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_0, tcal6408_componentVars.REG_INPUT_PORT);
+    uint8_t intStatus = I2CTOOL::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_0, tcal6408_componentVars.REG_INT_STATUS);
+    uint8_t pinStates = I2CTOOL::i2c_readRegister(tcal6408_componentVars.I2C_ADDRESS_0, tcal6408_componentVars.REG_INPUT_PORT);
     bool fanFaultDetected = (intStatus & (1 << tcal6408_componentVars.PIN_FAN_NFAULT)) && !(pinStates & (1 << tcal6408_componentVars.PIN_FAN_NFAULT));
     bool thermFaultDetected = ((intStatus & (1 << tcal6408_componentVars.PIN_TMP_THERM)) && !(pinStates & (1 << tcal6408_componentVars.PIN_TMP_THERM))) || ((intStatus & (1 << tcal6408_componentVars.PIN_TMP_THERM2)) && !(pinStates & (1 << tcal6408_componentVars.PIN_TMP_THERM2))) ;
    

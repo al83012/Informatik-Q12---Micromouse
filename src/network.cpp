@@ -23,7 +23,7 @@ string Network::getWsUrl() {
 
 void Network::connectWS() {
   string ws_ip = getWsUrl();
-  log_i(ws_ip.c_str());
+  log_i("%s%", ws_ip.c_str());
   Utility::printClient("#Connecting to... " + ws_ip);
 
   networkVars.client = WebsocketsClient();
@@ -57,16 +57,16 @@ void Network::scanNetworks() {
     log_e("# NO NW FOUND.");
   } else {
     log_d();
-    log_d(n);
+    log_d("%d%", n);
     log_d(" NW FOUND");
     for (int i = 0; i < n; ++i) {
-      log_d(i + 1);
+      log_d("%d%", i + 1);
       log_d(": ");
-      log_d(WiFi.SSID(i));
+      log_d("" , WiFi.SSID(i));
       log_d(" (");
-      log_d(WiFi.RSSI(i));
+      log_d("", WiFi.RSSI(i));
       log_d(")");
-      log_d((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+      log_d("", (WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
       delay(10);
     }
   }
@@ -82,7 +82,7 @@ void Network::initNetwork() {
   }
   log_d("");
   log_i("# SUCC! MY IP: ");
-  log_i(WiFi.localIP());
+  log_i("", WiFi.localIP());
 
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);

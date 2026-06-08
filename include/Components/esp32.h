@@ -38,25 +38,12 @@ extern Pins pins;
 
 struct HardwareConfig
 {
-
   int Serial_Clock = 115200;
 
 };
 extern HardwareConfig hardwareConfig;
 
-struct SpiConfig
-{
-    int SPI_Clock = 1000000;
-    SPISettings spiSettings;
-    SpiConfig() : spiSettings(SPI_Clock, 1, 0) {}
-};
 
-struct I2CConfig
-{
-    int I2C_Clock_0 = 400000;
-    int I2C_Clock_1 = 400000;
-
-};
 
 
 class Esp32 {
@@ -68,21 +55,6 @@ public:
 
     static Pins pins;
     static HardwareConfig hardwareConfig;
-    static I2CConfig i2cConfig;
-    static SpiConfig spiConfig;
-
-    static void initSPI();
-    static void initI2C();    
-
-    static void i2c_writeRegister(uint8_t deviceAddress, uint8_t registerAddress, uint8_t value);
-    static uint8_t i2c_readRegister(uint8_t deviceAddress, uint8_t registerAddress);
-
-    static void i2c_writeRegister16(uint8_t deviceAddress, uint8_t registerAddress, uint16_t value);
-    static uint16_t i2c_readRegister16(uint8_t deviceAddress, uint8_t registerAddress);
-
-
-    static void spi_writeRegister(uint8_t registerAddress, uint8_t value, int PIN);
-    static uint8_t spi_readRegister(uint8_t registerAddress, int PIN);
 
     static void shutdown();
    

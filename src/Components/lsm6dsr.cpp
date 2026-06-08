@@ -1,13 +1,14 @@
 #include "Components/LSM6DSR.h"
 #include "Arduino.h"
 #include "Components/esp32.h"
+#include "spitool.h"
 // Device communication through SPI !!
 // 3D- Accelerometer and Gyroscope
 LSM6DSR_ComponentVars lsm6dsr_componentVars;
 Pins pins = Esp32::pins;
 
 void LSM6DSR::init() {
-    uint8_t whoAmI = Esp32::spi_readRegister(lsm6dsr_componentVars.REG_WHO_AM_I, pins.PIN_LSM_CS);
+    uint8_t whoAmI = SPITOOL::spi_readRegister(lsm6dsr_componentVars.REG_WHO_AM_I, pins.PIN_LSM_CS);
     if (whoAmI != 0x6B) {
         log_e("# LSM6DSR (SPI) not found!");
     }
@@ -18,7 +19,7 @@ void LSM6DSR::init() {
 
 void LSM6DSR::readDataBlock(uint8_t startRegister, uint8_t* buffer, size_t length) {
     for (size_t i = 0; i < length; i++) {
-        buffer[i] = Esp32::spi_readRegister(startRegister + i, pins.PIN_LSM_CS);
+        buffer[i] = SPITOOL::spi_readRegister(startRegister + i, pins.PIN_LSM_CS);
     }
 }
 
@@ -58,8 +59,8 @@ void LSM6DSR::configureResolution() {
 
 
     //Config: +-4g | 2000 dps | 416 Hz ODR
-    Esp32::spi_writeRegister(lsm6dsr_componentVars.REG_CTRL1_XL, 0b01101000, pins.PIN_LSM_CS); // ODR 416 Hz, 4g
-    Esp32::spi_writeRegister(lsm6dsr_componentVars.REG_CTRL2_G,  0b01101100, pins.PIN_LSM_CS); // ODR 416 Hz, 2000 dps
+    SPITOOL::spi_writeRegister(lsm6dsr_componentVars.REG_CTRL1_XL, 0b01101000, pins.PIN_LSM_CS); // ODR 416 Hz, 4g
+    SPITOOL::spi_writeRegister(lsm6dsr_componentVars.REG_CTRL2_G,  0b01101100, pins.PIN_LSM_CS); // ODR 416 Hz, 2000 dps
 
     log_d("# LSM6DSR resolution configured: +-4g for accelerometer, 2000 dps for gyroscope");
 }

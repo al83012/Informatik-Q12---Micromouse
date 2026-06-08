@@ -32,8 +32,6 @@ struct IIS2MDC_Componentvars {
     const uint8_t REG_TEMP_OUT_L = 0x6E;
     const uint8_t REG_TEMP_OUT_H = 0x6F;
 
-
-
     const uint8_t RESET_CONFIG_A =   0b00100000;
     const uint8_t DEFAULT_CONFIG_A = 0b10001100; 
     const uint8_t DEFAULT_CONFIG_C = 0b00010000;

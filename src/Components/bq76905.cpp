@@ -1,6 +1,7 @@
 #include "Components/BQ76905.h"
 #include "Arduino.h"
 #include "components/esp32.h"
+#include "i2ctool.h"
 // Battery Management System (BMS) for 4-16 cells in series
 
 BQ76905_ComponentVars bq76905_componentVars;
@@ -26,7 +27,7 @@ void BQ76905::readAllCellVoltages() {
 
 int BQ76905::getCellVoltage(int cell) {
     uint8_t cmd_addr = 0x14 + (cell*2);
-    return Esp32::i2c_readRegister16(bq76905_componentVars.I2C_ADDRESS, cmd_addr);
+    return I2CTOOL::i2c_readRegister16(bq76905_componentVars.I2C_ADDRESS, cmd_addr);
 
 }
 

@@ -62,14 +62,14 @@ void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
       auto task = activeTasks[j];
 
       log_d("#RSLV NEW TASK");
-      log_d(task.subStep);
-      log_d(task.direction);
-      log_d(task.reaction);
+      log_d("%d", task.subStep);
+      log_d("%c", task.direction);
+      log_d("%c", task.reaction);
 
       if (task.subStep == sub_step || handleVars.MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         log_d("Distance: ");
-        log_d(distance);
+        log_d("%d%", distance);
 
         string content;
         content = "MEASUREMENT #" + to_string(globalVars.currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " " + to_string(distance);
@@ -197,7 +197,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
   string message = WSmessage.data().c_str();
-  log_d(message.c_str());
+  log_d("%s%", message.c_str());
   int words = 0;
   vector<MeasurementTask> activeTasks;
 
@@ -206,7 +206,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
   //DEBUG: Print arguments with id:
   for (int i = 0; i < arguments.size(); i++) {
     string content = to_string(i) + " -> \"" + arguments[i] + "\"";
-    log_d(content.c_str());
+    log_d("%s%", content.c_str());
   }
   
       
@@ -224,7 +224,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
       if (globalVars.lastCMD_ID == globalVars.currCMD_ID - 1) {
         log_d("# CMD_ID VALID:");
-        log_d(globalVars.currCMD_ID);
+        log_d("%d", globalVars.currCMD_ID);
 
 
         //Passive movement start
@@ -288,16 +288,16 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
                 task.reaction = handleVars.CONTINUE_ID;
               }
               activeTasks.push_back(task);
-              log_d(activeTasks.size());
+              log_d("%d", activeTasks.size());
               log_d("# ADD NEW TASK:");
-              log_d(task.subStep);
-              log_d(task.direction);
-              log_d(task.reaction);
+              log_d("%d", task.subStep);
+              log_d("%c", task.direction);
+              log_d("%c%", task.reaction);
             }
 
             log_d("activeTasks:");
             for (int k = 0; k < activeTasks.size(); k++) {
-              log_d(String(activeTasks[k].subStep));
+              log_d("%d", (activeTasks[k].subStep));
             }
 
             if (arguments[0] == "MOVE") {

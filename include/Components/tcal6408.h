@@ -69,8 +69,6 @@ public:
 
     static void handleInterruptDriver();
     static void handleInterruptSensor();
-
-
 };
 
 
