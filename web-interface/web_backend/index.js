@@ -72,7 +72,7 @@ async function loop_worker(manager) {
 
 
 class Options {
-    static recon = true;
+    static recon = false;
     static input = true;
 }
 

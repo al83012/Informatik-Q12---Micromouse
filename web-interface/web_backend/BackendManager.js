@@ -16,6 +16,8 @@ export class BackendManager {
         "rotation": 0, // 0 up clockwise
         "direction": "n", // rotation in n-s-w-e //maybe unused
         "sensors": {
+            "battery": 99,
+            /*
             "left_1": 0,
             "left_2": 0,
 
@@ -23,7 +25,7 @@ export class BackendManager {
             "front_2": 0,
 
             "right_1": 0,
-            "right_2": 0,
+            "right_2": 0,*/
         }
     };
     in_console = ["[B] Connected"];
@@ -233,6 +235,10 @@ export class BackendManager {
 
         for (let algo of this.algorithms) {
             actions.push(Actions.add_algorithm(algo));
+        }
+
+        for (const [sensor, value] of Object.entries(this.in_mouse.sensors)) {
+            actions.push(Actions.update_sensor(sensor, value));
         }
 
         for (let i = 0; i < this.in_maze.discovered.length; i++) {

@@ -126,7 +126,7 @@ export class Index {
                     add_message(data["message"]);
                     break;
                 case "update_sensor":
-                    update_sensors(data["sensor"], data["values"]);
+                    update_sensors(data["sensor"], data["value"]);
                     break;
                 case "add_algorithm":
                     add_algorithm(data["algorithm"]);
@@ -701,10 +701,9 @@ function unselect_square(square) {
     current_state = ["reset", "finished"];
 }
 
-function update_sensors(sensor, value) {
-    let sensor_ele = document.getElementById(sensor);
-    sensor_ele.innerHTML = (sensor === "left" ? "Links: " : (sensor === "front" ? "Vorne: " : "Rechts: "));
-    sensor_ele.innerHTML = sensor_ele.innerHTML + value[0] + ":" + value[1];
+function update_sensors(sensorId, value) {
+    let sensor_ele = document.getElementById("sensor-" + sensorId);
+    sensor_ele.innerHTML = sensor_ele.getAttribute("content").replace("$", value);
 }
 
 function add_message(message) {

@@ -21,7 +21,7 @@ e {
     --bg_old: #0a0c12;
     --bg_path: #0765A0;
     --shadow_path: #4994C3;
-    --text-color: #7F3D41/*#6B2737;*/;
+    --text-color: #e15459 /*#6B2737;*/;
     --button-text-color: #D9C5B2;
     --square_size: 30px;
     --square_size_full: calc(var(--square_size) + var(--square_border_size)*2);
@@ -94,6 +94,16 @@ body {
     border-style: solid;
     border-color: darkgray;
     box-shadow: darkgray 0 0 4px 0;
+}
+
+.bottom_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    margin-top: 10px;
+    width: 100%;
+    height: fit-content;
 }
 
 /*.header_small_container {
@@ -205,7 +215,7 @@ body {
     flex-direction: column;
     width: fit-content;
     height: fit-content;
-    margin-left: 15px;
+    margin-left: 5px;
 }
 
 .algo_container {
@@ -220,6 +230,7 @@ body {
     border-radius: 15px;
     box-shadow: darkgray 0 0 3px 0;
     background-color: var(--win_bg);
+    margin-right: 15px;
 }
 
 .algo_header {
@@ -227,11 +238,11 @@ body {
     align-items: center;
     justify-content: left;
     flex-direction: row;
-    width: 100%;
+    width: fit-content;
     height: fit-content;
-    border-bottom-width: 1px;
+    /*border-bottom-width: 1px;
     border-bottom-style: solid;
-    border-bottom-color: darkgray;
+    border-bottom-color: darkgray;*/
 }
 
 .algo_header_text {
@@ -246,16 +257,17 @@ body {
     align-items: flex-start;
     justify-content: left;
     flex-direction: column;
-    width: 300px;
+    width: fit-content;
     height: fit-content;
+    margin-right: 5px;
 }
 
 .algo_current {
     color: var(--text-color);
     font-weight: bold;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    margin-left: 15px;
+    margin-top: 7px;
+    margin-bottom: 7px;
+    margin-left: 5px;
     font-size: 1.5rem;
 
     border: darkgray 1px solid;
@@ -392,7 +404,7 @@ body {
     justify-items: left;
     justify-content: left;
     flex-direction: column;
-    width: 280px;
+    width: 200px;
     height: 350px;
     background: var(--win_bg);
     border-bottom-left-radius: 15px;
@@ -412,7 +424,7 @@ body {
     border-width: 2px;
     border-style: solid;
     border-radius: 15px;
-    margin-right: 15px;
+    margin-right: 5px;
 
     background-color: var(--win_bg);
 
@@ -461,7 +473,7 @@ body {
     /*justify-content: flex-end;*/
     flex-direction: column;
     align-items: flex-start;
-    width: 380px;
+    width: 300px;
     height: 600px;
     background-color: var(--win_bg);
     border-radius: 5px;
@@ -898,7 +910,7 @@ body {
     flex-direction: column;
     width: fit-content;
     height: fit-content;
-    margin: 1rem 0;
+    /*margin: 1rem 0;*/
 
     border: darkgray 2px solid;
     border-radius: 15px;
