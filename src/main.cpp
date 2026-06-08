@@ -8,6 +8,7 @@
 #include "network.h"
 #include "handler.h"
 #include "Components/Esp32.h"
+#include "components/tpl0102.h"
 
 void setup() {
 
@@ -15,6 +16,8 @@ void setup() {
   Network::setup();
 
  log_i("# Setup done!");
+  TPL0102::DbgPrintVoltages();
+ 
 }
 
 void loop() {

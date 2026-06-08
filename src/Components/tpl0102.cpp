@@ -436,3 +436,24 @@ int TPL0102::exitShutdown(){
 float TPL0102::getHighVoltage(){
     return tpl0102_componentVars.highVoltage;
 }
+
+void TPL0102::DbgPrintVoltages() {
+ float voltage = getVoltageA();
+ 
+  log_i("VoltageA: %f", voltage);
+  setVoltageA(3.0f);
+  voltage = getVoltageA();
+  log_i("VoltageA: %f", voltage);
+
+
+  voltage = getVoltageB();
+  log_i("VoltageB: %f", voltage);
+
+  setVoltageB(3.3f);
+  voltage = getVoltageB();
+  log_i("VoltageB: %f", voltage);
+
+  enterShutdown();
+  delay(10000);
+  exitShutdown();
+}

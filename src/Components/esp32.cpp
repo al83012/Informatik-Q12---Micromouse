@@ -38,7 +38,7 @@ void Esp32::initSubComponents() {
     BQ76905::init();
     TMP464::init();
     IIS2MDC::init();
-    TPL0102::init(0.0); // TODO: Conf. highVoltage
+    TPL0102::init(3.2); // TODO: Conf. highVoltage
     Fan::init();
 }
 

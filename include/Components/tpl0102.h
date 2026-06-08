@@ -47,6 +47,7 @@ class TPL0102 {
 
         static float getHighVoltage();
 
+        static void DbgPrintVoltages();
     private:
 
         static int SetVolatileWiperA(uint8_t position);
