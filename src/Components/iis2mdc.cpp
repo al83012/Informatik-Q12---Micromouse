@@ -7,9 +7,9 @@ IIS2MDC_Componentvars iis2mdc_componentVars;
 void IIS2MDC::init() {
     Wire.beginTransmission(iis2mdc_componentVars.I2C_ADDRESS);
     if (Wire.endTransmission() != 0) {
-        Serial.println("# IIS2MDC (Magnetometer) not found");
+        log_e("# IIS2MDC (Magnetometer) not found");
     } else {
-        Serial.println("# IIS2MDC (Magnetometer) initialized successfully");
+        log_i("# IIS2MDC (Magnetometer) initialized successfully");
     }
 
 

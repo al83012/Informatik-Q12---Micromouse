@@ -14,7 +14,7 @@ void setup() {
   Esp32::initESP32();
   Network::setup();
 
-  Serial.println("# Setup done!");
+ log_i("# Setup done!");
 }
 
 void loop() {

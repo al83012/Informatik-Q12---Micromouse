@@ -7,18 +7,18 @@ void TCAL6408::init() {
     // Initialize the TCA6408 I/O expander for the Motor-Driver
     Wire.beginTransmission(tcal6408_componentVars.I2C_ADDRESS_0);
     if (Wire.endTransmission() != 0) {
-        Serial.println("# TCAL6408 (Motor Driver) not found at address 0b0100000");
+        log_e("# TCAL6408 (Motor Driver) not found at address 0b0100000");
     } else {
-        Serial.println("# TCAL6408 (Motor Driver) initialized successfully");
+        log_i("# TCAL6408 (Motor Driver) initialized successfully");
     }
 
     // Initialize the TCA6408 I/O expander for the Sensors
 
     Wire.beginTransmission(tcal6408_componentVars.I2C_ADDRESS_1);
     if (Wire.endTransmission() != 0) {
-        Serial.println("# TCAL6408 (Sensor) not found at address 0b0100000");
+        log_e("# TCAL6408 (Sensor) not found at address 0b0100000");
     } else {
-        Serial.println("# TCAL6408 (Sensor) initialized successfully");
+        log_i("# TCAL6408 (Sensor) initialized successfully");
     }
 
     write_init_states();
@@ -28,11 +28,11 @@ void TCAL6408::init() {
 void TCAL6408::write_init_states() {
     // Set initial states for Sensor PCB
     write_register_sensor(tcal6408_componentVars.REG_CONFIG, tcal6408_componentVars.SENSOR_PCB_INITIAL_STATE); 
-    Serial.println("# TCAL6408: Initial states set for Sensor PCB");
+    log_d("# TCAL6408: Initial states set for Sensor PCB");
 
     // Set initial states for Motor Driver PCB
     write_register_driver(tcal6408_componentVars.REG_CONFIG, tcal6408_componentVars.MOTOR_DRIVER_CB_INITIAL_STATE); 
-    Serial.println("# TCAL6408: Initial states set for Motor Driver PCB");
+    log_d("# TCAL6408: Initial states set for Motor Driver PCB");
 }
 
 uint8_t TCAL6408::read_register_driver(uint8_t reg) {
@@ -103,13 +103,13 @@ void TCAL6408::handleInterruptDriver() {
     bool thermFaultDetected = ((intStatus & (1 << tcal6408_componentVars.PIN_TMP_THERM)) && !(pinStates & (1 << tcal6408_componentVars.PIN_TMP_THERM))) || ((intStatus & (1 << tcal6408_componentVars.PIN_TMP_THERM2)) && !(pinStates & (1 << tcal6408_componentVars.PIN_TMP_THERM2))) ;
    
     if (fanFaultDetected) {
-            Serial.println("# FAN EMERGENCY (TCAL6408/Driver)!");
+            log_i("# FAN EMERGENCY (TCAL6408/Driver)!");
             // Safely regulate fan; For now well shutdown
             Esp32::shutdown();
         }
 
     if (thermFaultDetected) {
-            Serial.println("# TEMP EMERGENCY (TCAL6408/Driver)!");
+            log_i("# TEMP EMERGENCY (TCAL6408/Driver)!");
             // Emergency shutdown for now; maybe add emergency cooling later on
             Esp32::shutdown();
         }

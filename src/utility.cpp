@@ -35,12 +35,12 @@ void Utility::restart() {
 
     networkVars.client.send("RESTART");
     globalVars.wait_restart_confirm = true;
-    Serial.println("# AWAIT RSTRT CONFIRM...");
+    log_i("# AWAIT RSTRT CONFIRM...");
 }
     
 void Utility::finishedAll() {
 string message = "CMD-FINISHED #";
-  Serial.println("# CMD DONE > SRV");
+  log_d("# CMD DONE > SRV");
   //Serial.println(String(X));
   // Serial.println(String(Y));
   //Serial.print(globalVars.dir);
@@ -52,12 +52,12 @@ string message = "CMD-FINISHED #";
 
 void Utility::finishedAllInterrupt(string message) {
   string content = "CMD-FINISHED #" + globalVars.currCMD_ID + ' ' + message;
-  Serial.println("# CMD DONE INTRPT > SRV");
+  log_d("# CMD DONE INTRPT > SRV");
   printClient(content);
 }
 
 void Utility::desync() {
- Serial.println("# DSYNC > SRV");
+ log_e("# DSYNC > SRV");
   string error = "DESYNC ";
   for (int i = globalVars.lastCMD_ID + 1; i < globalVars.currCMD_ID; i++) {
     error = error + "#";
@@ -65,12 +65,12 @@ void Utility::desync() {
     error = error + " ";
   }
   printClient(error);
-  Serial.println("# AWAIT RESYNC...");
+  log_e("# AWAIT RESYNC...");
   globalVars.desync_mode = true;
 }
 
 void Utility::debug(string message) {
-  Serial.println("# RSTRT > SRV");
+  log_d("# RSTRT > SRV");
 
   //measurements.clear();
   //reactions.clear();

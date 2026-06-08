@@ -9,11 +9,11 @@ Pins pins = Esp32::pins;
 void LSM6DSR::init() {
     uint8_t whoAmI = Esp32::spi_readRegister(lsm6dsr_componentVars.REG_WHO_AM_I, pins.PIN_LSM_CS);
     if (whoAmI != 0x6B) {
-        Serial.printf("# LSM6DSR (SPI) not found!");
+        log_e("# LSM6DSR (SPI) not found!");
     }
     configureResolution();
 
-    Serial.println("# LSM6DSR (SPI) initialized successfully");
+    log_i("# LSM6DSR (SPI) initialized successfully");
 }
 
 void LSM6DSR::readDataBlock(uint8_t startRegister, uint8_t* buffer, size_t length) {
@@ -61,5 +61,5 @@ void LSM6DSR::configureResolution() {
     Esp32::spi_writeRegister(lsm6dsr_componentVars.REG_CTRL1_XL, 0b01101000, pins.PIN_LSM_CS); // ODR 416 Hz, 4g
     Esp32::spi_writeRegister(lsm6dsr_componentVars.REG_CTRL2_G,  0b01101100, pins.PIN_LSM_CS); // ODR 416 Hz, 2000 dps
 
-    Serial.println("# LSM6DSR resolution configured: +-4g for accelerometer, 2000 dps for gyroscope");
+    log_d("# LSM6DSR resolution configured: +-4g for accelerometer, 2000 dps for gyroscope");
 }

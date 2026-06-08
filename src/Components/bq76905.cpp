@@ -9,9 +9,9 @@ BQ76905_CellVoltages bq76905_cellVoltages;
 void BQ76905::init() {
     Wire.beginTransmission(bq76905_componentVars.I2C_ADDRESS);
     if (Wire.endTransmission() != 0) {
-        Serial.println("# BQ76905 not found at address 0x08");
+        log_e("# BQ76905 not found at address 0x08");
     } else {
-        Serial.println("# BQ76905 initialized successfully");
+        log_i("# BQ76905 initialized successfully");
     } 
 }
 
@@ -37,6 +37,6 @@ void BQ76905::readTemperature() {
 
 void BQ76905::alert() {
     //TODO: Handle alert further; For now emergency shutdown
-    Serial.println("# BATTERY MANAGEMENT CRITICAL ALERT! (BQ76905)");
+    log_e("# BATTERY MANAGEMENT CRITICAL ALERT! (BQ76905)");
     Esp32::shutdown();
 }

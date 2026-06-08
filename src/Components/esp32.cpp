@@ -29,7 +29,7 @@ void Esp32::initESP32() {
     initInterrupts();
 
     delay(1000);
-    Serial.println("# ESP32 INIT DONE!");
+    log_i("# ESP32 INIT DONE!");
 }
 
 void Esp32::initSubComponents() {
@@ -76,8 +76,7 @@ void Esp32::i2c_writeRegister(uint8_t deviceAddress, uint8_t registerAddress, ui
 
     uint8_t error = Wire.endTransmission();
     if (error != 0) {
-        Serial.print("# I2C Error: ");
-        Serial.println(error);
+        log_e("# I2C Error: %d", error);
     }
 }
 
@@ -85,7 +84,7 @@ uint8_t Esp32::i2c_readRegister(uint8_t deviceAddress, uint8_t registerAddress) 
     Wire.beginTransmission(deviceAddress);
     Wire.write(registerAddress);
     if(Wire.endTransmission((uint8_t)false) != 0) {
-        Serial.println("# I2C Error during register address transmission");
+        log_e("# I2C Error during register address transmission");
         return 0;
 
     }
@@ -94,7 +93,7 @@ uint8_t Esp32::i2c_readRegister(uint8_t deviceAddress, uint8_t registerAddress) 
     if (Wire.available()) {
         return Wire.read();
     } else {
-        Serial.println("# I2C Error: No data available to read");
+        log_e("# I2C Error: No data available to read");
         return 0;
     }
 }
@@ -104,7 +103,7 @@ uint16_t Esp32::i2c_readRegister16(uint8_t deviceAddress, uint8_t registerAddres
     Wire.beginTransmission(deviceAddress);
     Wire.write(registerAddress);
     if(Wire.endTransmission((uint8_t)false) != 0) {
-        Serial.println("# I2C Error during register address transmission (16 bit)");
+        log_e("# I2C Error during register address transmission (16 bit)");
         return 0;
     }
 
@@ -114,7 +113,7 @@ uint16_t Esp32::i2c_readRegister16(uint8_t deviceAddress, uint8_t registerAddres
         uint8_t lowByte = Wire.read();
         return (highByte << 8) | lowByte;
     } else {
-        Serial.println("# I2C Error: Not enough data available to read (16 bit)");
+        log_e("# I2C Error: Not enough data available to read (16 bit)");
         return 0;
     }
 }
@@ -127,8 +126,7 @@ void Esp32::i2c_writeRegister16(uint8_t deviceAddress, uint8_t registerAddress, 
 
     uint8_t error = Wire.endTransmission();
     if (error != 0) {
-        Serial.print("# I2C Error: ");
-        Serial.println(error);
+        log_e("# I2C Error: %d", error);
     }
 }
 
@@ -160,12 +158,12 @@ void Esp32::initInterrupts() {
 }
 
 void Esp32::shutdown() {
-    Serial.println("# SHUTTING DOWN ESP32");
+    log_i("# SHUTTING DOWN ESP32");
     Serial.flush();
 
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
-    Serial.println("# ENTERING DEEP-SLEEP");
+    log_i("# ENTERING DEEP-SLEEP");
     delay(100);
     esp_deep_sleep_start();
 }

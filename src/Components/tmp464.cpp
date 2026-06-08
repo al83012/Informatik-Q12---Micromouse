@@ -9,9 +9,9 @@ void TMP464::init() {
     // Initialize the TMP464 temperature sensor
     Wire.beginTransmission(tmp464_componentVars.I2C_ADDRESS);
     if (Wire.endTransmission() != 0) {
-        Serial.println("# TMP464 not found at address 0x48");
+        log_e("# TMP464 not found at address 0x48");
     } else {
-        Serial.println("# TMP464 initialized successfully");
+        log_i("# TMP464 initialized successfully");
     }
 }
 

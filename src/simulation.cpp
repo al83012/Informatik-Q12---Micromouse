@@ -39,7 +39,7 @@ void Simulation::sim_move(int n) {
     simulationVars.X = newX;
     simulationVars.Y = newY;
   } else {
-    Serial.println("# CANNOT MOVE");
+    log_e("# CANNOT MOVE");
   }
 }
 void Simulation::sim_turn(int turns) {

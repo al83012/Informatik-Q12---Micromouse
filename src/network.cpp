@@ -23,7 +23,7 @@ string Network::getWsUrl() {
 
 void Network::connectWS() {
   string ws_ip = getWsUrl();
-  Serial.println(ws_ip.c_str());
+  log_i(ws_ip.c_str());
   Utility::printClient("#Connecting to... " + ws_ip);
 
   networkVars.client = WebsocketsClient();
@@ -34,7 +34,7 @@ void Network::connectWS() {
   bool connected = networkVars.client.connect(ws_ip.c_str());
 
   if (connected) {
-    Serial.println("# CN SUCC!");
+    log_i("# CN SUCC!");
     Utility::debug("From the moment i understood the weakness of my flesh, it disgusted me...");
     if (globalVars.reset) {
       networkVars.client.send("RESTART");
@@ -44,45 +44,45 @@ void Network::connectWS() {
     networkVars.client.ping();
 
   } else {
-    Serial.println("# CN FAIL!");
+    log_e("# CN FAIL!");
   }
 }
 
 void Network::scanNetworks() {
-  Serial.println("# SCAN FOR NW...");
+  log_i("# SCAN FOR NW...");
   int n = WiFi.scanNetworks();
 
-    Serial.println("# SCAN DONE!");
+    log_d("# SCAN DONE!");
   if (n == 0) {
-    Serial.println("# NO NW FOUND.");
+    log_e("# NO NW FOUND.");
   } else {
-    Serial.println();
-    Serial.print(n);
-    Serial.println(" NW FOUND");
+    log_d();
+    log_d(n);
+    log_d(" NW FOUND");
     for (int i = 0; i < n; ++i) {
-      Serial.print(i + 1);
-      Serial.print(": ");
-      Serial.print(WiFi.SSID(i));
-      Serial.print(" (");
-      Serial.print(WiFi.RSSI(i));
-      Serial.print(")");
-      Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+      log_d(i + 1);
+      log_d(": ");
+      log_d(WiFi.SSID(i));
+      log_d(" (");
+      log_d(WiFi.RSSI(i));
+      log_d(")");
+      log_d((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
       delay(10);
     }
   }
-  Serial.println("");
+  log_d("");
 }
 void Network::initNetwork() {
-  Serial.println("# INIT NTW CN...");
+ log_d("# INIT NTW CN...");
   WiFi.begin(networkVars.ssid, networkVars.password);
-  Serial.println("# Connecting");
+  log_d("# Connecting");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    log_d(".");
   }
-  Serial.println("");
-  Serial.println("# SUCC! MY IP: ");
-  Serial.println(WiFi.localIP());
+  log_d("");
+  log_i("# SUCC! MY IP: ");
+  log_i(WiFi.localIP());
 
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
@@ -93,11 +93,11 @@ void Network::checkNetwork() {
   if (networkVars.client.available()) {
     networkVars.client.poll();
   } else {
-    Serial.println("# CN LOST!");
-    Serial.println("# RE-CN...");
+    log_e("# CN LOST!");
+    log_d("# RE-CN...");
     Network::connectWS();
     if (networkVars.client.available()) {
-    Serial.println("# RE-CN SUCC!");
+    log_d("# RE-CN SUCC!");
     Utility::printClient("CONTINUE");
 
     }
@@ -105,7 +105,7 @@ void Network::checkNetwork() {
 }
 
 void Network::setup() {
- Serial.println("# Initializing WiFi...");
+  log_i("# Initializing WiFi...");
   WiFi.mode(WIFI_STA);
   Network::scanNetworks();
   Network::initNetwork();

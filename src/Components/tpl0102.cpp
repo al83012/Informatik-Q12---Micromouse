@@ -8,9 +8,9 @@ TPL0102_ComponentVars tpl0102_componentVars;
 void TPL0102::init() {
      Wire.beginTransmission(tpl0102_componentVars.I2C_ADDRESS);
     if (Wire.endTransmission() != 0) {
-        Serial.println("# TPL0102 (Potentiometer) not found!");
+        log_e("# TPL0102 (Potentiometer) not found!");
     } else {
-        Serial.println("# TPL0102 (Potentiometer) initialized successfully");
+        log_i("# TPL0102 (Potentiometer) initialized successfully");
     }
 }
 
