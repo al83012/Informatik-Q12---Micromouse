@@ -228,7 +228,7 @@ impl<const N: usize> Process<N> {
         match cmd {
             NonIndexMicromouseMessage::Command(cmd) => {
                 let Some(cmd_id) = self.micromouse_manager.send_command(cmd.clone()).await else {
-                    warn!(target: "proc", "SENT CMD WHILE RESTARTING");
+                    warn!(target: "proc", "SENT CMD WHILE RESTARTING; Command has been invalidated by the restart, but was still in the process of being sent and could not be deleted");
                     return;
                 };
 
@@ -244,9 +244,10 @@ impl<const N: usize> Process<N> {
                 self.frontend_manager
                     .send(FrontendMessage::Debug("SENT RestartConfirm".to_string()))
                     .await;
-                info!(target: "proc", "SENT RestartConfirm")
+                info!(target: "proc", "SENT RestartConfirm; Stopped the command-lock: Any commands emitted by the strat-tree-manager are now valid until the next restart")
             }
             NonIndexMicromouseMessage::ResetMapAndPos => {
+                info!(target: "proc", "SENT ResetMapAndPos; Scheduled the micromouse-manager to reset its map once the micromouse has reported that the cmd sent before this one is complete");
                 self.micromouse_manager.queue_reset_map().await;
             }
         }
