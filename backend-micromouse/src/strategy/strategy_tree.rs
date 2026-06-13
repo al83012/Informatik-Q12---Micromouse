@@ -24,7 +24,7 @@ use crate::{
             ComputedActions, FromConfig, GoalPosition, Strategy, StrategyComputationResult,
             StrategyEndState,
         },
-        visuals::FrontendVisuals,
+        visuals::{FrontendVisuals, PathSegment},
     },
     utils::{
         hyperlink_logging::LinkFileName,
@@ -409,8 +409,7 @@ where
             );
             let non_expanded_node_ids = {
                 // println!("Layer to expand: {layer_to_expand:?}");
-                let Some(layer) = self
-                    .layer_mut(layer_to_expand) else {
+                let Some(layer) = self.layer_mut(layer_to_expand) else {
                     break 'expansion;
                 };
 
@@ -598,15 +597,20 @@ where
             for parent_node in apply_on_node {
                 info!(target: "strat",link_node_id = parent_node.link(), "Based on node {parent_node:?}");
                 let child_node_layer = parent_node.layer_id + RelativeLayerId(1);
-                let basis_world = {
-                    let parent_node = self.node(parent_node).expect("Checked");
-                    &parent_node.on_basis_of_world
-                };
+                let (parent_pos, cmd_application) = {
+                    let basis_world = {
+                        let parent_node = self.node(parent_node).expect("Checked");
+                        &parent_node.on_basis_of_world
+                    };
 
-                let cmd_application = FilteredCommandApplication::new(
-                    Some(basis_world.clone().into()),
-                    do_cmd.clone(),
-                );
+                    (
+                        basis_world.mouse,
+                        FilteredCommandApplication::new(
+                            Some(basis_world.clone().into()),
+                            do_cmd.clone(),
+                        ),
+                    )
+                };
 
                 // There will be 1 child per potential outcome of the given command
                 let mut children = HashMap::new();
@@ -618,13 +622,19 @@ where
                         from_node: parent_node,
                         branch: child_path_id,
                     };
+
+                    self.visuals.create_path(
+                        path_id.clone(),
+                        PathSegment::new(parent_pos, child_world.mouse)
+                            .expect("Child should form valid path"),
+                    );
                     // TODO: maybe reset child_world
                     let child_node = StrategyTreeNode::new_leaf(
                         child_world.clone(),
                         strategy_state_after.clone(),
                         path_id,
                     );
-                    let child_node_id = self.add_node(child_node, child_node_layer);
+                    let child_node_id = { self.add_node(child_node, child_node_layer) };
                     info!(target: "strat", link_node_id = child_node_id.link(), "CHILD NODE {child_node_id:?}\n{child_world}");
                     nodes_created += 1;
                     new_apply_on_node.push(child_node_id);
@@ -1006,6 +1016,7 @@ where
         };
 
         if let Some((child_id, parent)) = node_to_delete.as_branch_from_parent.clone().map(|p| {
+            self.visuals.remove_path(p.clone());
             (
                 p.branch,
                 self.node_mut(p.from_node).expect("Parent should exist"),

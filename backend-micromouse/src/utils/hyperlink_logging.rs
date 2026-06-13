@@ -578,7 +578,6 @@ pub fn init_tree_logger() {
             warn_fmt_layer
                 .with_filter(EnvFilter::new("info"))
                 .with_filter(FilterFn::new(|meta| !meta.target().ends_with("apl"))),
-            // .with_filter(FilterFn::new(|meta| !meta.target().eq("strat"))),
         )
     };
 

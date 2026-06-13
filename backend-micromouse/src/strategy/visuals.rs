@@ -61,7 +61,7 @@ impl FrontendVisuals {
         let (send, recv) = tokio::sync::mpsc::unbounded_channel();
         (Self { event_sender: send }, recv)
     }
-    pub async fn create_path(
+    pub fn create_path(
         &mut self,
         path_id: AbsolutePathId,
         path: PathSegment,
@@ -76,7 +76,7 @@ impl FrontendVisuals {
             .expect("Should be open during execution");
     }
 
-    pub async fn remove_path(&self, path_id: AbsolutePathId) {
+    pub fn remove_path(&self, path_id: AbsolutePathId) {
         self.event_sender
             .send(
                 PathVisualEvent {
