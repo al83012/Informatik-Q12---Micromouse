@@ -25,6 +25,8 @@ pub type StepNum = u32;
 #[derive(Debug, Clone)]
 pub enum MicromouseMessage {
     Command(CommandMessage),
+    // Indicates to the micromouse that all invalid messages have either been cleared or already been sent to 
+    // it (and ignored) --> It can now start receiving messages like normal again
     RestartConfirm,
 }
 
@@ -54,8 +56,13 @@ pub enum MicromouseResponse {
     Desync(Vec<CommandId>),
     Stop,
     Continue,
+    // A restart means, that any information about the content of the 
+    // micromouse-queue and state has been invalidated; We can no longer 
+    // guarantee that there are commands / that the numbering is consistent
+    // --> We have to set everything to its starting-condition (e.g. the 
+    // command-numbering); We also have to assume that the pos is 0,0,PosX
     Restart,
-    Battery(Battery),
+    Sensor{name: String, value: f32}
 }
 
 #[derive(Serialize, Deserialize, Clone)]
