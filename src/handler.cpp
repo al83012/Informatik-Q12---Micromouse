@@ -12,7 +12,6 @@
 using namespace websockets;
 using namespace std;
 
-HandleVars handleVars;
 
 void Handler::handleEvent(WebsocketsEvent event, String data) {
       if (event == WebsocketsEvent::ConnectionOpened) {
@@ -54,7 +53,7 @@ int Handler::measure(char dir) {
 
 
 
-void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
+void Handler::moveActive(int cells, vector<Master::MeasurementTask>& activeTasks) {
     
   for (int i = 0; i < cells; i++) {
     int sub_step = i;
@@ -66,24 +65,24 @@ void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
       log_d("%c", task.direction);
       log_d("%c", task.reaction);
 
-      if (task.subStep == sub_step || handleVars.MAX_SUB_STEPS) {
+      if (task.subStep == sub_step || Handler::HandleVars::MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         log_d("Distance: ");
         log_d("%d%", distance);
 
         string content;
-        content = "MEASUREMENT #" + to_string(globalVars.currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " " + to_string(distance);
+        content = "MEASUREMENT #" + to_string(Master::GlobalVars::currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " " + to_string(distance);
 
-        if (distance >= handleVars.SENSORLIMIT) { content = content + " SENSORLIMIT"; }
+        if (distance >= Handler::HandleVars::SENSORLIMIT) { content = content + " SENSORLIMIT"; }
         log_d("#MSR > SRV");
         Utility::printClient(content);
 
-        if (distance > handleVars.DISTANCE_THRESHOLD) {
-          if (task.reaction == handleVars.STOP_IF_OPEN_ID) {
+        if (distance > Handler::HandleVars::DISTANCE_THRESHOLD) {
+          if (task.reaction == Handler::HandleVars::STOP_IF_OPEN_ID) {
             string content = to_string(sub_step) + "_" + task.direction + "_STOP-IF-OPEN";
             log_d("#STOPPED: STOP-IF-OPEN");
             Utility::debug("Interrupt at substep " + sub_step);
-            globalVars.interrupt = true;
+            Master::GlobalVars::interrupt = true;
             Utility::finishedAllInterrupt(content);
             return;
           }
@@ -93,11 +92,11 @@ void Handler::moveActive(int cells, vector<MeasurementTask>& activeTasks) {
         } else {
 
 
-          if (task.direction == handleVars.STOP_IF_BLOCKED_ID) {
+          if (task.direction == Handler::HandleVars::STOP_IF_BLOCKED_ID) {
             string content = to_string(sub_step) + "_" + task.direction + "_STOP-IF-BLOCKED";
             log_d("#STOPPED: STOP_IF_BLOCKED");
             Utility::debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-            globalVars.interrupt = true;
+            Master::GlobalVars::interrupt = true;
             Utility::finishedAllInterrupt(content);
             return;
           }
@@ -132,7 +131,7 @@ void Handler::turnPassive(int turns) {
 
 
 
-void Handler::turnActive(int turns, vector<MeasurementTask>& activeTasks) {
+void Handler::turnActive(int turns, vector<Master::MeasurementTask>& activeTasks) {
      bool counterclock = false;
   if (turns < 0) {
     turns = turns * -1;
@@ -142,21 +141,21 @@ void Handler::turnActive(int turns, vector<MeasurementTask>& activeTasks) {
   for (int i = 0; i <= turns; i++) {
     int sub_step = i;
     for (auto task : activeTasks) {
-      if (task.subStep == sub_step || handleVars.MAX_SUB_STEPS) {
+      if (task.subStep == sub_step || Handler::HandleVars::MAX_SUB_STEPS) {
         int distance = measure(task.direction);
         string content;
-        content = "MEASUREMENT #" + to_string(globalVars.currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " "  + to_string(distance);
+        content = "MEASUREMENT #" + to_string(Master::GlobalVars::currCMD_ID) + " " + to_string(sub_step) + "_" + to_string(task.direction) + " "  + to_string(distance);
 
-        if (distance >= handleVars.SENSORLIMIT) { content = content + string(" SENSORLIMIT"); }
+        if (distance >= Handler::HandleVars::SENSORLIMIT) { content = content + string(" SENSORLIMIT"); }
         log_d("#MSR > SRV");
         Utility::printClient(content);
 
 
-        if (distance > handleVars.DISTANCE_THRESHOLD) {
-          if (task.reaction == handleVars.STOP_IF_OPEN_ID) {
+        if (distance > Handler::HandleVars::DISTANCE_THRESHOLD) {
+          if (task.reaction == Handler::HandleVars::STOP_IF_OPEN_ID) {
             string content = to_string(sub_step) + "_" + task.direction + "_STOP-IF-OPEN";
             Utility::debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-            globalVars.interrupt = true;
+            Master::GlobalVars::interrupt = true;
             Utility::finishedAllInterrupt(content);
             return;
           }
@@ -166,10 +165,10 @@ void Handler::turnActive(int turns, vector<MeasurementTask>& activeTasks) {
         } else {
 
 
-          if (task.reaction == handleVars.STOP_IF_BLOCKED_ID) {
+          if (task.reaction == Handler::HandleVars::STOP_IF_BLOCKED_ID) {
             string content = to_string(sub_step) + "_" + to_string(task.direction) + "_STOP-IF-BLOCKED";
             Utility::debug("Interrupt at substep " + sub_step);  //TODO: Attach interrupt to finished message
-            globalVars.interrupt = true;
+            Master::GlobalVars::interrupt = true;
             Utility::finishedAllInterrupt(content);
             return;
           }
@@ -192,14 +191,14 @@ void Handler::turnActive(int turns, vector<MeasurementTask>& activeTasks) {
 
 void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
-  globalVars.dir = posY;
+  Master::GlobalVars::dir = Master::directions::posY;
 
 
 
   string message = WSmessage.data().c_str();
   log_d("%s%", message.c_str());
   int words = 0;
-  vector<MeasurementTask> activeTasks;
+  vector<Master::MeasurementTask> activeTasks;
 
   vector<string> arguments = Utility::splitString(message, ' ');
 
@@ -212,19 +211,19 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
       
 
 
-  if (!globalVars.desync_mode && !globalVars.wait_restart_confirm) {
+  if (!Master::GlobalVars::desync_mode && !Master::GlobalVars::wait_restart_confirm) {
     //Scanning for command type
     if (arguments[1].find("#") != string::npos) {
       log_d("# CMD RCV");
 
 
       arguments[1].erase(0, 1);
-      globalVars.lastCMD_ID = globalVars.currCMD_ID;
-      globalVars.currCMD_ID = stoi(arguments[1]);
+      Master::GlobalVars::lastCMD_ID = Master::GlobalVars::currCMD_ID;
+      Master::GlobalVars::currCMD_ID = stoi(arguments[1]);
 
-      if (globalVars.lastCMD_ID == globalVars.currCMD_ID - 1) {
+      if (Master::GlobalVars::lastCMD_ID == Master::GlobalVars::currCMD_ID - 1) {
         log_d("# CMD_ID VALID:");
-        log_d("%d", globalVars.currCMD_ID);
+        log_d("%d", Master::GlobalVars::currCMD_ID);
 
 
         //Passive movement start
@@ -241,7 +240,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
         } else {  // if not passive -> must be active
-          MeasurementTask task;
+          Master::MeasurementTask task;
 
           int cells = stoi(arguments[2]);
           if (arguments[3] == "MEASURE") {
@@ -270,7 +269,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
                 }
 
               } else {
-                task.subStep = handleVars.MAX_SUB_STEPS;
+                task.subStep = Handler::HandleVars::MAX_SUB_STEPS;
                 task.direction = word[2];
               }
               char dir = word[2];
@@ -278,14 +277,14 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
               if (word.find("STOP-IF-OPEN") != string::npos) {
-                task.reaction = handleVars.STOP_IF_OPEN_ID;
+                task.reaction = Handler::HandleVars::STOP_IF_OPEN_ID;
               } else if (word.find("STOP-IF-BLOCKED") != string::npos) {
-                task.reaction = handleVars.STOP_IF_BLOCKED_ID;
+                task.reaction = Handler::HandleVars::STOP_IF_BLOCKED_ID;
 
               } else if (word.find("TURN-IF-BLOCKED") != string::npos) {
                 //reactions[sub_step] = String(word[word.length() - 1]).toInt();
               } else if (word.find("CONTINUE") != string::npos) {
-                task.reaction = handleVars.CONTINUE_ID;
+                task.reaction = Handler::HandleVars::CONTINUE_ID;
               }
               activeTasks.push_back(task);
               log_d("%d", activeTasks.size());
@@ -309,9 +308,9 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
 
-            if (!globalVars.interrupt) {
+            if (!Master::GlobalVars::interrupt) {
               Utility::finishedAll();
-              globalVars.interrupt = false;
+              Master::GlobalVars::interrupt = false;
             }
 
           } else {
@@ -337,7 +336,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
     if(arguments[0] == "RESTART-CONFIRM") {
         log_i("# RSTRT CONFIRM RCV!");
-        globalVars.wait_restart_confirm = false;
+        Master::GlobalVars::wait_restart_confirm = false;
         return;
       }
 

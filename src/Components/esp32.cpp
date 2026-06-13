@@ -15,54 +15,52 @@
 #include "i2ctool.h"
 #include "spitool.h"
 
-Pins Esp32::pins;
-HardwareConfig Esp32::hardwareConfig;
 
 void Esp32::initESP32() {
-    Serial.begin(hardwareConfig.Serial_Clock);
+    Serial.begin(Esp32::HardwareConfig::Serial_Clock);
     initPinStates();
     I2CTOOL::init();
     SPITOOL::init();
 
 
     initSubComponents();
-    initInterrupts();
+   // initInterrupts();
 
     delay(1000);
     log_i("# ESP32 INIT DONE!");
 }
 
 void Esp32::initSubComponents() {
-    TCAL6408::init();
+    /*TCAL6408::init();
     LSM6DSR::init();
-    BQ76905::init();
-    TMP464::init();
-    IIS2MDC::init();
-    TPL0102::init(3.2); // TODO: Conf. highVoltage
-    Fan::init();
+    BQ76905::init();*/
+    //TMP464::init();
+    //IIS2MDC::init();
+    TPL0102::init(3.4); 
+   // Fan::init();
 }
 
 void Esp32::initPinStates() {
     
-    pinMode(pins.PIN_FAN_EN, OUTPUT);
-    pinMode(pins.PIN_IR_LED_0, OUTPUT);
-    pinMode(pins.PIN_IR_LED_1, OUTPUT);
-    pinMode(pins.PIN_IR_LED_2, OUTPUT);
-    pinMode(pins.PIN_IR_LED_3, OUTPUT);
-    pinMode(pins.PIN_LSM_INT_1, INPUT);
-    pinMode(pins.PIN_LSM_INT_2, INPUT);
-    pinMode(pins.PIN_VL53_0_INT, INPUT);
-    pinMode(pins.PIN_VL53_1_INT, INPUT);
-    pinMode(pins.PIN_VL53_2_INT, INPUT);
-    pinMode(pins.PIN_BQ_ALERT, INPUT);
+    pinMode(FAN_EN, OUTPUT);
+    pinMode(IRLED_0, OUTPUT);
+    pinMode(IRLED_1, OUTPUT);
+    pinMode(IRLED_2, OUTPUT);
+    pinMode(IRLED_3, OUTPUT);
+    pinMode(LSM_INT_1, INPUT);
+    pinMode(LSM_INT_2, INPUT);
+    pinMode(VL_0_INT, INPUT);
+    pinMode(VL_1_INT, INPUT);
+    pinMode(VL_2_INT, INPUT);
+    pinMode(BQ_INT, INPUT);
 
 }
 
 
 
 void Esp32::initInterrupts() {
-    attachInterrupt(digitalPinToInterrupt(pins.PIN_BQ_ALERT), BQ76905::alert, FALLING);
-    attachInterrupt(digitalPinToInterrupt(pins.PIN_TCCAL_DRV_INT), TCAL6408::handleInterruptDriver, FALLING);
+    attachInterrupt(digitalPinToInterrupt(BQ_INT), BQ76905::alert, FALLING);
+    attachInterrupt(digitalPinToInterrupt(TCAL_DRV_INT), TCAL6408::handleInterruptDriver, FALLING);
     
 }
 

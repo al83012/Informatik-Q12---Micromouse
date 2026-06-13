@@ -6,31 +6,30 @@
 #include "Client.h"
 using namespace std;
 
- struct NetworkVars {
-websockets::WebsocketsClient client;
+namespace Network {
 
-string websockets_server = "ws://";
-unsigned long lastReconnectAttempt = 0;
-const unsigned long reconnectInterval = 2000;
-const char* ssid = "HOTSPOT-TEST";
-const char* password = "012345678";
-const uint16_t port = 9001;
-const char *serverName = "172.13.1.1";
-};
+namespace NetworkVars {
+inline websockets::WebsocketsClient client;
 
-extern NetworkVars networkVars;
+inline string websockets_server = "ws://";
+inline unsigned long lastReconnectAttempt = 0;
+constexpr unsigned long reconnectInterval = 2000;
+constexpr char* ssid = "HOTSPOT-TEST";
+constexpr char* password = "012345678";
+constexpr uint16_t port = 9001;
+constexpr  char *serverName = "172.13.1.1";
+}
 
-class Network {
-public:
 
-    static string getWsUrl();
-    static void connectWS();
-    static void initNetwork();
-    static void scanNetworks();
-    static void checkNetwork();
-    static void setup();
+    string getWsUrl();
+    void connectWS();
+    void initNetwork();
+    void scanNetworks();
+    void checkNetwork();
+    void setup();
     
-};
 
+
+}
 
 #endif

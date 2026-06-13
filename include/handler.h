@@ -9,32 +9,32 @@ using namespace std;
 #include "WiFi.h"
 #include "HTTPClient.h"
 
- struct HandleVars {
+namespace Handler {
+
+namespace HandleVars {
 //Command config
-const int MAX_CMD_ARGS = 15;
-const int MAX_SUB_STEPS = 256;
-const int DISTANCE_THRESHOLD = 0;
-const int SENSORLIMIT = 5;
+constexpr int MAX_CMD_ARGS = 15;
+constexpr int MAX_SUB_STEPS = 256;
+constexpr int DISTANCE_THRESHOLD = 0;
+constexpr int SENSORLIMIT = 5;
 
 
 //IDs
-const int STOP_IF_OPEN_ID = 10;
-const int STOP_IF_BLOCKED_ID = 11;
-const int CONTINUE_ID = 12;
-};
-extern HandleVars handleVars;
+constexpr int STOP_IF_OPEN_ID = 10;
+constexpr int STOP_IF_BLOCKED_ID = 11;
+constexpr int CONTINUE_ID = 12;
 
-class Handler {
-public:
-    static void handleEvent(websockets::WebsocketsEvent event, String data);
-    static void handleCommand(websockets::WebsocketsMessage WSmessage);
-    static int measure(char dir);
-    static void movePassive(int cells);
-    static void moveActive(int cells, vector<MeasurementTask>& activeTasks);
-    static void turnPassive(int turns);
-    static void turnActive(int turns, vector<MeasurementTask>& activeTasks);
-
-};
+} 
 
 
+ void handleEvent(websockets::WebsocketsEvent event, String data);
+ void handleCommand(websockets::WebsocketsMessage WSmessage);
+ int measure(char dir);
+ void movePassive(int cells);
+ void moveActive(int cells, vector<Master::MeasurementTask>& activeTasks);
+ void turnPassive(int turns);
+ void turnActive(int turns, vector<Master::MeasurementTask>& activeTasks);
+
+
+}
 #endif

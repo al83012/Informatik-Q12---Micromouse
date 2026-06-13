@@ -3,6 +3,8 @@
 #include <String>
 #include "simulation.h"
 
+namespace Master {
+
 using namespace std;
 enum directions {
   posX,
@@ -18,20 +20,18 @@ enum directions {
   int reaction;
 };
 
- struct GlobalVars {
-    bool desync_mode = false;
-    bool wait_restart_confirm = false;
-    int lastCMD_ID = -1;
-    int currCMD_ID = -1;
-    bool interrupt = false;
-    bool reset = true;
-    enum directions dir = posX;
-};
-extern GlobalVars globalVars;
+ namespace GlobalVars {
+   inline bool desync_mode = false;
+   inline bool wait_restart_confirm = false;
+   inline int lastCMD_ID = -1;
+   inline int currCMD_ID = -1;
+   inline bool interrupt = false;
+   inline bool reset = true;
+   inline enum directions dir = posX;
+  }
 
 
-class Master {
-};
 
+}
 
 #endif

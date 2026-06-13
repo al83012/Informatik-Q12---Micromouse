@@ -12,17 +12,17 @@ using namespace std;
 
 
 void Utility::printClient(string message) {
-    networkVars.client.send(message.c_str());
+    Network::NetworkVars::client.send(message.c_str());
 }
 
 void Utility::stop() {
     printClient("STOP");
-    networkVars.client.send("STOP");
+    Network::NetworkVars::client.send("STOP");
 }
 
 void Utility::battery() {
     printClient("BTRY > SRV");
-    networkVars.client.send("BATTERY 0");
+    Network::NetworkVars::client.send("BATTERY 0");
 }
 
 void Utility::restart() {
@@ -30,11 +30,11 @@ void Utility::restart() {
 
     //measurements.clear();
     //reactions.clear();
-    globalVars.lastCMD_ID = -1;
-    globalVars.currCMD_ID = -1;
+    Master::GlobalVars::lastCMD_ID = -1;
+    Master::GlobalVars::currCMD_ID = -1;
 
-    networkVars.client.send("RESTART");
-    globalVars.wait_restart_confirm = true;
+    Network::NetworkVars::client.send("RESTART");
+    Master::GlobalVars::wait_restart_confirm = true;
     log_i("# AWAIT RSTRT CONFIRM...");
 }
     
@@ -43,15 +43,15 @@ string message = "CMD-FINISHED #";
   log_d("# CMD DONE > SRV");
   //Serial.println(String(X));
   // Serial.println(String(Y));
-  //Serial.print(globalVars.dir);
+  //Serial.print(Master::GlobalVars::dir);
 
-  message = message + to_string(globalVars.currCMD_ID);
+  message = message + to_string(Master::GlobalVars::currCMD_ID);
   printClient(message);
 }
      
 
 void Utility::finishedAllInterrupt(string message) {
-  string content = "CMD-FINISHED #" + globalVars.currCMD_ID + ' ' + message;
+  string content = "CMD-FINISHED #" + Master::GlobalVars::currCMD_ID + ' ' + message;
   log_d("# CMD DONE INTRPT > SRV");
   printClient(content);
 }
@@ -59,14 +59,14 @@ void Utility::finishedAllInterrupt(string message) {
 void Utility::desync() {
  log_e("# DSYNC > SRV");
   string error = "DESYNC ";
-  for (int i = globalVars.lastCMD_ID + 1; i < globalVars.currCMD_ID; i++) {
+  for (int i = Master::GlobalVars::lastCMD_ID + 1; i < Master::GlobalVars::currCMD_ID; i++) {
     error = error + "#";
     error = error + std::to_string(i);
     error = error + " ";
   }
   printClient(error);
   log_e("# AWAIT RESYNC...");
-  globalVars.desync_mode = true;
+  Master::GlobalVars::desync_mode = true;
 }
 
 void Utility::debug(string message) {
@@ -74,10 +74,10 @@ void Utility::debug(string message) {
 
   //measurements.clear();
   //reactions.clear();
-  globalVars.lastCMD_ID = -1;
-  globalVars.currCMD_ID = -1;
+  Master::GlobalVars::lastCMD_ID = -1;
+  Master::GlobalVars::currCMD_ID = -1;
 
-  networkVars.client.send(("DBG " + message).c_str());
+  Network::NetworkVars::client.send(("DBG " + message).c_str());
 }
 
 std::vector<string> Utility::splitString(string str, char delimiter) {

@@ -3,34 +3,31 @@
 #include <Wire.h>
 // Battery Management System (BMS) for 2-5 cells in series
 // Voltage values are stored in mV
+namespace BQ76905
+{
+    
+namespace ComponentVars {
+    constexpr uint8_t I2C_ADDRESS = 0x08; 
+}
 
-struct BQ76905_ComponentVars {
-    const uint8_t I2C_ADDRESS = 0x08; 
-};
-extern BQ76905_ComponentVars bq76905_componentVars;
+namespace CellVoltages {
+   inline float cell1;
+   inline float cell2;
+   inline float cell3;
+   inline float cell4;
+   inline float cell5;
+}
 
-struct BQ76905_CellVoltages {
-    float cell1;
-    float cell2;
-    float cell3;
-    float cell4;
-    float cell5;
-};
 
-extern BQ76905_CellVoltages cellVoltages;
-
-struct BQ76905_Temperature {
-    int temperature;  
-};
-extern BQ76905_Temperature bq76905_temperature;
-
-class BQ76905 {
-public:
-    static void init();
-    static void readAllCellVoltages();
-    static int getCellVoltage(int Cell);
-    static void readTemperature(); 
-    static void alert();
+namespace Temperature {
+    inline int temperature;  
 };
 
+    void init();
+    void readAllCellVoltages();
+    int getCellVoltage(int Cell);
+    void readTemperature(); 
+    void alert();
+
+} 
 #endif

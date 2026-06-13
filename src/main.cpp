@@ -9,18 +9,23 @@
 #include "handler.h"
 #include "Components/Esp32.h"
 #include "components/tpl0102.h"
+#include "i2ctool.h"
 
 void setup() {
-
-  Esp32::initESP32();
-  Network::setup();
+delay(1000);
+log_i("Initializing Setup");
+Esp32::initESP32();
+ // Network::setup();
 
  log_i("# Setup done!");
-  TPL0102::DbgPrintVoltages();
+ I2CTOOL::I2CScanner();
+
+ TPL0102::DbgPrintVoltages();
  
 }
 
 void loop() {
-  Network::checkNetwork();
+ // Network::checkNetwork();
+ delay(200);
+ log_d(".");
 }
-

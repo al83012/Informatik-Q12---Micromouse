@@ -1,75 +1,559 @@
 #include "i2ctool.h"
 #include "Components/Esp32.h"
 
-I2CConfig I2CTOOL::i2cConfig;
-
-
 
 void I2CTOOL::init() {
-    Wire.begin(pins.PIN_SDA_0, pins.PIN_SCL_0, i2cConfig.I2C_Clock_0);  
-    Wire.begin(pins.PIN_SDA_1, pins.PIN_SCL_1, i2cConfig.I2C_Clock_1);   
-}
+    
+    log_d("# Trying to initialize I2CTool");
 
-
-void I2CTOOL::i2c_writeRegister(uint8_t deviceAddress, uint8_t registerAddress, uint8_t value) {
-    Wire.beginTransmission(deviceAddress);
-    Wire.write(registerAddress);
-    Wire.write(value);
-
-    uint8_t error = Wire.endTransmission();
-    if (error != 0) {
-        log_e("# I2C Error: %d", error);
+    if(Wire.begin(SDA0, SCL0, I2CTOOL::Config::I2C_Clock_0)){
+        log_i("# I2C0 initiated succesfully.");
     }
-}
+    else{
+        log_e("# FAILED to initialize I2C0!");
+    }
 
-uint8_t I2CTOOL::i2c_readRegister(uint8_t deviceAddress, uint8_t registerAddress) {
-    Wire.beginTransmission(deviceAddress);
-    Wire.write(registerAddress);
-    if(Wire.endTransmission((uint8_t)false) != 0) {
-        log_e("# I2C Error during register address transmission");
-        return 0;
-}
-
-    Wire.requestFrom((uint8_t)deviceAddress, (size_t)1);
-    if (Wire.available()) {
-        return Wire.read();
-    } else {
-        log_e("# I2C Error: No data available to read");
-        return 0;
+    if(Wire1.begin(SDA1, SCL1, I2CTOOL::Config::I2C_Clock_1)){
+        log_i("# I2C1 initiated succesfully.");
+    }
+    else{
+        log_e("# FAILED to initialize I2C1!");
     }
 }
 
 
-uint16_t I2CTOOL::i2c_readRegister16(uint8_t deviceAddress, uint8_t registerAddress) {
-    Wire.beginTransmission(deviceAddress);
-    Wire.write(registerAddress);
-    if(Wire.endTransmission((uint8_t)false) != 0) {
-        log_e("# I2C Error during register address transmission (16 bit)");
-        return 0;
-    }
 
-    Wire.requestFrom((uint8_t)deviceAddress, (size_t)2);
-    if (Wire.available() >= 2) {
-        uint8_t highByte = Wire.read();
-        uint8_t lowByte = Wire.read();
-        return (highByte << 8) | lowByte;
-    } else {
-        log_e("# I2C Error: Not enough data available to read (16 bit)");
-        return 0;
+bool I2CTOOL::I2C0Write(uint8_t Address, uint8_t Register, uint8_t Data, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to write on I2C0 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::WRITERETRYATTEMPTS; i++){
+            if(I2C0Write(Address, Register, Data, false)){
+                log_d("# I2C0 Auto-Retry write success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::WRITERETRYDELAY);
+        }
+
+        log_e("# I2C0 Auto-Retry write failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to write on I2C0...");
+
+        Wire.beginTransmission(Address);
+
+        Wire.write(Register);
+
+        Wire.write(Data);
+
+        uint8_t err = Wire.endTransmission(true);
+        if (err != 0) {
+            log_e("# I2C0 write failed with error code %d!", err);
+            return false;
+        }
+
+        log_d("# I2C0 write success.");
+        return true;
+
     }
 }
 
-void I2CTOOL::i2c_writeRegister16(uint8_t deviceAddress, uint8_t registerAddress, uint16_t value) {
-    Wire.beginTransmission(deviceAddress);
-    Wire.write(registerAddress);
-    Wire.write((value >> 8) & 0xFF); // High byte
-    Wire.write(value & 0xFF);        // Low byte
 
-    uint8_t error = Wire.endTransmission();
-    if (error != 0) {
-        log_e("# I2C Error: %d", error);
+bool I2CTOOL::I2C0Write(uint8_t Address, uint8_t Register, uint16_t Data, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to write on I2C0 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::WRITERETRYATTEMPTS; i++){
+            if(I2C0Write(Address, Register, Data, false)){
+                log_d("I2C0 Auto-Retry write success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::WRITERETRYDELAY);
+        }
+
+        log_e("# I2C0 Auto-Retry write failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to write on I2C0...");
+
+        Wire.beginTransmission(Address);
+
+        Wire.write(Register);
+
+        Wire.write((uint8_t)Data);
+        Wire.write((uint8_t)(Data >> 8));
+
+        uint8_t err = Wire.endTransmission(true);
+        if (err != 0) {
+            log_e("# I2C0 write failed with error code %d!", err);
+            return false;
+        }
+
+        log_d("# I2C0 write success.");
+        return true;
+
     }
 }
+
+
+bool I2CTOOL::I2C0Write(uint8_t Address, uint8_t Register, const uint8_t* DataStart, size_t Size, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to write on I2C0 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::WRITERETRYATTEMPTS; i++){
+            if(I2C0Write(Address, Register, DataStart, Size, false)){
+                log_d("I2C0 Auto-Retry write success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::WRITERETRYDELAY);
+        }
+
+        log_e("# I2C0 Auto-Retry write failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to write on I2C0...");
+
+        Wire.beginTransmission(Address);
+
+        Wire.write(Register);
+
+        Wire.write(DataStart, Size);
+
+        uint8_t err = Wire.endTransmission(true);
+        if (err != 0) {
+            log_e("# I2C0 write failed with error code %d!", err);
+            return false;
+        }
+
+        log_d("# I2C0 write success.");
+        return true;
+
+    }
+}
+
+
+bool I2CTOOL::I2C1Write(uint8_t Address, uint8_t Register, uint8_t Data, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to write on I2C1 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::WRITERETRYATTEMPTS; i++){
+            if(I2C1Write(Address, Register, Data, false)){
+                log_d("# I2C1 Auto-Retry write success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::WRITERETRYDELAY);
+        }
+
+        log_e("# I2C1 Auto-Retry write failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to write on I2C1...");
+
+        Wire1.beginTransmission(Address);
+
+        Wire1.write(Register);
+
+        Wire1.write(Data);
+
+        uint8_t err = Wire1.endTransmission(true);
+        if (err != 0) {
+            log_e("# I2C1 write failed with error code %d!", err);
+            return false;
+        }
+
+        log_d("# I2C1 write success.");
+        return true;
+
+    }
+}
+
+
+bool I2CTOOL::I2C1Write(uint8_t Address, uint8_t Register, uint16_t Data, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to write on I2C1 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::WRITERETRYATTEMPTS; i++){
+            if(I2C1Write(Address, Register, Data, false)){
+                log_d("# I2C1 Auto-Retry write success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::WRITERETRYDELAY);
+        }
+
+        log_e("# I2C1 Auto-Retry write failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to write on I2C1...");
+
+        Wire1.beginTransmission(Address);
+
+        Wire1.write(Register);
+
+        Wire1.write((uint8_t)Data);
+        Wire1.write((uint8_t)(Data >> 8));
+
+        uint8_t err = Wire1.endTransmission(true);
+        if (err != 0) {
+            log_e("# I2C1 write failed with error code %d!", err);
+            return false;
+        }
+
+        log_d("# I2C1 write success.");
+        return true;
+
+    }
+}
+
+bool I2CTOOL::I2C1Write(uint8_t Address, uint8_t Register, const uint8_t* DataStart, size_t Size, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to write on I2C1 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::WRITERETRYATTEMPTS; i++){
+            if(I2C1Write(Address, Register, DataStart, Size, false)){
+                log_d("# I2C1 Auto-Retry write success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::WRITERETRYDELAY);
+        }
+
+        log_e("# I2C1 Auto-Retry write failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to write on I2C1...");
+
+        Wire1.beginTransmission(Address);
+
+        Wire1.write(Register);
+
+        Wire1.write(DataStart, Size);
+
+        uint8_t err = Wire1.endTransmission(true);
+        if (err != 0) {
+            log_e("# I2C1 write failed with error code %d!", err);
+            return false;
+        }
+
+        log_d("# I2C1 write success.");
+        return true;
+
+    }
+}
+
+bool I2CTOOL::I2C0Read(uint8_t Address, uint8_t Register, uint8_t& ReadOutput, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to read on I2C0 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::READRETRYATTEMPTS; i++){
+            if(I2C0Read(Address, Register, ReadOutput, false)){
+                log_d("# I2C0 Auto-Retry read success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::READRETRYDELAY);
+        }
+
+        log_e("# I2C0 Auto-Retry read failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to read on I2C0...");
+
+        Wire.beginTransmission(Address);
+
+        Wire.write(Register);
+
+        uint8_t err = Wire.endTransmission(false);
+        if (err != 0) {
+            log_e("# I2C0 read failed with error code %d!", err);
+            return false;
+        }
+
+        uint8_t bytesReceived = Wire.requestFrom(Address, (uint8_t)1);
+        if (bytesReceived != 1) {
+            log_e("# I2C read failed as bytes-recieved doesn't match bytes-requested!");
+            return false;
+        }
+
+        ReadOutput = Wire.read();
+
+        log_d("# I2C0 read success.");
+        return true;
+
+    }
+}
+
+bool I2CTOOL::I2C0Read(uint8_t Address, uint8_t Register, uint16_t& ReadOutput, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to read on I2C0 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::READRETRYATTEMPTS; i++){
+            if(I2C0Read(Address, Register, ReadOutput, false)){
+                log_d("# I2C0 Auto-Retry read success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::READRETRYDELAY);
+        }
+
+        log_e("# I2C0 Auto-Retry read failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to read on I2C0...");
+
+        Wire.beginTransmission(Address);
+
+        Wire.write(Register);
+
+        uint8_t err = Wire.endTransmission(false);
+        if (err != 0) {
+            log_e("# I2C0 read failed with error code %d!", err);
+            return false;
+        }
+
+        uint8_t bytesReceived = Wire.requestFrom(Address, (uint8_t)2);
+        if (bytesReceived != 2) {
+            log_e("# I2C read failed as bytes-recieved doesn't match bytes-requested!");
+            return false;
+        }
+
+        uint8_t msb = Wire.read();
+        uint8_t lsb = Wire.read();
+
+        ReadOutput = (((uint16_t)msb) << 8) | lsb;
+
+        log_d("# I2C0 read success.");
+        return true;
+
+    }
+}
+
+
+bool I2CTOOL::I2C0Read(uint8_t Address, uint8_t Register, uint8_t* ReadOutput, size_t Size, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to read on I2C0 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::READRETRYATTEMPTS; i++){
+            if(I2C0Read(Address, Register, ReadOutput, Size, false)){
+                log_d("# I2C0 Auto-Retry read success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::READRETRYDELAY);
+        }
+
+        log_e("# I2C0 Auto-Retry read failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to read on I2C0...");
+
+        Wire.beginTransmission(Address);
+
+        Wire.write(Register);
+
+        uint8_t err = Wire.endTransmission(false);
+        if (err != 0) {
+            log_e("# I2C0 read failed with error code %d!", err);
+            return false;
+        }
+
+        uint8_t bytesReceived = Wire.requestFrom(Address, Size, true);
+        if (bytesReceived != Size) {
+            log_e("# I2C read failed as bytes-recieved doesn't match bytes-requested!");
+            return false;
+        }
+
+
+        for(int i = 0; i < Size; i++){
+            ReadOutput[i] = (uint8_t)Wire.read();
+        }
+
+        log_d("# I2C0 read success.");
+        return true;
+
+    }
+}
+
+
+bool I2CTOOL::I2C1Read(uint8_t Address, uint8_t Register, uint8_t& ReadOutput, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to read on I2C1 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::READRETRYATTEMPTS; i++){
+            if(I2C1Read(Address, Register, ReadOutput, false)){
+                log_d("I2C1 Auto-Retry read success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::READRETRYDELAY);
+        }
+
+        log_e("# I2C1 Auto-Retry read failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to read on I2C1...");
+
+        Wire1.beginTransmission(Address);
+
+        Wire1.write(Register);
+
+        uint8_t err = Wire1.endTransmission(false);
+        if (err != 0) {
+            log_e("# I2C1 read failed with error code %d!", err);
+            return false;
+        }
+
+        uint8_t bytesReceived = Wire1.requestFrom(Address, (uint8_t)1);
+        if (bytesReceived != 1) {
+            log_e("# I2C read failed as bytes-recieved doesn't match bytes-requested!");
+            return false;
+        }
+
+        ReadOutput = Wire1.read();
+
+        log_d("# I2C1 read success.");
+        return true;
+
+    }
+}
+
+
+bool I2CTOOL::I2C1Read(uint8_t Address, uint8_t Register, uint16_t& ReadOutput, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to read on I2C1 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::READRETRYATTEMPTS; i++){
+            if(I2C1Read(Address, Register, ReadOutput, false)){
+                log_d("I2C1 Auto-Retry read success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::READRETRYDELAY);
+        }
+
+        log_e("# I2C1 Auto-Retry read failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to read on I2C1...");
+
+        Wire1.beginTransmission(Address);
+
+        Wire1.write(Register);
+
+        uint8_t err = Wire1.endTransmission(false);
+        if (err != 0) {
+            log_e("# I2C1 read failed with error code %d!", err);
+            return false;
+        }
+
+        uint8_t bytesReceived = Wire1.requestFrom(Address, (uint8_t)2);
+        if (bytesReceived != 2) {
+            log_e("# I2C read failed as bytes-recieved doesn't match bytes-requested!");
+            return false;
+        }
+
+        uint8_t msb = Wire1.read();
+        uint8_t lsb = Wire1.read();
+
+        ReadOutput = (((uint16_t)msb) << 8) | lsb;
+
+        log_d("# I2C1 read success.");
+        return true;
+
+    }
+}
+
+
+bool I2CTOOL::I2C1Read(uint8_t Address, uint8_t Register, uint8_t* ReadOutput, size_t Size, bool AutoRetry){
+    if(AutoRetry){
+        log_d("# Trying to read on I2C1 with Auto-Retry...");
+
+        for(int i = 0; i < I2CTOOL::Config::READRETRYATTEMPTS; i++){
+            if(I2C1Read(Address, Register, ReadOutput, Size, false)){
+                log_d("# I2C1 Auto-Retry read success after %d tries.", ++i);
+                return true;
+            }
+
+            delay(I2CTOOL::Config::READRETRYDELAY);
+        }
+
+        log_e("# I2C1 Auto-Retry read failed!");
+        return false;
+    }
+    else{
+        log_d("# Trying to read on I2C1...");
+
+        Wire1.beginTransmission(Address);
+
+        Wire1.write(Register);
+
+        uint8_t err = Wire1.endTransmission(false);
+        if (err != 0) {
+            log_e("# I2C1 read failed with error code %d!", err);
+            return false;
+        }
+
+        uint8_t bytesReceived = Wire1.requestFrom(Address, Size, true);
+        if (bytesReceived != Size) {
+            log_e("# I2C read failed as bytes-recieved doesn't match bytes-requested!");
+            return false;
+        }
+
+
+        for(int i = 0; i < Size; i++){
+            ReadOutput[i] = (uint8_t)Wire1.read();
+        }
+
+        log_d("# I2C1 read success.");
+        return true;
+
+    }
+}
+
+void I2CTOOL::flip(uint16_t& Data){
+    uint16_t tmp = Data;
+    Data = (Data >> 8) | (tmp << 8);
+}
+
+void I2CTOOL::flip(uint8_t* Data, size_t Size){
+    for(int i = 0; i < Size / 2; i++){
+        std::swap(Data[i], Data[Size - i - 1]);
+    }
+}
+
+
+#define I2C0Write55 I2CT.I2C0Write // possible maybe use different name than function
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void I2CTOOL::I2CScanner(){
     uint8_t Devices0 = 0;
@@ -80,8 +564,8 @@ void I2CTOOL::I2CScanner(){
     log_i("Scanning for I2C devices...");
     log_i("Scanning I2C0...");
     for(address = 1; address < 127; address++){
-        Wire.beginTransmission(address);
-        error = Wire.endTransmission();
+        Wire1.beginTransmission(address);
+        error = Wire1.endTransmission();
 
         if(error == 0){
             Devices0++;

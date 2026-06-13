@@ -2,13 +2,13 @@
 #define FAN_H
 #include "esp32.h"
 
-class Fan {
-public:
-    static void init();
-    static void setRotation(bool state);
-    static void enable();
-    static void disable();
+namespace Fan {
 
-};
+     void init();
+     void setRotation(bool state);
+     void enable();
+     void disable();
+
+}
 
 #endif

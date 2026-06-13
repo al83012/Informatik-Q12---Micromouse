@@ -3,7 +3,7 @@
 
 
 void Fan::init() {
-    TCAL6408::setPinStateDriver(tcal6408_componentVars.PIN_FAN_PH, HIGH); // Default -> Clockwise
+    TCAL6408::setPinStateDriver(TCAL6408::ComponentVars::PIN_FAN_PH, HIGH); // Default -> Clockwise
 }
 
 void Fan::setRotation(bool state) {

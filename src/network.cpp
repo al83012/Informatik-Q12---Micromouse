@@ -11,11 +11,10 @@
 using namespace websockets;
 using namespace std;
 
-NetworkVars networkVars;
 
 
 string Network::getWsUrl() {
-    string url = networkVars.websockets_server + WiFi.gatewayIP().toString().c_str() + ":" + to_string(networkVars.port) + "/";
+    string url = Network::NetworkVars::websockets_server + WiFi.gatewayIP().toString().c_str() + ":" + to_string(Network::NetworkVars::port) + "/";
     return url;
 }
 
@@ -26,22 +25,22 @@ void Network::connectWS() {
   log_i("%s%", ws_ip.c_str());
   Utility::printClient("#Connecting to... " + ws_ip);
 
-  networkVars.client = WebsocketsClient();
+  Network::NetworkVars::client = WebsocketsClient();
 
-  networkVars.client.onMessage(Handler::handleCommand);
-  networkVars.client.onEvent(Handler::handleEvent);
+  Network::NetworkVars::client.onMessage(Handler::handleCommand);
+  Network::NetworkVars::client.onEvent(Handler::handleEvent);
 
-  bool connected = networkVars.client.connect(ws_ip.c_str());
+  bool connected = Network::NetworkVars::client.connect(ws_ip.c_str());
 
   if (connected) {
     log_i("# CN SUCC!");
     Utility::debug("From the moment i understood the weakness of my flesh, it disgusted me...");
-    if (globalVars.reset) {
-      networkVars.client.send("RESTART");
-      networkVars.client.send("CONTINUE");
-      globalVars.reset = false;
+    if (Master::GlobalVars::reset) {
+      Network::NetworkVars::client.send("RESTART");
+      Network::NetworkVars::client.send("CONTINUE");
+      Master::GlobalVars::reset = false;
     }
-    networkVars.client.ping();
+    Network::NetworkVars::client.ping();
 
   } else {
     log_e("# CN FAIL!");
@@ -74,7 +73,7 @@ void Network::scanNetworks() {
 }
 void Network::initNetwork() {
  log_d("# INIT NTW CN...");
-  WiFi.begin(networkVars.ssid, networkVars.password);
+  WiFi.begin(Network::NetworkVars::ssid, Network::NetworkVars::password);
   log_d("# Connecting");
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -90,13 +89,13 @@ void Network::initNetwork() {
 }
     
 void Network::checkNetwork() {
-  if (networkVars.client.available()) {
-    networkVars.client.poll();
+  if (Network::NetworkVars::client.available()) {
+    Network::NetworkVars::client.poll();
   } else {
     log_e("# CN LOST!");
     log_d("# RE-CN...");
     Network::connectWS();
-    if (networkVars.client.available()) {
+    if (Network::NetworkVars::client.available()) {
     log_d("# RE-CN SUCC!");
     Utility::printClient("CONTINUE");
 
@@ -110,10 +109,10 @@ void Network::setup() {
   Network::scanNetworks();
   Network::initNetwork();
 
-  networkVars.client = websockets::WebsocketsClient();
+  Network::NetworkVars::client = websockets::WebsocketsClient();
 
-  networkVars.client.onMessage(Handler::handleCommand);
-  networkVars.client.onEvent(Handler::handleEvent);
+  Network::NetworkVars::client.onMessage(Handler::handleCommand);
+  Network::NetworkVars::client.onEvent(Handler::handleEvent);
   Network::connectWS();
 }
         
