@@ -28,11 +28,21 @@ pub enum MicromouseMessage {
     RestartConfirm,
 }
 
+//Micromouse messages without associated index --> They were not yet ordered by the 
+//micromouse-manager, they are still in the process- and strategy-tree-phase of the 
+//program
 #[derive(Debug, Clone)]
 pub enum NonIndexMicromouseMessage {
     Command(Command),
+    // Signal indicating that every invalidated command from the strategy-tree-manager
+    // has been cleared --> The commands after that are in compliance with the restarted map
     RestartConfirm,
-    // Signal to set everything (besides the current tile) to undiscovered
+    // Signal to set everything (besides the current tile) to undiscovered;
+    // Indicates that the strategy-tree-manager has applied a reset-map-graft at some point
+    // and that any command processed after this signal in the order should be applied to 
+    // that reset map instead of the previous one
+    // --> schedules a reset of the micromouse-managers map when the micromouse reports the 
+    // start of a command that was sent after this signal
     ResetMapAndPos,
 }
 
