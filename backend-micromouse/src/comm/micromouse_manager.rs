@@ -100,10 +100,13 @@ impl<const N: usize> MicromouseManager<N> {
             .await
     }
 
-    #[instrument(skip(self), name = "queue_reset_map")] 
+    #[instrument(skip(self), name = "queue_reset_map")]
     pub async fn queue_reset_map(&self) {
         let reset_map_before_id = CommandId(self.next_cmd_send_id.load(Ordering::SeqCst));
-        self.reset_map_before.lock().await.insert(reset_map_before_id);
+        self.reset_map_before
+            .lock()
+            .await
+            .insert(reset_map_before_id);
     }
 
     #[instrument(skip(self), name = "send_command")]
@@ -207,7 +210,8 @@ impl<const N: usize> MicromouseManager<N> {
                 info!(target: "comm/mng/measure", "READ MEASUREMENT {measurement_message:?}");
                 // Check whether command is new
                 let mut current_cmd = self.current_command.lock().await;
-                self.update_current_command_id(measurement_message.from_cmd, &mut current_cmd)
+                let reset_event = self
+                    .update_current_command_id(measurement_message.from_cmd, &mut current_cmd)
                     .await?;
                 let map_update = self
                     .update_cmd_application(
@@ -217,7 +221,11 @@ impl<const N: usize> MicromouseManager<N> {
                     )
                     .await?;
                 debug!(target: "comm/mng/map", "Updated Map\n{:#?}", &map_update);
-                Ok(map_update.into())
+                let map_events: Vec<_> = map_update.into();
+                Ok(reset_event
+                    .into_iter()
+                    .chain(map_events.into_iter())
+                    .collect())
             }
             MicromouseResponse::CommandFinished(command_finished_message) => {
                 let _s = span!(
@@ -229,11 +237,12 @@ impl<const N: usize> MicromouseManager<N> {
                 // let _s = process_span("cmd_finished");
                 debug!(target: "comm/mng/cmd", "FINISHED COMMAND {command_finished_message:?}");
                 let mut just_finished_cmd = self.current_command.lock().await;
-                self.update_current_command_id(
-                    command_finished_message.cmd_id,
-                    &mut just_finished_cmd,
-                )
-                .await?;
+                let reset_event = self
+                    .update_current_command_id(
+                        command_finished_message.cmd_id,
+                        &mut just_finished_cmd,
+                    )
+                    .await?;
                 if just_finished_cmd.is_none() {
                     error!(target: "comm/mng/cmd", "NO CURRENT COMMAND TO FINISH");
                     return Err(MicromouseManagerError::CmdNotKnown(
@@ -272,15 +281,19 @@ impl<const N: usize> MicromouseManager<N> {
                 self.clear_current_command(&mut just_finished_cmd).await;
                 let require_new = self.unconfirmed_cmd.lock().await.is_empty();
                 let map_update: Vec<MicromouseEvent> = map_update.into();
-                Ok(vec![MicromouseEvent::FinishedCommand {
-                    cmd_id: finished_cmd_id,
-                    // If we are not aware of a command in the queue, we will have to get a new
-                    // one
-                    require_new,
-                }]
-                .into_iter()
-                .chain(map_update)
-                .collect())
+                Ok(reset_event
+                    .into_iter()
+                    .chain(
+                        vec![MicromouseEvent::FinishedCommand {
+                            cmd_id: finished_cmd_id,
+                            // If we are not aware of a command in the queue, we will have to get a new
+                            // one
+                            require_new,
+                        }]
+                        .into_iter()
+                        .chain(map_update),
+                    )
+                    .collect())
             }
             MicromouseResponse::Desync(command_ids) => {
                 let _s = process_span("process_desync");
@@ -339,9 +352,10 @@ impl<const N: usize> MicromouseManager<N> {
     }
 
     #[instrument(skip(self), name = "reset_map")]
-    async fn reset_map(&self) {
+    async fn reset_map(&self) -> MicromouseEvent {
         let mut current_world = self.current_world.write().await;
         *current_world = current_world.only_pos();
+        MicromouseEvent::ResetMapApplied
     }
 
     #[instrument(skip(self), name = "remove_unordered", fields(link_cmd_id = cmd_to_remove.link()))]
@@ -505,7 +519,7 @@ impl<const N: usize> MicromouseManager<N> {
         &self,
         response_cmd_id: CommandId,
         current_cmd: &mut MutexGuard<'a, Option<(FilteredCommandApplication<N>, CommandId)>>,
-    ) -> Result<(), MicromouseManagerError> {
+    ) -> Result<Option<MicromouseEvent>, MicromouseManagerError> {
         info!(target: "comm/mng/cmd", "UPDATING CURRENT CMD ID");
         if current_cmd.is_none() {
             debug!(target: "comm/mng/cmd", "NO CURRENT CMD REGISTERED");
@@ -529,9 +543,11 @@ impl<const N: usize> MicromouseManager<N> {
                 new_cmd
             };
 
-            if self.reset_map_before.lock().await.remove(&new_cmd.cmd_id) {
-                self.reset_map().await;
-            }
+            let reset_map = if self.reset_map_before.lock().await.remove(&new_cmd.cmd_id) {
+                Some(self.reset_map().await)
+            } else {
+                None
+            };
 
             // Storing the starting state of the new command, so that we can easily calculate,
             // where the mouse currently is
@@ -552,7 +568,7 @@ impl<const N: usize> MicromouseManager<N> {
                 info!(target: "comm/mng/cmd", "Cmd Id matches next expected --> Next cmd; now = {expected_next_id}, next = {}", expected_next_id + 1);
                 self.next_cmd_process_id
                     .store(expected_next_id + 1, std::sync::atomic::Ordering::SeqCst);
-                Ok(())
+                Ok(reset_map)
             } else {
                 error!(target: "comm/mng/cmd", "WRONG PROCESS ORDER: tried_starting = #{}, expected = #{expected_next_id}", response_cmd_id.0);
                 // WARN: LIFE MUST GO ON (but really, this essentially silences the error, so that
@@ -570,7 +586,7 @@ impl<const N: usize> MicromouseManager<N> {
 
             if current_cmd_id == response_cmd_id {
                 // No change; current command = new command
-                Ok(())
+                Ok(None)
             } else {
                 // Life must go on
                 // Pretend, that the next cmd we expect to see is the one after that
@@ -618,6 +634,7 @@ pub enum MicromouseEvent {
     DebugMessage(String),
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),
     Desync,
+    ResetMapApplied,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -319,6 +319,7 @@ impl<const N: usize> Process<N> {
                 }
             }
             MicromouseEvent::UpdatePosition(p) => {} // MicromouseEvent::
+            MicromouseEvent::ResetMapApplied => {}
         }
 
         self.frontend_manager
