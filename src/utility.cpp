@@ -20,10 +20,6 @@ void Utility::stop() {
     Network::NetworkVars::client.send("STOP");
 }
 
-void Utility::battery() {
-    printClient("BTRY > SRV");
-    Network::NetworkVars::client.send("BATTERY 0");
-}
 
 void Utility::restart() {
     printClient("RSTRT > SRV");
@@ -97,4 +93,10 @@ std::vector<string> Utility::splitString(string str, char delimiter) {
         tokens.push_back(token);
     }
     return tokens;
+}
+
+void Utility::sensor(string name, float value) {
+    log_i("# SENSOR > SRV");
+    printClient("SENSOR " + name + " " + to_string(value));
+
 }

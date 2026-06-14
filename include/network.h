@@ -14,10 +14,10 @@ inline websockets::WebsocketsClient client;
 inline string websockets_server = "ws://";
 inline unsigned long lastReconnectAttempt = 0;
 constexpr unsigned long reconnectInterval = 2000;
-constexpr char* ssid = "HOTSPOT-TEST";
-constexpr char* password = "012345678";
+constexpr const char* ssid = "HOTSPOT-TEST";
+constexpr const char* password = "012345678";
 constexpr uint16_t port = 9001;
-constexpr  char *serverName = "172.13.1.1";
+constexpr const char* serverName = "172.13.1.1";
 }
 
 

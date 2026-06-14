@@ -34,10 +34,10 @@ void Esp32::initSubComponents() {
     /*TCAL6408::init();
     LSM6DSR::init();
     BQ76905::init();*/
-    //TMP464::init();
+    TMP464::init();
     //IIS2MDC::init();
     TPL0102::init(3.4); 
-   // Fan::init();
+    //Fan::init();
 }
 
 void Esp32::initPinStates() {

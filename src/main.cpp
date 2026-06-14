@@ -9,6 +9,8 @@
 #include "handler.h"
 #include "Components/Esp32.h"
 #include "components/tpl0102.h"
+#include "components/tmp464.h"
+
 #include "i2ctool.h"
 
 void setup() {
@@ -21,11 +23,13 @@ Esp32::initESP32();
  I2CTOOL::I2CScanner();
 
  TPL0102::DbgPrintVoltages();
- 
+ TMP464::DbgPrintTemperatures(); 
+
+
 }
 
 void loop() {
  // Network::checkNetwork();
- delay(200);
+ delay(2000);
  log_d(".");
 }

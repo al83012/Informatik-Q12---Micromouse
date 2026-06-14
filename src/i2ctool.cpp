@@ -1,6 +1,7 @@
 #include "i2ctool.h"
 #include "Components/Esp32.h"
-
+#include "measurement.h"
+#include  <iostream>
 
 void I2CTOOL::init() {
     
@@ -540,21 +541,6 @@ void I2CTOOL::flip(uint8_t* Data, size_t Size){
 #define I2C0Write55 I2CT.I2C0Write // possible maybe use different name than function
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void I2CTOOL::I2CScanner(){
     uint8_t Devices0 = 0;
     uint8_t Devices1 = 0;
@@ -611,4 +597,26 @@ void I2CTOOL::I2CScanner(){
         }
     }
     log_i("I2C1 devices found: %d", Devices1);
+}
+
+void I2CTOOL::findComponent(uint8_t I2C_ADDRESS, Measurement::Sensors::SensorNames SensorName) {
+    using namespace Measurement::Sensors;
+
+    Wire.beginTransmission(I2C_ADDRESS);
+    if (Wire.endTransmission() != 0) {
+        log_e("%s not found at address %d", Measurement::Sensors::to_string(SensorName), I2C_ADDRESS);
+    } else {
+        log_i("%s initialized successfully", Measurement::Sensors::to_string(SensorName));
+    }
+}
+
+void I2CTOOL::findComponent(Measurement::Sensors::SensorNames SensorName) {
+    using namespace Measurement::Sensors;
+
+    Wire.beginTransmission(Measurement::Sensors::getI2CAddress(SensorName));
+    if (Wire.endTransmission() != 0) {
+        log_e("%s not found at address %d", Measurement::Sensors::to_string(SensorName), Measurement::Sensors::getI2CAddress(SensorName));
+    } else {
+        log_i("%s initialized successfully", Measurement::Sensors::to_string(SensorName));
+    }
 }

@@ -1,6 +1,7 @@
 #ifndef BQ76905_H
 #define BQ76905_H
 #include <Wire.h>
+
 // Battery Management System (BMS) for 2-5 cells in series
 // Voltage values are stored in mV
 namespace BQ76905

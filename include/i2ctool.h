@@ -2,7 +2,7 @@
 #define I2CTOOL_H
 #include "Wire.h"
 #include "Arduino.h"
-
+#include "measurement.h"
 namespace I2CTOOL {
 
 namespace Config
@@ -13,7 +13,6 @@ namespace Config
     constexpr int WRITERETRYDELAY = 1;
     constexpr int READRETRYATTEMPTS = 5;
     constexpr int READRETRYDELAY = 1;
-
 
 }
 
@@ -39,6 +38,12 @@ namespace Config
     void flip(uint8_t* Data, size_t Size);
     void I2CScanner();
 
+    void findComponent(uint8_t I2C_ADDRESS);
+    void findComponent(uint8_t I2C_ADDRESS, Measurement::Sensors::SensorNames SensorName);
+    void findComponent(Measurement::Sensors::SensorNames SensorName);
+
+
+
    /* void i2c_writeRegister(uint8_t deviceAddress, uint8_t registerAddress, uint8_t value);
     uint8_t i2c_readRegister(uint8_t deviceAddress, uint8_t registerAddress);
 
@@ -51,6 +56,8 @@ namespace Config
 
    
 
+
+    
 
 
 }

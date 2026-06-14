@@ -34,7 +34,13 @@ struct Data {
     Data readSensorData();
     void readDataBlock(uint8_t startRegister, uint8_t* buffer, size_t length);
 
-    
+    int16_t getAccelX();
+    int16_t getAccelY();
+    int16_t getAccelZ();
+
+    int16_t getGyroX();
+    int16_t getGyroY();
+    int16_t getGyroZ();
 
 
 }

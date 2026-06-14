@@ -2,18 +2,22 @@
 #include "Arduino.h"
 #include "Components/esp32.h"
 #include "spitool.h"
+#include "measurement.h"
 // Device communication through SPI !!
 // 3D- Accelerometer and Gyroscope
+using namespace SPITOOL;
+using namespace Measurement::Sensors;
+using namespace LSM6DSR;
 
 
 void LSM6DSR::init() {
-    uint8_t whoAmI = SPITOOL::spi_readRegister(LSM6DSR::ComponentVars::REG_WHO_AM_I, LSM_CS);
+    uint8_t whoAmI = spi_readRegister(ComponentVars::REG_WHO_AM_I, LSM_CS);
     if (whoAmI != 0x6B) {
-        log_e("# LSM6DSR (SPI) not found!");
+        log_e("# %s not found!", Measurement::Sensors::to_string(Measurement::Sensors::SensorNames::LSM6DSR_ACCELEROMETER_GYROSKOP));
     }
     configureResolution();
 
-    log_i("# LSM6DSR (SPI) initialized successfully");
+    log_i("# %s initialized successfully", Measurement::Sensors::to_string(Measurement::Sensors::SensorNames::LSM6DSR_ACCELEROMETER_GYROSKOP));
 }
 
 void LSM6DSR::readDataBlock(uint8_t startRegister, uint8_t* buffer, size_t length) {
@@ -22,9 +26,9 @@ void LSM6DSR::readDataBlock(uint8_t startRegister, uint8_t* buffer, size_t lengt
     }
 }
 
-    LSM6DSR::Data LSM6DSR::readSensorData() {
+    Data LSM6DSR::readSensorData() {
     uint8_t buffer[12];
-    readDataBlock(LSM6DSR::ComponentVars::REG_OUTX_L_G, buffer, 12);
+    readDataBlock(ComponentVars::REG_OUTX_L_G, buffer, 12);
 
     Data data;
     data.gyroX = (int16_t)(buffer[1] << 8 | buffer[0]);
@@ -58,8 +62,8 @@ void LSM6DSR::configureResolution() {
 
 
     //Config: +-4g | 2000 dps | 416 Hz ODR
-    SPITOOL::spi_writeRegister(LSM6DSR::ComponentVars::REG_CTRL1_XL, 0b01101000, LSM_CS); // ODR 416 Hz, 4g
-    SPITOOL::spi_writeRegister(LSM6DSR::ComponentVars::REG_CTRL2_G,  0b01101100, LSM_CS); // ODR 416 Hz, 2000 dps
+    spi_writeRegister(ComponentVars::REG_CTRL1_XL, 0b01101000, LSM_CS); // ODR 416 Hz, 4g
+    spi_writeRegister(ComponentVars::REG_CTRL2_G,  0b01101100, LSM_CS); // ODR 416 Hz, 2000 dps
 
-    log_d("# LSM6DSR resolution configured: +-4g for accelerometer, 2000 dps for gyroscope");
+    d_sensor(SensorNames::LSM6DSR_ACCELEROMETER_GYROSKOP, "resolution configured: +-4g for accelerometer, 2000 dps for gyroscope");
 }

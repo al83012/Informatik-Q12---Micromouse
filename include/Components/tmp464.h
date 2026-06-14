@@ -63,6 +63,9 @@ namespace ComponentVars {
 
      void setShutdownMode(bool enableShutdown);
 
+     void DbgPrintTemperatures();
+     
+
 
     
 

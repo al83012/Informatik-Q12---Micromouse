@@ -4,28 +4,27 @@
 #include "i2ctool.h"
 
 // Temperature Sensor
+using namespace TMP464;
+using namespace I2CTOOL;
+using namespace Measurement::Sensors;
+
 
 void TMP464::init() {
     // Initialize the TMP464 temperature sensor
-    Wire.beginTransmission(TMP464::ComponentVars::I2C_ADDRESS);
-    if (Wire.endTransmission() != 0) {
-        log_e("# TMP464 not found at address 0x48");
-    } else {
-        log_i("# TMP464 initialized successfully");
-    }
+    findComponent(Measurement::Sensors::SensorNames::TMP464_TEMPERATURE_SENSOR);
 
     setStandardConfiguration();
 
 }
 void TMP464::setStandardConfiguration() {
      log_d("# (TMP464) Trying to set standard configuration");
-    I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_CONFIG, TMP464::ComponentVars::SETTINGS_REG_CONFIG);
+    I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_CONFIG, ComponentVars::SETTINGS_REG_CONFIG);
 }
 
 float TMP464::readLocalTemperature() {
     log_d("# (TMP464) Trying to read local temperature");
     uint16_t rawTemp;
-     I2CTOOL::I2C1Read(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_LOCAL_TEMP, rawTemp);
+     I2C1Read(ComponentVars::I2C_ADDRESS, ComponentVars::REG_LOCAL_TEMP, rawTemp);
     return convertToCelsius(rawTemp);
 }
 
@@ -33,7 +32,7 @@ float TMP464::readRemoteTemperature(uint8_t channel) {
     log_d("# (TMP464) Trying to read remote temperature on channel %d", channel);
     //Channel 1 = 0x01 ; Channel 2 = 0x02 ; Channel 3 = 0x03 ; Channel 4 = 0x04
     uint16_t rawTemp;
-    I2CTOOL::I2C1Read(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_TEMP + (channel - 1), rawTemp); 
+    I2C1Read(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_TEMP + (channel - 1), rawTemp); 
     return convertToCelsius(rawTemp);
 }
 
@@ -48,7 +47,7 @@ void TMP464::setLocalTermLimit(uint16_t limit) {
     log_e("# Invalid temperature limit (LocalTempLimit - TMP464)!");
     uint16_t formatted_limit = limit << 8;
     } else {
-    I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_LOCAL_THERM_LIMIT, limit);
+    I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_LOCAL_THERM_LIMIT, limit);
     }
 }
 
@@ -57,7 +56,7 @@ void TMP464::setLocalTerm2Limit(uint16_t limit) {
     log_e("# Invalid temperature limit2 (LocalTempLimit2 - TMP464)!");
     uint16_t formatted_limit = limit << 8;
     } else {
-    I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_LOCAL_THERM2_LIMIT, limit);
+    I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_LOCAL_THERM2_LIMIT, limit);
     }
 }
 
@@ -69,13 +68,13 @@ void TMP464::setRemoteTermLimit(uint8_t channel, uint16_t limit) {
     } else {
     
     if(channel == 1) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_1_THERM_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_1_THERM_LIMIT, limit);
     } else if(channel == 2) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_2_THERM_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_2_THERM_LIMIT, limit);
     } else if(channel == 3) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_3_THERM_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_3_THERM_LIMIT, limit);
     } else if(channel == 4) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_4_THERM_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_4_THERM_LIMIT, limit);
     } else {
         log_e("# (TMP464) Error while trying to set remote temperature: Invalid channel!");
     }
@@ -92,13 +91,13 @@ void TMP464::setRemoteTerm2Limit(uint8_t channel, uint16_t limit) {
     } else {
     
     if(channel == 1) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_1_THERM2_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_1_THERM2_LIMIT, limit);
     } else if(channel == 2) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_2_THERM2_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_2_THERM2_LIMIT, limit);
     } else if(channel == 3) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_3_THERM2_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_3_THERM2_LIMIT, limit);
     } else if(channel == 4) {
-        I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_REMOTE_4_THERM2_LIMIT, limit);
+        I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_4_THERM2_LIMIT, limit);
     } else {
         log_e("# (TMP464) Error while trying to set remote temperature: Invalid channel!");
     }
@@ -130,7 +129,7 @@ void TMP464::setGlobalTermLimits(uint16_t lowestSafeTemp, uint16_t highestSafeTe
 void TMP464::setShutdownMode(bool enableShutDown) {
     log_d("# Trying to enable shutdown mode (TMP464)");
     uint16_t current_reg;
-    I2CTOOL::I2C1Read(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_CONFIG, current_reg);
+    I2C1Read(ComponentVars::I2C_ADDRESS, ComponentVars::REG_CONFIG, current_reg);
     if(enableShutDown) {
         current_reg |= (1 << 5);
         log_d("# Succesfuly enabled shutdown mode! (TMP464) ");
@@ -139,6 +138,14 @@ void TMP464::setShutdownMode(bool enableShutDown) {
         current_reg &= ~(1 << 5);
     }
 
-    I2CTOOL::I2C1Write(TMP464::ComponentVars::I2C_ADDRESS, TMP464::ComponentVars::REG_CONFIG, current_reg);
+    I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_CONFIG, current_reg);
 
+}
+
+void TMP464::DbgPrintTemperatures() {
+    log_d("%d", readLocalTemperature());
+    log_d("%d", readRemoteTemperature(0x01));
+    log_d("%d", readRemoteTemperature(0x02));
+    log_d("%d", readRemoteTemperature(0x03));
+    log_d("%d", readRemoteTemperature(0x04));
 }
