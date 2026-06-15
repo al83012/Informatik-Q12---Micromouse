@@ -345,6 +345,7 @@ impl<const N: usize> MicromouseManager<N> {
         *self.current_command.lock().await = None;
         *self.current_world.write().await = WorldData::default();
         *self.unconfirmed_cmd.lock().await = HashMap::new();
+        *self.reset_map_before.lock().await = HashSet::new();
         self.start_marker
             .store(true, std::sync::atomic::Ordering::SeqCst);
         // self.notify_empty_queue.notify_waiters();
