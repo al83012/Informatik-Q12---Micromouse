@@ -169,11 +169,12 @@ impl TryFrom<String> for MicromouseResponse {
                             ))?),
                         }),
                     ),
-                    ["BATTERY", percent] => Ok(MicromouseResponse::Battery(
-                        percent
-                            .parse::<Battery>()
-                            .map_err(|_e| FormatError::new(percent.to_string()))?,
-                    )),
+                    ["SENSOR", name, value] => {
+                        let Some(value) = value.parse::<f32>() else {
+                            return Err(FormatError::new(value));
+                        };
+                        Ok(MicromouseResponse::Sensor{name: name.to_string(), value})
+                    }
                     ["DESYNC", desynced_cmd_ids @ ..] if !desynced_cmd_ids.is_empty() => {
                         let mut des = Vec::with_capacity(desynced_cmd_ids.len());
                         for d in desynced_cmd_ids {
