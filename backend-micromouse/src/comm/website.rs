@@ -34,6 +34,12 @@ pub struct DiscoveryMessage {
 
 #[derive(Serialize, Debug, Deserialize)]
 pub enum FrontendMessage {
+    /// INFO for MicromouseEvents
+    /// ResetMapApplied:
+    /// Set everything to undiscovered besides the current position of the mouse
+    /// Restart:
+    /// The internal state of the micromouse was reset: Assumes position (0|0) PosX; Requires manual restart
+    /// (0|0) PosX & ResetMap
     MicromouseEvent(MicromouseEvent),
     StrategyTreeError(StrategyTreeError),
     StrategyEnd(StrategyEndState),
