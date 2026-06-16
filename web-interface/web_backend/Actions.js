@@ -70,8 +70,12 @@ export class Actions {
     }
 
     static update_path(path) {
-        //TODO: convert path into string
-        return new Action("update_path", new Map([["path", ""]]));
+        //path must follow this pattern:
+        //[<path parts>]
+        //<path part>: [<coord x>, <coord y>, <coord x>, <coord y>, ..., <change id>]
+        //<coord x/y>: number between 0 and 15
+        //<change id>: 0=same/keep 1=add -1=remove
+        return new Action("update_path", new Map([["path", path]]));
     }
 
     static move_mouse(x, y, x_new, y_new) {

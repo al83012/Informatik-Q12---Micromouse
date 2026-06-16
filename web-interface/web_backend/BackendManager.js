@@ -9,7 +9,7 @@ export class BackendManager {
         "discovered": [[0, 0], [0, 1], [0, 2], [1,0], [2,0], [3,0]],
         "walls": [], // e.g. [[0,0, 0,1], [1,0, 1,1]] //wall between 00 and 01 as well as 10 and 11
         "goals": [],
-        "paths": [] //TODO: Think of overlapping paths
+        "paths": {} //TODO: Think of overlapping paths
     };
     in_mouse = {
         "pos": [0, 0],
@@ -220,6 +220,71 @@ export class BackendManager {
 
     b_wall_exists(x, y, dir) {
 
+    }
+
+    calculate_path_change(path_id, path_changes) {
+        //assuming that path_changes follows this format and that every part (same/keep,remove,add) is in changes:
+        //[<changes>]
+        //<change> = [<coord x start>, <coord y start>, <coord x end>, <coord y end>, <change id>]
+
+        if (this.in_maze.paths[path_id] === undefined) {
+            //create new path
+            this.in_maze.paths[path_id] = [];
+        }
+
+        let path_coords = [];
+        let path_change_syncs = [];
+        let new_path = [];
+
+        for (let change of path_changes) {
+            let part_coords = [];
+            for (let x_dif = 0; x_dif < change[2] - change[0]; x_dif++) {
+                path_coords.push([change[0] + x_dif, change[1]]);
+            }
+
+            for (let x_dif = 0; x_dif > change[2] - change[0]; x_dif--) {
+                path_coords.push([change[0] + x_dif, change[1]]);
+            }
+
+            for (let y_dif = 0; y_dif < change[3] - change[1]; y_dif++) {
+                path_coords.push([change[0], change[1] + y_dif]);
+            }
+
+            for (let y_dif = 0; y_dif > change[3] - change[1]; y_dif--) {
+                path_coords.push([change[0], change[1] + y_dif]);
+            }
+
+            part_coords.push(change[4]);
+
+            path_coords.push(part_coords);
+        }
+
+        for (const [key, value] of this.in_maze.paths) {
+            if (key === path_id) continue;
+
+            for (let part_coord of path_coords) {
+                for (let maze_coord of value) {
+                    if (Math.min(part_coord.length, maze_coord.length) <= 2) continue; //skip parts that are to short to be tested //TODO: think of a way to test those edge cases
+                    let is_same = false;
+                    for (let i = 0; i < Math.min(part_coord.length, maze_coord.length); i++) {
+                        if (part_coord[i] === maze_coord[i] && part_coord[i+1] === maze_coord[i+1]
+                            && part_coord[i+2] === maze_coord[i+2] && part_coord[i+3] === maze_coord[i+3]) {
+                            is_same = true;
+                        }
+                    }
+                    if (!is_same) {
+                        path_change_syncs.push(JSON.parse(JSON.stringify(part_coord)));
+                    }
+                }
+
+                let id = part_coord.pop(); //remove change id
+                if (id !== -1) {
+                    new_path.push(part_coord);
+                }
+            }
+        }
+
+        this.in_maze.paths[path_id] = new_path;
     }
 
     get_full() {

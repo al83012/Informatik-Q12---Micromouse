@@ -201,7 +201,6 @@ body {
 
 .body_container {
     display: flex;
-    align-items: center;
     justify-content: center;
     flex-direction: row;
     margin-top: 5px;
@@ -300,7 +299,7 @@ body {
     height: 500px;
     background-color: var(--win_bg);
 
-    z-index: 100;
+    z-index: 202;
 
     border: gray 2px solid;
     border-radius: 15px;
@@ -310,7 +309,7 @@ body {
 .pop_window_algorithm_dimmer {
     display: block;
     position: absolute;
-    z-index: 99;
+    z-index: 201;
     width: 100%;
     height: 100%;
 
@@ -370,15 +369,17 @@ body {
     width: fit-content;
     height: fit-content;
 
-    margin-top: 10px;
+    margin-top: 5px;
 
     border: darkgray 2px solid;
     border-radius: 15px;
+
+    box-shadow: darkgray 0 0 2px 1px;
 }
 
 .sensor_header {
     display: flex;
-    width: 96%;
+    width: 95%;
     height: fit-content;
     justify-content: left;
     flex-direction: row;
@@ -404,21 +405,96 @@ body {
     justify-items: left;
     justify-content: left;
     flex-direction: column;
-    width: 200px;
-    height: 350px;
+    width: 180px;
+    height: 590px;
     background: var(--win_bg);
     border-bottom-left-radius: 15px;
     border-bottom-right-radius: 15px;
 }
 
+.left_container {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+}
+
+.graph_container {
+    position: relative;
+    display: flex;
+    width: 300px;
+    height: 230px;
+    margin-top: 5px;
+    margin-right: 2px;
+    border: darkgray 2px solid;
+    border-radius: 15px;
+    box-shadow: darkgray 0 0 3px 0px;
+    background: var(--win_bg);
+}
+
+.graph_container.small {
+    position: absolute;
+    z-index: 200;
+    width: 300px;
+    height: 230px;
+    top: 58.5%;
+    left: 1.5%;
+
+    transition: width 0.75s ease-in-out, height 0.75s ease-in-out, top 0.75s ease-in-out, left 0.75s ease-in-out, left 0.75s ease-in-out, position 0.1s ease-in-out 0.75s;
+}
+.graph_container.large {
+    position: absolute;
+    width: 70%;
+    height: 70%;
+    z-index: 200;
+    top: 15%;
+    left: 15%;
+
+    transition: width 0.75s ease-in-out, height 0.75s ease-in-out, top 0.75s ease-in-out, left 0.75s ease-in-out, left 0.75s ease-in-out;
+}
+
+.graph {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.graph_background {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: var(--win_bg);
+    z-index: 199;
+    opacity: 0.5;
+    top: 0;
+    left: 0;
+}
+
+.graph_background.shown {
+    display: block;
+    opacity: 0.7;
+    transition: opacity 0.2s ease-in-out, display 0.2s ease-in-out 0.2s;
+}
+
+.graph_background.hidden {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, display 0.2s ease-in-out 0.2s;
+}
 
 .debug_console_container {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
     width: fit-content;
     height: 80%;
+
+    top: 0;
 
     border-color: darkgray;
     border-width: 2px;
@@ -474,7 +550,7 @@ body {
     flex-direction: column;
     align-items: flex-start;
     width: 300px;
-    height: 600px;
+    height: 340px;
     background-color: var(--win_bg);
     border-radius: 5px;
     border-bottom-left-radius: 15px;
@@ -518,8 +594,8 @@ body {
 
 .maze_container {
     display: flex;
-    width: fit-content;/*calc(var(--square_size_full)*16);*/
-    height: fit-content;
+    width: 585px;/*calc(var(--square_size_full)*16);*/
+    height: 628px;
     align-items: center;
     justify-content: center;
     flex-direction: column;
@@ -582,7 +658,7 @@ body {
     align-items: center;
     justify-content: center;
     background-color: red;
-    margin: 27px;
+    margin: 20px;
     box-shadow: darkslategray 0 0 5px 5px;
 }
 

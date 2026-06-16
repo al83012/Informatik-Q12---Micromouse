@@ -28,6 +28,10 @@ export class Index {
     static squares = {};
     static algorithms = [];
 
+    static ChartFunc;
+    static Chart;
+    static ChartData;
+
     static eventLoad() {
         //creating error feedback to backend
         if (has_backend) {
@@ -48,6 +52,18 @@ export class Index {
         info_link_pill.onclick = function () {
             document.location.replace(document.location.origin + "/info/info.html");
             //document.location.reload();
+        }
+
+        let graph_container = document.getElementById("graph_container");
+        graph_container.onclick = function() {
+            let graph_container = document.getElementById("graph_container");
+            if (graph_container.className.includes("small")) {
+                graph_container.className = "graph_container large";
+                document.getElementById("graph_background").className = "graph_background shown";
+            } else {
+                graph_container.className = "graph_container small";
+                document.getElementById("graph_background").className = "graph_background hidden";
+            }
         }
 
 
@@ -112,6 +128,28 @@ export class Index {
             request.open("GET", document.location.origin + "/update_full");
             request.send();
         }
+
+        this.ChartFunc({
+            type: 'line',
+            data: {
+                labels: ['1', '2', '3', '4', '5', '6', '7', '5', '6', '7'],
+                datasets: [{
+                    label: 'Temp 1',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [0, 10, 5, 2, 20, 30, 45],
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        suggestedMax: 45,
+                    }
+                },
+                events: []
+            }
+        });
     }
 
     static handleUpdate(response) {
@@ -184,6 +222,33 @@ export class Index {
                 button_id: 0,
             }));
         }
+
+        this.ChartFunc({
+            type: 'line',
+            data: {
+                labels: ['1', '2', '3', '4', '5', '6', '7', '5', '6', '7'],
+                datasets: [{
+                    label: 'Temp 1',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [0, 10, 5, 2, 20, 30, 45],
+                },{
+                    label: 'Temp 2',
+                    backgroundColor: 'rgb(53, 162, 235)',
+                    borderColor: 'rgb(53, 162, 235)',
+                    data: [0, 30, 10, 13, 10, 15, 20],
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        suggestedMax: 45,
+                    }
+                },
+                events: []
+            }
+        });
 
         /*let pathGroup = new AnimGroup(5);
 
