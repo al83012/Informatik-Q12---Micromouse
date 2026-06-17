@@ -10,7 +10,10 @@ use crate::{
         measurement::{Measurement, MeasurementValue},
         world_data::{PartialWorldData, WorldData},
     },
-    transform::{direction::RelativeDirection, position::{MouseTransform, Position}},
+    transform::{
+        direction::RelativeDirection,
+        position::{MouseTransform, Position},
+    },
 };
 
 #[derive(Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Serialize, Deserialize)]
@@ -25,13 +28,13 @@ pub type StepNum = u32;
 #[derive(Debug, Clone)]
 pub enum MicromouseMessage {
     Command(CommandMessage),
-    // Indicates to the micromouse that all invalid messages have either been cleared or already been sent to 
+    // Indicates to the micromouse that all invalid messages have either been cleared or already been sent to
     // it (and ignored) --> It can now start receiving messages like normal again
     RestartConfirm,
 }
 
-//Micromouse messages without associated index --> They were not yet ordered by the 
-//micromouse-manager, they are still in the process- and strategy-tree-phase of the 
+//Micromouse messages without associated index --> They were not yet ordered by the
+//micromouse-manager, they are still in the process- and strategy-tree-phase of the
 //program
 #[derive(Debug, Clone)]
 pub enum NonIndexMicromouseMessage {
@@ -41,9 +44,9 @@ pub enum NonIndexMicromouseMessage {
     RestartConfirm,
     // Signal to set everything (besides the current tile) to undiscovered;
     // Indicates that the strategy-tree-manager has applied a reset-map-graft at some point
-    // and that any command processed after this signal in the order should be applied to 
+    // and that any command processed after this signal in the order should be applied to
     // that reset map instead of the previous one
-    // --> schedules a reset of the micromouse-managers map when the micromouse reports the 
+    // --> schedules a reset of the micromouse-managers map when the micromouse reports the
     // start of a command that was sent after this signal
     ResetMapAndPos,
 }
@@ -56,13 +59,13 @@ pub enum MicromouseResponse {
     Desync(Vec<CommandId>),
     Stop,
     Continue,
-    // A restart means, that any information about the content of the 
-    // micromouse-queue and state has been invalidated; We can no longer 
+    // A restart means, that any information about the content of the
+    // micromouse-queue and state has been invalidated; We can no longer
     // guarantee that there are commands / that the numbering is consistent
-    // --> We have to set everything to its starting-condition (e.g. the 
+    // --> We have to set everything to its starting-condition (e.g. the
     // command-numbering); We also have to assume that the pos is 0,0,PosX
     Restart,
-    Sensor{name: String, value: f32}
+    Sensor { name: String, value: f32 },
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -170,10 +173,13 @@ impl TryFrom<String> for MicromouseResponse {
                         }),
                     ),
                     ["SENSOR", name, value] => {
-                        let Some(value) = value.parse::<f32>() else {
-                            return Err(FormatError::new(value));
+                        let Ok(value) = value.parse::<f32>() else {
+                            return Err(FormatError::new(*value));
                         };
-                        Ok(MicromouseResponse::Sensor{name: name.to_string(), value})
+                        Ok(MicromouseResponse::Sensor {
+                            name: name.to_string(),
+                            value,
+                        })
                     }
                     ["DESYNC", desynced_cmd_ids @ ..] if !desynced_cmd_ids.is_empty() => {
                         let mut des = Vec::with_capacity(desynced_cmd_ids.len());
@@ -284,7 +290,6 @@ impl From<&MicromouseMessage> for Message {
     }
 }
 
-
 impl From<MeasurementMessage> for String {
     fn from(value: MeasurementMessage) -> Self {
         let cmd_id = value.from_cmd;
@@ -298,7 +303,6 @@ impl From<MeasurementMessage> for String {
         )
     }
 }
-
 
 impl std::fmt::Display for MeasurementInterrupt {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

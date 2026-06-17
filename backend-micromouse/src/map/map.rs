@@ -12,6 +12,7 @@ use crate::{
         check::PotentiallyEq,
         measurement::Measurement,
         upgrade::IsUpgradeable,
+        world_data::{PartialWorldData, WorldData},
     },
     transform::{
         direction::{Direction, DirectionNormalizedVector},
@@ -209,8 +210,10 @@ impl<const N: usize> Map<N> {
         Some(&mut self.cell_discovery_status[x][y])
     }
 
-
-    #[instrument(name = "apply_measurement", fields(description = "Change map in such a way, that measurement would occur"))]
+    #[instrument(
+        name = "apply_measurement",
+        fields(description = "Change map in such a way, that measurement would occur")
+    )]
     pub fn apply_measurement(
         &mut self,
         measurement: &Measurement,
@@ -392,11 +395,44 @@ impl<const N: usize> From<PartialMap<N>> for Map<N> {
     }
 }
 
+impl<const N: usize> AsRef<Map<N>> for PartialMap<N> {
+    fn as_ref(&self) -> &Map<N> {
+        &self.0
+    }
+}
+
+impl<const N: usize> AsRef<Map<N>> for WorldData<N> {
+    fn as_ref(&self) -> &Map<N> {
+        &self.map
+    }
+}
+
+impl<const N: usize> AsRef<WorldData<N>> for &WorldData<N> {
+    fn as_ref(&self) -> &WorldData<N> {
+        self
+    }
+}
+
+impl<const N: usize> AsRef<Map<N>> for PartialWorldData<N> {
+    fn as_ref(&self) -> &Map<N> {
+        &self.map
+    }
+}
+
 impl CellDiscoveryStatus {
     pub fn is_discovered(&self) -> bool {
         match self {
             CellDiscoveryStatus::Visited | CellDiscoveryStatus::Discovered => true,
-            _ => false
+            _ => false,
+        }
+    }
+}
+
+impl WallDiscoveryStatus {
+    pub fn is_discovered(&self) -> bool {
+        match self {
+            WallDiscoveryStatus::Visited | WallDiscoveryStatus::Exists(_) => true,
+            _ => false,
         }
     }
 }

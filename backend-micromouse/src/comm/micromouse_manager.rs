@@ -51,7 +51,6 @@ pub struct MicromouseManager<const N: usize> {
     queue_length_sender: tokio::sync::watch::Sender<usize>,
     queue_length_receiver: Mutex<tokio::sync::watch::Receiver<usize>>,
     target_queue_length: usize,
-    battery: Mutex<f32>,
     start_marker: AtomicBool,
     restarting: AtomicBool,
 }
@@ -81,7 +80,6 @@ impl<const N: usize> MicromouseManager<N> {
             mode: Mutex::new(MicromouseMode::Stopped),
             current_command: Mutex::new(None),
             current_world: RwLock::new(WorldData::default()),
-            battery: Mutex::new(100.0),
 
             start_marker: AtomicBool::from(true),
             queue_length_sender,
@@ -326,12 +324,10 @@ impl<const N: usize> MicromouseManager<N> {
                 *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Continue])
             }
-            MicromouseResponse::Battery(b_100) => {
-                let _s = process_span("process_battery");
-                debug!(target: "comm/mng/battery", "BATTERY: {b_100}/100");
-                let f_b = b_100 as f32 / 100.0;
-                *self.battery.lock().await = f_b;
-                Ok(vec![])
+            MicromouseResponse::Sensor { name, value } => {
+                let _s = process_span("process_sensor");
+                debug!(target: "comm/mng/sensor", "SENSOR: {name} = {value}");
+                Ok(vec![MicromouseEvent::Sensor { name, value }])
             }
         }
     }
@@ -631,6 +627,10 @@ pub enum MicromouseEvent {
     Stop,
     Restart,
     Continue,
+    Sensor {
+        name: String,
+        value: f32,
+    },
     Error(MicromouseManagerError),
     DebugMessage(String),
     RejectedOutcomes(NonEmpty<RejectedOutcomes>),

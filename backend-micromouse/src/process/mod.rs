@@ -321,6 +321,9 @@ impl<const N: usize> Process<N> {
             }
             MicromouseEvent::UpdatePosition(p) => {} // MicromouseEvent::
             MicromouseEvent::ResetMapApplied => {}
+            MicromouseEvent::Sensor { ref name, value } => {
+                info!(target: "proc", "SENSOR EVENT {name} = {value}")
+            }
         }
 
         self.frontend_manager
