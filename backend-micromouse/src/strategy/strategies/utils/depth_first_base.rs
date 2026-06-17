@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    usize,
+    u8, usize,
 };
 
 use tracing::instrument;
@@ -30,6 +30,7 @@ pub struct DepthFirstWithCurrent(DepthFirstBase);
 pub struct DepthFirstBase {
     intersections: HashMap<Position, Intersection>,
     intersection_queue: VecDeque<Position>,
+    explored: HashSet<IntersectionPath>,
     path_from_start: Path,
     current_cmd: TaskExecution,
 }
@@ -39,7 +40,7 @@ pub struct Intersection {
     visitable_directions: HashSet<Direction>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct IntersectionPath {
     at_intersection: Position,
     in_direction: Direction,
@@ -88,6 +89,9 @@ impl DepthFirstBase {
 
     pub fn add_new_intersections(&mut self, intersection_paths: Vec<IntersectionPath>) {
         for new_path in intersection_paths {
+            if self.explored.contains(&new_path) {
+                continue;
+            }
             if let Some(existing_intersection) =
                 self.intersections.get_mut(&new_path.at_intersection)
             {
@@ -113,7 +117,7 @@ impl DepthFirstBase {
     ) {
         let mut remove_intersections = vec![];
         for (i_pos, i_dirs) in self.intersections.iter_mut() {
-            i_dirs.visitable_directions = i_dirs
+            let prune_dirs = i_dirs
                 .visitable_directions
                 .clone()
                 .into_iter()
@@ -123,9 +127,17 @@ impl DepthFirstBase {
                         dir: *dir,
                     };
                     let max_steps = max_steps_in_direction(&world, from_origin, goal);
-                    max_steps != 0
-                })
-                .collect();
+                    max_steps == 0
+                });
+
+            for prune_dir in prune_dirs {
+                i_dirs.visitable_directions.remove(&prune_dir);
+                self.explored.insert(IntersectionPath {
+                    at_intersection: *i_pos,
+                    in_direction: prune_dir,
+                });
+            }
+
             if i_dirs.visitable_directions.is_empty() {
                 remove_intersections.push(*i_pos)
             }
@@ -308,10 +320,37 @@ impl DepthFirstWithCurrent {
         map: impl AsRef<Map<N>>,
         from_pos: MouseTransform,
         goal: GoalPosition,
+        interrupt_right: bool,
+        interrupt_left: bool,
     ) -> Command {
         let max_steps_fwd = max_steps_in_direction(map, from_pos, goal);
 
+        self.0.explored.insert(IntersectionPath {
+            at_intersection: from_pos.pos,
+            in_direction: from_pos.dir,
+        });
         let next_move = MovementType::Move(max_steps_fwd as u8);
+        let side_interrupts = (1..=max_steps_fwd).flat_map(|i| {
+            let left_i = if interrupt_left {
+                Some(MeasurementInterrupt {
+                    direction: RelativeDirection::Left,
+                    at_step: InterruptStep::At(i as u32),
+                    action: InterruptAction::StopIfOpen,
+                })
+            } else {
+                None
+            };
+            let right_i = if interrupt_right {
+                Some(MeasurementInterrupt {
+                    direction: RelativeDirection::Right,
+                    at_step: InterruptStep::At(i as u32),
+                    action: InterruptAction::StopIfOpen,
+                })
+            } else {
+                None
+            };
+            left_i.into_iter().chain(right_i)
+        });
         let next_cmd = Command {
             ty: next_move,
             interrupts: vec![
@@ -330,7 +369,10 @@ impl DepthFirstWithCurrent {
                     at_step: InterruptStep::Each,
                     action: InterruptAction::Continue,
                 },
-            ],
+            ]
+            .into_iter()
+            .chain(side_interrupts)
+            .collect(),
         };
 
         self.0.current_cmd = TaskExecution {
@@ -358,7 +400,8 @@ impl DepthFirstWithCurrent {
             ]),
         };
         let mut res = Self(DepthFirstBase {
-            intersections: HashMap::from([(world.mouse.pos.clone(), intersection)]),
+            intersections: HashMap::from([(world.mouse.pos, intersection)]),
+            explored: HashSet::new(),
             intersection_queue: VecDeque::from([world.mouse.pos]),
             path_from_start: Path::new(world.mouse),
             current_cmd: TaskExecution {
