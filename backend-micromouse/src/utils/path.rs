@@ -66,7 +66,7 @@ impl Path {
         debug!(target: "path/op", "Return to {goal_on_path:?}");
         if self.nodes.len() == 1 {
             debug!(target: "path/op", "Only 1 node");
-            let only_node = self.nodes.first().expect("Checked");
+            let only_node = self.nodes.pop().expect("Checked");
             if only_node.pos == goal_on_path.pos {
                 debug!(target: "path/op", "Same pos");
                 let rotate = only_node.dir.shortest_rotate_to(&goal_on_path.dir);
@@ -92,103 +92,50 @@ impl Path {
 
         let mut moves = vec![];
 
-        let mut current_transf = *self.nodes.last().expect("Len >= 1");
+        //INFO: Searching the right segment
 
-        // From the back: delete all the segments until finding one that contains the position (and
-        // then also delete that)
-        while self.nodes.len() > 1 {
-            let last = self.nodes.pop().expect("Len > 1");
-            let second_last = self.nodes.last().expect("Len > 1");
-            debug!(target: "path/op", "Checking segment {last:?} ..= {second_last:?}");
-
-            let x_range = last.pos.x.min(second_last.pos.x)..=last.pos.x.max(second_last.pos.x);
-            let y_range = last.pos.y.min(second_last.pos.y)..=last.pos.y.max(second_last.pos.y);
-
-            let is_inside = x_range.contains(&goal_pos.x) && y_range.contains(&goal_pos.y);
-            if is_inside {
-                debug!(target: "path/op", "Is inside");
-                if last.pos == goal_pos {
-                    if second_last.pos == last.pos {
-                        // The second last ist the node that connects the last move to this cell
-                        // while the last is only a rotated version
-                        self.nodes.push(goal_on_path);
-                    } else {
-                        // The last was necessary to connect the nodes
-                        self.nodes.push(last);
-                        self.nodes.push(goal_on_path);
-                    }
-                } else if second_last.pos == goal_pos {
-                    // the goal is on the second_last, just rotated --> The second_last is gonna be
-                    // replaced
-
-                    self.nodes.pop();
-                    self.nodes.push(goal_on_path);
-                } else {
-                    let directions_aligned = second_last.dir == goal_on_path.dir;
-
-                    if !directions_aligned {
-                        // Inserting an in-between step
-                        self.nodes.push(MouseTransform {
-                            pos: goal_pos,
-                            dir: second_last.dir,
-                        });
-                    }
-                    self.nodes.push(goal_on_path);
-                }
-                let move_dir = current_transf
-                    .pos
-                    .direction_straight_line(goal_pos)
-                    .expect("Should be in straight line");
-                let rotate_to_move = current_transf.dir.shortest_rotate_to(&move_dir);
-                if rotate_to_move != 0 {
-                    moves.push(MovementType::Turn(rotate_to_move));
-                }
-                let fwd = last
-                    .pos
-                    .distance_straight_line(goal_pos)
-                    .expect("Should be in straight line");
-                // if fwd != 0 {
-                    moves.push(MovementType::Move(fwd as u8));
-                // }
-                let rotate_to_goal = move_dir.shortest_rotate_to(&goal_on_path.dir);
-                if rotate_to_goal != 0 {
-                    moves.push(MovementType::Turn(rotate_to_goal));
-                }
-                break;
-            }
-
-            if last.pos != second_last.pos {
-                // Move
-                let move_dir = last
-                    .pos
-                    .direction_straight_line(second_last.pos)
-                    .expect("Should be in straight line");
-                let rotate_to_move = current_transf.dir.shortest_rotate_to(&move_dir);
-                if rotate_to_move != 0 {
-                    moves.push(MovementType::Turn(rotate_to_move));
-                }
-                let fwd = last
-                    .pos
-                    .distance_straight_line(second_last.pos)
-                    .expect("Should be in straight line");
-                moves.push(MovementType::Move(fwd as u8));
-                current_transf = MouseTransform {
-                    pos: second_last.pos,
-                    dir: move_dir,
-                };
-            } else {
-                // only rotation
-                let goal_rot = second_last.dir.rotated(2);
-                let rotate = current_transf.dir.shortest_rotate_to(&goal_rot);
-                if rotate != 0 {
-                    moves.push(MovementType::Turn(rotate))
-                }
-                current_transf = MouseTransform {
-                    pos: second_last.pos,
-                    dir: goal_rot,
-                };
+        // The directions in which the path entered a cell; not the rotation within
+        let mut cell_entrance_directions: Vec<(usize, MouseTransform)> = vec![];
+        for (node_id, node) in self.nodes.iter().enumerate() {
+            if cell_entrance_directions.last().map(|(_id, pos)| pos.pos) != Some(node.pos) {
+                cell_entrance_directions.push((node_id, *node));
             }
         }
+
+        let mut goal_before_entrance = None;
+
+        for i in (1..cell_entrance_directions.len()).rev() {
+            let (maybe_before_id, maybe_before_node) = cell_entrance_directions[i];
+            let (_, to_node) = cell_entrance_directions[i - 1];
+
+            let dir_to_node = maybe_before_node
+                .pos
+                .direction_straight_line(to_node.pos)
+                .expect("Should be in straight line");
+            let without_before = (maybe_before_node.pos + dir_to_node.steps_in_dir(1))
+                .expect("Should be a valid pos");
+
+            let pos_x_range =
+                without_before.x.min(to_node.pos.x)..=without_before.x.max(to_node.pos.x);
+            let pos_y_range =
+                without_before.y.min(to_node.pos.y)..=without_before.y.max(to_node.pos.y);
+
+            if pos_x_range.contains(&goal_pos.x) && pos_y_range.contains(&goal_pos.y) {
+                goal_before_entrance = Some(i);
+            }
+        }
+
+        let Some(goal_before_entrance) = goal_before_entrance else {
+            todo!("Goal is on last pos --> Remove up to the entrance + just rotate + add new (or not, if it is aligned with the entrance)");
+            todo!("Return");
+        };
+        todo!("reverse relative to last entrance");
+        todo!("Likewise --> move from 1 entrance to the other (in reverse) until reaching the entrance that is right after the goal");
+        todo!("(Delete all nodes on the way there; Add the respective moves)");
+
+        todo!("Once reaching the entrance after the goal: Move forward until reaching the goal");
+        todo!("Then: rotate to the right direction");
+        todo!("Delete all nodes after the entrance right before the goal, then place the goal in there");
 
         Ok(moves)
     }
