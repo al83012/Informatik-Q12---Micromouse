@@ -486,8 +486,15 @@ where
                 if expanded || num_of_expandables == 0 {
                     // --> Either we expanded all nodes that we had to expand successfully, or
                     // there were no nodes to expand (they were headless)
+
+                    if num_of_expandables == 0 {
+                        info!(target: "strat", "Increasing full layer --> Layer is completely headless and thus fully expanded");
+                    }
+
                     self.highest_full_layer =
                         MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
+                } else if !expanded {
+                    info!(target: "strat", "Did not increase full layer --> Did not do any expansions even though elements were expandable");
                 }
                 info!(target: "strat", "Increase full layers to {:?}", self.highest_full_layer);
 
