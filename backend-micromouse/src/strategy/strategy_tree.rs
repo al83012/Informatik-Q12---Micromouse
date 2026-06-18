@@ -380,8 +380,7 @@ where
 
         // Once a layer in-between was not fully expanded, that layer and all layers after that
         // will not incr the fully_expanded_layer-counter
-        let mut skipped_layer = false;
-        let mut expanded = false;
+        let mut prev_layer_not_fully_expanded = false;
         // Iterating through all the layers that are still to be expanded
         'expansion: for i in 0..layer_budget {
             // println!("Layerexpansion {i}/{layer_budget}");
@@ -421,6 +420,10 @@ where
                     .collect::<Vec<_>>()
             };
 
+            let num_of_expandables = non_expanded_node_ids.len();
+
+            let mut failed_expansion_in_layer = false;
+            let mut expanded = false;
             'layer_expansion: for non_expanded_node_id in non_expanded_node_ids {
                 let abs_node_id = AbsoluteNodeId {
                     layer_id: layer_to_expand,
@@ -445,7 +448,7 @@ where
                     }
                     NodeExpansionResult::NotYetExpandable => {
                         info!(target: "strat", "Could not expand yet --> skipped_layer = true");
-                        skipped_layer = true;
+                        prev_layer_not_fully_expanded = true;
                         // INFO: This should be alright, as long as the root node isn't being
                         // completed and is the only one left
                     }
@@ -472,7 +475,7 @@ where
                     break 'expansion;
                 }
             }
-            if skipped_layer {
+            if prev_layer_not_fully_expanded {
                 // We skipped some node expansion in this layer as it was not yet available to us
                 // INFO: it will still try to expand the already existing layers up to that depth,
                 // but it will not incr the expanden-layer-counter
@@ -480,10 +483,11 @@ where
             } else {
                 layers_fully_expanded += 1;
                 // The highest full layer is the layer after one in which all nodes were expanded
-                if expanded {
+                if expanded || num_of_expandables == 0 {
+                    // --> Either we expanded all nodes that we had to expand successfully, or
+                    // there were no nodes to expand (they were headless)
                     self.highest_full_layer =
                         MarkerLayerId::AtLayer(layer_to_expand + RelativeLayerId(1));
-                    expanded = false;
                 }
                 info!(target: "strat", "Increase full layers to {:?}", self.highest_full_layer);
 
