@@ -4,6 +4,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
+use tokio_util::either;
 use tracing::instrument;
 
 use crate::{
@@ -16,7 +17,12 @@ use crate::{
         world_data::{PartialWorldData, WorldData},
     },
     strategy::{
-        strategies::utils::{depth_first_base::DepthFirstBase, value_map::ValueMap},
+        strategies::utils::{
+            depth_first_base::{
+                DepthFirstBase, DepthFirstWithCurrent, MaybeInitDepthFirst, PathRanking,
+            },
+            value_map::ValueMap,
+        },
         strategy::{
             ComputedAction, ComputedActions, FromConfig, Strategy, StrategyComputationResult,
             StrategyEndState,
@@ -34,12 +40,15 @@ use crate::{
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 pub struct DepthFirstConfig {
-    pub forward_first: bool,
+    pub path_ranking: PathRanking,
+    pub interrupt_left: bool,
+    pub interrupt_right: bool,
 }
 
 #[derive(Clone, Debug)]
 pub struct DepthFirst<const N: usize> {
-    df_base: DepthFirstBase,
+    df: MaybeInitDepthFirst,
+    config: DepthFirstConfig,
 }
 
 impl<const N: usize> FromConfig<N> for DepthFirst<N> {
@@ -50,7 +59,10 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
         fields(description = "Create new DepthFirst-Strategy instance based on config")
     )]
     fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self {
-        todo!("")
+        Self {
+            df: MaybeInitDepthFirst::HasInitialStep(DepthFirstWithCurrent::new(starting_state)),
+            config: config.clone(),
+        }
     }
 }
 
@@ -70,6 +82,72 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         if world.mouse.pos == goal.0 {
             return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
         }
-        todo!()
+
+        let df = match self.df {
+            MaybeInitDepthFirst::HasInitialStep(ref with_initial) => {
+                let (init_cmd, successor) = with_initial.clone().move_forward_from(
+                    world,
+                    world.mouse,
+                    *goal,
+                    self.config.interrupt_right,
+                    self.config.interrupt_left,
+                );
+                return StrategyComputationResult::Computed(Ok(ComputedActions(NonEmpty::one(
+                    ComputedAction {
+                        next_strategy_state: Some(Self {
+                            df: MaybeInitDepthFirst::WithoutCurrentStep(successor),
+                            config: self.config.clone(),
+                        }),
+                        after_command: init_cmd,
+                    },
+                ))));
+            }
+            MaybeInitDepthFirst::WithoutCurrentStep(ref df) => df,
+        };
+
+        let Some(mut successor) = df.with_current_world(world, *goal) else {
+            return StrategyComputationResult::NotEnoughInformation;
+        };
+
+        let (headless_moves, moves_dest) =
+            match successor.moves_to_next_intersection(self.config.path_ranking, *goal) {
+                Ok((moves, dest)) => (moves, dest),
+                Err(strat_end) => return StrategyComputationResult::Computed(Err(strat_end)),
+            };
+        let (seeking_move, successor) = successor.move_forward_from(
+            world,
+            moves_dest,
+            *goal,
+            self.config.interrupt_right,
+            self.config.interrupt_left,
+        );
+
+        let successor = Self {
+            df: MaybeInitDepthFirst::WithoutCurrentStep(successor),
+            config: self.config.clone(),
+        };
+
+        let actions: Vec<_> = headless_moves
+            .into_iter()
+            .map(|m| {
+                let cmd = Command {
+                    ty: m,
+                    interrupts: vec![],
+                };
+                ComputedAction {
+                    // Non-expandable / headless
+                    next_strategy_state: None,
+                    after_command: cmd,
+                }
+            })
+            .chain(Some(ComputedAction {
+                next_strategy_state: Some(successor),
+                after_command: seeking_move,
+            }))
+            .collect();
+
+        StrategyComputationResult::Computed(Ok(ComputedActions(
+            actions.non_empty().expect("Command have to be non_empty"),
+        )))
     }
 }

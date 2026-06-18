@@ -4,7 +4,7 @@ use crate::{
         dyn_strategy_tree::{DynStrategyConfig, StrategyChangeCommand},
         strategies::{
             breadth_first::BreadthFirstConfig, dbg_known_path::DbgKnownPathConfig,
-            depth_first::DepthFirstConfig,
+            depth_first::DepthFirstConfig, utils::depth_first_base::PathRanking,
         },
         strategy::GoalPosition,
     },
@@ -122,7 +122,9 @@ fn test_parse_frontend_msg() {
             "reset_map": true,
             "set_strategy": {
                 "DepthFirst" : {
-                    "forward_first": true
+                    "path_ranking": "LowestMoves",
+                    "interrupt_right": false,
+                    "interrupt_left": false
                 }
             }
         }
@@ -133,7 +135,9 @@ fn test_parse_frontend_msg() {
         FrontendResponse::StrategyChange(StrategyChangeCommand {
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::DepthFirst(DepthFirstConfig {
-                forward_first: true
+                path_ranking: PathRanking::LowestMoves,
+                interrupt_right: false,
+                interrupt_left: false,
             })),
             set_goal: None
         })

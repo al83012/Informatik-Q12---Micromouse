@@ -3,6 +3,7 @@ use std::{
     u8, usize,
 };
 
+use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
 use crate::{
@@ -24,6 +25,7 @@ use crate::{
 
 // The successor of the DepthFirstBase (Will create a clone of the DFB if the construction is
 // successful)
+#[derive(Clone, Debug)]
 pub struct DepthFirstWithCurrent(DepthFirstBase);
 
 #[derive(Clone, Debug)]
@@ -33,6 +35,12 @@ pub struct DepthFirstBase {
     explored: HashSet<IntersectionPath>,
     path_from_start: Path,
     current_cmd: TaskExecution,
+}
+
+#[derive(Clone, Debug)]
+pub enum MaybeInitDepthFirst {
+    HasInitialStep(DepthFirstWithCurrent),
+    WithoutCurrentStep(DepthFirstBase),
 }
 
 #[derive(Clone, Debug)]
@@ -46,7 +54,7 @@ pub struct IntersectionPath {
     in_direction: Direction,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy, Serialize, Deserialize, PartialEq)]
 pub enum PathRanking {
     Undefined,
     LowestMoves,
@@ -54,6 +62,7 @@ pub enum PathRanking {
         turn_value: usize,
         move_value: usize,
     },
+    TowardsGoal,
 }
 
 #[derive(Clone, Debug)]
@@ -245,6 +254,7 @@ impl DepthFirstWithCurrent {
     pub fn moves_to_next_intersection(
         &mut self,
         path_ranking: PathRanking,
+        goal: GoalPosition,
     ) -> Result<(Vec<MovementType>, MouseTransform), StrategyEndState> {
         let move_back_to_pos =
             self.0
@@ -288,6 +298,17 @@ impl DepthFirstWithCurrent {
                         MovementType::Move(x) => *x as usize * move_value,
                     })
                     .sum(),
+                PathRanking::TowardsGoal => {
+                    if let Some(neighbor_pos) = *move_back_to_pos + dir.steps_in_dir(1) {
+                        let dx = goal.0.x as i32 - neighbor_pos.x as i32;
+                        let dy = goal.0.y as i32 - neighbor_pos.y as i32;
+
+                        let manhattan_dist = (dx.abs() + dy.abs()) as usize;
+                        manhattan_dist
+                    } else {
+                        usize::MAX
+                    }
+                }
             };
 
             if score < best_ranking {
@@ -315,14 +336,14 @@ impl DepthFirstWithCurrent {
         // Also: skips any intersections that are guaranteed to have 0 max_steps
     }
 
-    fn move_forward_from<const N: usize>(
-        &mut self,
+    pub fn move_forward_from<const N: usize>(
+        mut self,
         map: impl AsRef<Map<N>>,
         from_pos: MouseTransform,
         goal: GoalPosition,
         interrupt_right: bool,
         interrupt_left: bool,
-    ) -> Command {
+    ) -> (Command, DepthFirstBase) {
         let max_steps_fwd = max_steps_in_direction(map, from_pos, goal);
 
         self.0.explored.insert(IntersectionPath {
@@ -379,7 +400,7 @@ impl DepthFirstWithCurrent {
             from_pos,
             do_cmd: next_cmd.clone(),
         };
-        next_cmd
+        (next_cmd, self.0)
     }
 
     // Prepares for next step / successor
@@ -389,7 +410,7 @@ impl DepthFirstWithCurrent {
 
     // This is the entry-point of the Base <-> Current relationship as this does not require a
     // measure-check before being able to output the initial cmd
-    pub fn new<const N: usize>(world: impl AsRef<WorldData<N>>, goal: GoalPosition) -> Self {
+    pub fn new<const N: usize>(world: impl AsRef<WorldData<N>>) -> Self {
         let world = world.as_ref();
         let intersection = Intersection {
             visitable_directions: HashSet::from([
@@ -399,7 +420,7 @@ impl DepthFirstWithCurrent {
                 Direction::NegY,
             ]),
         };
-        let mut res = Self(DepthFirstBase {
+        let res = Self(DepthFirstBase {
             intersections: HashMap::from([(world.mouse.pos, intersection)]),
             explored: HashSet::new(),
             intersection_queue: VecDeque::from([world.mouse.pos]),
@@ -413,7 +434,6 @@ impl DepthFirstWithCurrent {
             },
         });
 
-        res.0.prune_zero_steps(world, goal);
         res
     }
 }

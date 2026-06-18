@@ -442,3 +442,9 @@ impl<const N: usize> From<PartialWorldData<N>> for WorldData<N> {
         }
     }
 }
+
+impl<const N: usize> AsRef<WorldData<N>> for PartialWorldData<N> {
+    fn as_ref(&self) -> &WorldData<N> {
+        &self.0
+    }
+}
