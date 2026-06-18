@@ -27,6 +27,7 @@ use crate::{
         strategies::{
             depth_first::DepthFirstConfig,
             follow_wall::{FollowWallConfig, WallDirection},
+            utils::depth_first_base::PathRanking,
         },
         strategy::GoalPosition,
         strategy_tree::AbsolutePathId,
@@ -56,18 +57,20 @@ impl FrontendSimulator {
             .expect("Connection failed");
         info!(target: "test/sim", " < Connection Response = {response:?}");
 
+        tokio::time::sleep(Duration::from_secs(2)).await;
         let msg = FrontendResponse::StrategyChange(StrategyChangeCommand {
             set_goal: None,
             reset_map: true,
-            set_strategy: Some(DynStrategyConfig::<10>::FollowWall(FollowWallConfig {
-                follow_wall: WallDirection::Right,
-                measure_all: false,
+            set_strategy: Some(DynStrategyConfig::<10>::DepthFirst(DepthFirstConfig {
+                path_ranking: PathRanking::Undefined,
+                interrupt_right: false,
+                interrupt_left: false,
             })),
         });
 
         ws_stream
             .send(Message::Text(Utf8Bytes::from(
-                serde_json::ser::to_string_pretty(&msg).expect("Shoudl be parseable"),
+                serde_json::ser::to_string_pretty(&msg).expect("Should be parseable"),
             )))
             .await;
 
@@ -132,6 +135,7 @@ impl FrontendSimulator {
                             }
                         }
                         let next_strat = self.other_strategy();
+                        // panic!("NEXT STRAT: {next_strat:?}");
                         ws_stream
                             .send(Message::Text(Utf8Bytes::from(next_strat)))
                             .await
@@ -158,17 +162,27 @@ impl FrontendSimulator {
         let current_strat_id = self.current_strat_id % 2;
 
         let next: &DynStrategyConfig<10> = &[
-            DynStrategyConfig::FollowWall(FollowWallConfig {
-                follow_wall: WallDirection::Right,
-                measure_all: true,
+            DynStrategyConfig::DepthFirst(DepthFirstConfig {
+                path_ranking: PathRanking::Undefined,
+                interrupt_left: false,
+                interrupt_right: false,
             }),
+            // DynStrategyConfig::FollowWall(FollowWallConfig {
+            //     follow_wall: WallDirection::Right,
+            //     measure_all: true,
+            // }),
             // DynStrategyConfig::DepthFirst(DepthFirstConfig {
             //     forward_first: true,
             // }),
-            DynStrategyConfig::FollowWall(FollowWallConfig {
-                follow_wall: WallDirection::Right,
-                measure_all: false,
+            DynStrategyConfig::DepthFirst(DepthFirstConfig {
+                path_ranking: PathRanking::TowardsGoal,
+                interrupt_left: false,
+                interrupt_right: false,
             }),
+            // DynStrategyConfig::FollowWall(FollowWallConfig {
+            //     follow_wall: WallDirection::Right,
+            //     measure_all: false,
+            // }),
         ][current_strat_id];
 
         let next_pos = [Position { x: 0, y: 0 }, Position { x: 5, y: 5 }][current_strat_id];
