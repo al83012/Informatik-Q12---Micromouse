@@ -14,7 +14,7 @@
 #include "Components/iis2mdc.h"
 #include "i2ctool.h"
 #include "spitool.h"
-
+#include "measurement.h"
 
 void Esp32::initESP32() {
     Serial.begin(Esp32::HardwareConfig::Serial_Clock);
@@ -38,6 +38,8 @@ void Esp32::initSubComponents() {
     //IIS2MDC::init();
     TPL0102::init(3.4); 
     //Fan::init();
+    Measurement::IR::init();
+   
 }
 
 void Esp32::initPinStates() {

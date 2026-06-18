@@ -10,6 +10,7 @@
 #include "Components/Esp32.h"
 #include "components/tpl0102.h"
 #include "components/tmp464.h"
+#include "measurement.h"
 
 #include "i2ctool.h"
 
@@ -24,7 +25,7 @@ Esp32::initESP32();
 
  TPL0102::DbgPrintVoltages();
  TMP464::DbgPrintTemperatures(); 
-
+ //Measurement::IR::debugPrintRawDistance(0);
 
 }
 

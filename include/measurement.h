@@ -1,7 +1,53 @@
 #ifndef MEASUREMENT_H
 #define MEASUREMENT_H
 #include "string"
+#include "Arduino.h"
+
 namespace Measurement {
+
+
+
+    namespace IR
+    {
+        constexpr int EMITTERS[4] = {IRLED_0, IRLED_1, IRLED_2, IRLED_3};
+        constexpr int RECEIVERS[4] = {PD_0, PD_1, PD_2, PD_3};
+
+       inline int FinalDistances_Unconverted[4];
+       inline int RawDistances_Unconverted[4];
+       inline int Noises[4];
+
+        void init();
+
+        int getDistance(int channel);
+        int getNoise(int channel);
+
+
+        void refreshDistance(int channel);
+      //  void refreshAllDistances();
+
+        void refreshNoise(int channel);
+     //   void refreshAllNoises();
+
+        void debugPrintRawDistance(int channel);
+
+
+        namespace Emitters {
+            void initIR_LEDs();
+            void enableLED(int channel);
+            void disableLED(int channel);
+
+        }
+
+        namespace Receivers {
+            void initPhotoSensors();
+            int readDistance(int channel);
+            int readAmbientNoise(int channel);
+            
+        }
+
+    } 
+    
+
 
     namespace Sensors {
     

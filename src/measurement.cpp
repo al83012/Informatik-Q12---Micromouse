@@ -96,3 +96,114 @@ void Measurement::Sensors::sendSensorData(SensorData data, float value) {
             default:                             return 0x00;
         }
 }
+
+void Measurement::IR::Emitters::initIR_LEDs() {
+    for (int i = 0; i < 4; i++)
+    {
+        log_i("# Setting IR_LED_PINS to OUTPUT...");
+        pinMode(EMITTERS[i], OUTPUT);
+        digitalWrite(EMITTERS[i], LOW);
+    }
+    
+}
+
+void Measurement::IR::Receivers::initPhotoSensors() {
+    for (int i = 0; i < 4; i++)
+    {
+        log_i("# Setting PD_PINS to INPUT...");
+        pinMode(RECEIVERS[i], INPUT);
+    }
+}
+
+int Measurement::IR::Receivers::readAmbientNoise(int channel) {
+    log_i("# Trying to read ambient noise on channel %d", channel);
+
+    if(channel >= 4 || channel < 0) {
+        log_e("# Invalid channel for reading ambient noise!");
+        return 0;
+    }
+    int noise = analogRead(Measurement::IR::RECEIVERS[channel]);
+    return noise;
+}
+
+void Measurement::IR::Emitters::enableLED(int channel) {
+    log_i("# Trying to enable IR_LED on channel %d", channel);
+    if(channel > 4 || channel < 0) {
+    log_e("# Invalid channel for pulsing IR_LED!");
+    return;
+    } else {
+    digitalWrite(EMITTERS[channel], HIGH);
+    }
+}
+
+void Measurement::IR::Emitters::disableLED(int channel) {
+
+    //No print statements or logic for turning off to save time
+
+    digitalWrite(EMITTERS[channel], LOW);
+
+}
+
+int Measurement::IR::Receivers::readDistance(int channel) {
+    return analogRead(RECEIVERS[channel]);
+}
+
+void Measurement::IR::refreshDistance(int channel) {
+
+    log_i("# Trying to refresh distance on channel %d", channel);
+    if(channel > 4 || channel < 0) {
+        log_e("# Invalid channel for refreshing distance");
+    }
+
+    refreshNoise(channel);
+    Measurement::IR::Emitters::enableLED(channel);
+    delayMicroseconds(4);
+    RawDistances_Unconverted[channel] = Measurement::IR::Receivers::readDistance(channel);
+    Measurement::IR::Emitters::disableLED(channel);
+    int delta = RawDistances_Unconverted[channel] - Noises[channel];
+
+    if(delta < 0) {
+        FinalDistances_Unconverted[channel] = 0;
+    } else {
+        FinalDistances_Unconverted[channel] = delta;
+    }
+}
+
+void Measurement::IR::refreshNoise(int channel) {
+     log_i("# Refreshing noise on channel %d", channel);
+
+    if(channel > 4 || channel < 0) {
+        log_e("# Invalid channel for refreshing ambient noise!");
+        return;
+    } else {
+        Noises[channel] = Measurement::IR::Receivers::readAmbientNoise(channel);
+    }
+}
+
+int Measurement::IR::getDistance(int channel) {
+    if(channel > 4 || channel < 0) {
+        return 0 ;
+    } else {
+        return FinalDistances_Unconverted[channel];
+    }
+}
+
+int Measurement::IR::getNoise(int channel) {
+    if(channel > 4 || channel < 0) {
+        return 0 ;
+    } else {
+        return Noises[channel];
+    }
+}
+
+void Measurement::IR::debugPrintRawDistance(int channel) {
+    log_d("# Noise of channel %d : %d", channel, Noises[channel]);
+    log_d("# Raw value of channel %d : %d", channel, FinalDistances_Unconverted[channel]);
+
+} 
+
+void Measurement::IR::init() {
+    log_i("# Initializing IR-Sensor-System");
+    Measurement::IR::Emitters::initIR_LEDs();
+    Measurement::IR::Receivers::initPhotoSensors();
+}
