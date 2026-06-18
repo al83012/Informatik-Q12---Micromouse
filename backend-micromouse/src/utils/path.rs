@@ -47,7 +47,7 @@ impl Path {
     // Like connect_to, but will first check that the given end is not already the last element
     pub fn end_with(&mut self, end: MouseTransform) -> bool {
         if self.nodes.last() != Some(&end) {
-            self.connect_to(end)        
+            self.connect_to(end)
         } else {
             false
         }
@@ -66,7 +66,7 @@ impl Path {
         debug!(target: "path/op", "Return to {goal_on_path:?}");
         if self.nodes.len() == 1 {
             debug!(target: "path/op", "Only 1 node");
-            let only_node = self.nodes.get(0).expect("Checked");
+            let only_node = self.nodes.first().expect("Checked");
             if only_node.pos == goal_on_path.pos {
                 debug!(target: "path/op", "Same pos");
                 let rotate = only_node.dir.shortest_rotate_to(&goal_on_path.dir);
@@ -92,7 +92,7 @@ impl Path {
 
         let mut moves = vec![];
 
-        let mut current_transf = self.nodes.last().expect("Len >= 1").clone();
+        let mut current_transf = *self.nodes.last().expect("Len >= 1");
 
         // From the back: delete all the segments until finding one that contains the position (and
         // then also delete that)
@@ -107,7 +107,17 @@ impl Path {
             let is_inside = x_range.contains(&goal_pos.x) && y_range.contains(&goal_pos.y);
             if is_inside {
                 debug!(target: "path/op", "Is inside");
-                if second_last.pos == goal_pos {
+                if last.pos == goal_pos {
+                    if second_last.pos == last.pos {
+                        // The second last ist the node that connects the last move to this cell
+                        // while the last is only a rotated version
+                        self.nodes.push(goal_on_path);
+                    } else {
+                        // The last was necessary to connect the nodes
+                        self.nodes.push(last);
+                        self.nodes.push(goal_on_path);
+                    }
+                } else if second_last.pos == goal_pos {
                     // the goal is on the second_last, just rotated --> The second_last is gonna be
                     // replaced
 
@@ -137,7 +147,9 @@ impl Path {
                     .pos
                     .distance_straight_line(goal_pos)
                     .expect("Should be in straight line");
-                moves.push(MovementType::Move(fwd as u8));
+                // if fwd != 0 {
+                    moves.push(MovementType::Move(fwd as u8));
+                // }
                 let rotate_to_goal = move_dir.shortest_rotate_to(&goal_on_path.dir);
                 if rotate_to_goal != 0 {
                     moves.push(MovementType::Turn(rotate_to_goal));
@@ -234,7 +246,6 @@ impl Path {
 
         moves
     }
-
 }
 
 #[derive(Debug, PartialEq, Clone)]
