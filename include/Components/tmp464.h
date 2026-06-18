@@ -51,13 +51,13 @@ namespace ComponentVars {
      float readRemoteTemperature(uint8_t channel);
 
     //10 bit bits available, rest will be ignored automatically (+-255 [0 = -255 | 256 = 0 | 512 = no limit])
-     void setLocalTermLimit(uint16_t limit);
-     void setLocalTerm2Limit(uint16_t limit);
+     void setLocalThermLimit(uint16_t limit);
+     void setLocalTherm2Limit(uint16_t limit);
 
-     void setRemoteTermLimit(uint8_t channel, uint16_t limit);
-     void setRemoteTerm2Limit(uint8_t channel, uint16_t limit);
+     void setRemoteThermLimit(uint8_t channel, uint16_t limit);
+     void setRemoteTherm2Limit(uint8_t channel, uint16_t limit);
 
-     void setGlobalTermLimits(uint16_t lowestSafeTemp, uint16_t highestSafeTemp);
+     void setGlobalThermLimits(uint16_t lowestSafeTemp, uint16_t highestSafeTemp);
     
      float convertToCelsius(uint16_t rawValue);
 

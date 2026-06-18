@@ -42,7 +42,7 @@ float TMP464::convertToCelsius(uint16_t rawValue) {
     return (signedTemp >> 3) * 0.0625f; //Shift 3 bits, since data is only stored in the upper 13 bits (resolution of 0.0625 - fixed)
 }
 
-void TMP464::setLocalTermLimit(uint16_t limit) {
+void TMP464::setLocalThermLimit(uint16_t limit) {
     if(limit > 256) {
     log_e("# Invalid temperature limit (LocalTempLimit - TMP464)!");
     uint16_t formatted_limit = limit << 8;
@@ -51,7 +51,7 @@ void TMP464::setLocalTermLimit(uint16_t limit) {
     }
 }
 
-void TMP464::setLocalTerm2Limit(uint16_t limit) {
+void TMP464::setLocalTherm2Limit(uint16_t limit) {
     if(limit > 256) {
     log_e("# Invalid temperature limit2 (LocalTempLimit2 - TMP464)!");
     uint16_t formatted_limit = limit << 8;
@@ -60,7 +60,7 @@ void TMP464::setLocalTerm2Limit(uint16_t limit) {
     }
 }
 
-void TMP464::setRemoteTermLimit(uint8_t channel, uint16_t limit) {
+void TMP464::setRemoteThermLimit(uint8_t channel, uint16_t limit) {
     log_d("# (TMP464) Trying to set RemoteTemp Limit %d", limit , "for channel %d", channel);
     if(limit > 256) {
     log_e("# Invalid temperature limit (RemoteTemp - TMP464)!");
@@ -83,7 +83,7 @@ void TMP464::setRemoteTermLimit(uint8_t channel, uint16_t limit) {
 
 }
 
-void TMP464::setRemoteTerm2Limit(uint8_t channel, uint16_t limit) {
+void TMP464::setRemoteTherm2Limit(uint8_t channel, uint16_t limit) {
     log_d("# (TMP464) Trying to set RemoteTemp Limit %d", limit , "for channel %d", channel);
     if(limit > 256) {
     log_e("# Invalid temperature limit (RemoteTemp - TMP464)!");
@@ -105,24 +105,24 @@ void TMP464::setRemoteTerm2Limit(uint8_t channel, uint16_t limit) {
     }
 }
 
-void TMP464::setGlobalTermLimits(uint16_t lowestSafeTemp, uint16_t highestSafeTemp) {
+void TMP464::setGlobalThermLimits(uint16_t lowestSafeTemp, uint16_t highestSafeTemp) {
 
     log_d("# (TMP464) Trying to set global temperature limits");
 
-    setLocalTermLimit(lowestSafeTemp);
-    setLocalTerm2Limit(highestSafeTemp);
+    setLocalThermLimit(lowestSafeTemp);
+    setLocalTherm2Limit(highestSafeTemp);
 
-    setRemoteTermLimit(1, lowestSafeTemp);
-    setRemoteTerm2Limit(1, highestSafeTemp);
+    setRemoteThermLimit(1, lowestSafeTemp);
+    setRemoteTherm2Limit(1, highestSafeTemp);
 
-    setRemoteTermLimit(2, lowestSafeTemp);
-    setRemoteTerm2Limit(2, highestSafeTemp);
+    setRemoteThermLimit(2, lowestSafeTemp);
+    setRemoteTherm2Limit(2, highestSafeTemp);
 
-    setRemoteTermLimit(3, lowestSafeTemp);
-    setRemoteTerm2Limit(3, highestSafeTemp);
+    setRemoteThermLimit(3, lowestSafeTemp);
+    setRemoteTherm2Limit(3, highestSafeTemp);
 
-    setRemoteTermLimit(4, lowestSafeTemp);
-    setRemoteTerm2Limit(4, highestSafeTemp);
+    setRemoteThermLimit(4, lowestSafeTemp);
+    setRemoteTherm2Limit(4, highestSafeTemp);
 
 }
 
