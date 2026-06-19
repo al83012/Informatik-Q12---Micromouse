@@ -634,11 +634,6 @@ where
                         branch: child_path_id,
                     };
 
-                    self.visuals.create_path(
-                        path_id.clone(),
-                        PathSegment::new(parent_pos, child_world.mouse)
-                            .expect("Child should form valid path"),
-                    );
                     // TODO: maybe reset child_world
                     let child_node = StrategyTreeNode::new_leaf(
                         child_world.clone(),
@@ -646,6 +641,12 @@ where
                         path_id,
                     );
                     let child_node_id = { self.add_node(child_node, child_node_layer) };
+                    self.visuals.create_path(
+                        PathSegment::new(parent_pos, child_world.mouse)
+                            .expect("Child should form valid path"),
+                        parent_node,
+                        child_node_id,
+                    );
                     info!(target: "strat", link_node_id = child_node_id.link(), "CHILD NODE {child_node_id:?}\n{child_world}");
                     nodes_created += 1;
                     new_apply_on_node.push(child_node_id);
@@ -905,7 +906,10 @@ where
             }
         }
 
+        let old_root_id = self.root_node();
+        self.visuals.remove_node(old_root_id);
         self.layers.remove(0);
+
         self.node_count -= 1;
 
         let new_first_layer = self.layers.first_mut().expect("Has Successor");
@@ -1026,8 +1030,9 @@ where
             return Err(PruneError::UnknownNode(node_and_children));
         };
 
+        self.visuals.prune_path(node_and_children);
+
         if let Some((child_id, parent)) = node_to_delete.as_branch_from_parent.clone().map(|p| {
-            self.visuals.remove_path(p.clone());
             (
                 p.branch,
                 self.node_mut(p.from_node).expect("Parent should exist"),

@@ -126,6 +126,25 @@ impl Path {
         }
 
         let Some(goal_before_entrance) = goal_before_entrance else {
+            let rotate_to = goal_on_path.dir;
+            let entrance = cell_entrance_directions.last().expect("len > 1");
+            let entrance_rotation = entrance.1.dir;
+            let entrance_idx = entrance.0;
+            let final_rotation = self.nodes.last().expect("len > 1").dir;
+
+            // remove up to the entrance:
+            while self.nodes.len() > entrance_idx + 1 {
+                self.nodes.pop();
+            }
+
+            let rotation_cmd = final_rotation.shortest_rotate_to(&rotate_to);
+            if rotation_cmd != 0 {
+                moves.push(MovementType::Turn(rotation_cmd));
+            }
+
+
+
+
             todo!("Goal is on last pos --> Remove up to the entrance + just rotate + add new (or not, if it is aligned with the entrance)");
             todo!("Return");
         };

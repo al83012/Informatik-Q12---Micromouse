@@ -34,7 +34,7 @@ pub enum CmdVisualEventType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PathVisualEvent {
-    path_id: AbsolutePathId,
+    associated_node: AbsoluteNodeId,
     ty: PathVisualEventType,
 }
 
@@ -42,8 +42,10 @@ pub struct PathVisualEvent {
 pub enum PathVisualEventType {
     Create {
         path: PathSegment,
+        leads_to_child_node: AbsoluteNodeId,
     },
     Remove,
+    Prune,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,25 +65,39 @@ impl FrontendVisuals {
     }
     pub fn create_path(
         &mut self,
-        path_id: AbsolutePathId,
         path: PathSegment,
+        from_node: AbsoluteNodeId,
+        to_node: AbsoluteNodeId,
     ) {
         self.event_sender
             .send(TreeVisualEvent::from(PathVisualEvent {
-                path_id,
+                associated_node: from_node,
                 ty: PathVisualEventType::Create {
                     path,
+                    leads_to_child_node: to_node,
                 },
             }))
             .expect("Should be open during execution");
     }
 
-    pub fn remove_path(&self, path_id: AbsolutePathId) {
+    pub fn remove_node(&self, node: AbsoluteNodeId) {
         self.event_sender
             .send(
                 PathVisualEvent {
-                    path_id,
+                    associated_node: node,
                     ty: PathVisualEventType::Remove,
+                }
+                .into(),
+            )
+            .expect("Should be open during execution");
+    }
+
+    pub fn prune_path(&self, from_node: AbsoluteNodeId) {
+        self.event_sender
+            .send(
+                PathVisualEvent {
+                    associated_node: from_node,
+                    ty: PathVisualEventType::Prune,
                 }
                 .into(),
             )
