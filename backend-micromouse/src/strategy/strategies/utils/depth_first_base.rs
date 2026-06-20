@@ -208,6 +208,7 @@ impl DepthFirstBase {
         world: impl AsRef<WorldData<N>>,
         is_visitable: impl Fn(Map<N>, Position, Direction) -> bool,
     ) -> Option<Vec<IntersectionPath>> {
+        info!(target: "strat/dfs", "TESTING EXPANDABLE after doing move {:?}", self.current_cmd);
         let world: &WorldData<N> = world.as_ref();
         let transformed_move: TransformedMovement = self.current_cmd.clone().into();
 
@@ -233,6 +234,7 @@ impl DepthFirstBase {
                 };
 
                 if !is_discovered {
+                    info!(target: "strat/dfs", "Failed at {pos_at_step:?} {dir:?} --> Undiscovered");
                     return None;
                 }
 
@@ -348,8 +350,7 @@ impl DepthFirstWithCurrent {
                         let dx = goal.0.x as i32 - neighbor_pos.x as i32;
                         let dy = goal.0.y as i32 - neighbor_pos.y as i32;
 
-                        let manhattan_dist = (dx.abs() + dy.abs()) as usize;
-                        manhattan_dist
+                        (dx * dx + dy * dy) as usize
                     } else {
                         usize::MAX
                     }

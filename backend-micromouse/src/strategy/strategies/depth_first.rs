@@ -5,7 +5,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use tokio_util::either;
-use tracing::instrument;
+use tracing::{info, instrument};
 
 use crate::{
     comm::micromouse_message::{
@@ -83,6 +83,7 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
 
         let df = match self.df {
             MaybeInitDepthFirst::HasInitialStep(ref with_initial) => {
+                info!(target: "strat/dfs", "INITIAL CMD: ");
                 let (init_cmd, successor) = with_initial.clone().move_forward_from(
                     world,
                     world.mouse,
@@ -102,8 +103,10 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
             }
             MaybeInitDepthFirst::WithoutCurrentStep(ref df) => df,
         };
+        info!(target: "strat/dfs", "TRY EXPAND DFS");
 
         let Some(mut successor) = df.with_current_world(world, *goal) else {
+            info!(target: "strat/dfs", "--> Not enough information");
             return StrategyComputationResult::NotEnoughInformation;
         };
 

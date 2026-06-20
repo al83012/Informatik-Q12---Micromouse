@@ -883,6 +883,8 @@ where
             }
             NodeExpansionResult::NotYetExpandable => {
                 error!(target: "strat", link_node_id = successor.link(), "Successor can never be expanded; Waiting for more measurements, but there are no more coming");
+                let successor_world = &self.node(successor).expect("Successor exists").on_basis_of_world;
+                error!(target: "strat", "WORLD NOT ENOUGH: \n{successor_world}");
                 return Err(FinishRootError::SuccessorNotYetExpandable);
             }
             NodeExpansionResult::EndState(s) => {
