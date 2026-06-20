@@ -151,3 +151,15 @@ impl<const N: usize> Iterator for RayIterator<N> {
         }
     }
 }
+
+
+impl std::ops::Sub<Position> for Position {
+    type Output = PositionOffset;
+
+    fn sub(self, rhs: Position) -> Self::Output {
+        PositionOffset {
+            d_x: self.x as i32 - rhs.x as i32,
+            d_y: self.y as i32 - rhs.y as i32
+        }
+    }
+}

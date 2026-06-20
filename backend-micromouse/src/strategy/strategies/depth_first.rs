@@ -24,8 +24,8 @@ use crate::{
             value_map::ValueMap,
         },
         strategy::{
-            ComputedAction, ComputedActions, FromConfig, Strategy, StrategyComputationResult,
-            StrategyEndState,
+            ComputedAction, ComputedActions, FromConfig, GoalPosition, Strategy,
+            StrategyComputationResult, StrategyEndState,
         },
     },
     transform::{
@@ -41,8 +41,6 @@ use crate::{
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 pub struct DepthFirstConfig {
     pub path_ranking: PathRanking,
-    pub interrupt_left: bool,
-    pub interrupt_right: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -89,8 +87,8 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
                     world,
                     world.mouse,
                     *goal,
-                    self.config.interrupt_right,
-                    self.config.interrupt_left,
+                    Self::interrupt_right(self.config.path_ranking, world.mouse, *goal),
+                    Self::interrupt_left(self.config.path_ranking, world.mouse, *goal),
                 );
                 return StrategyComputationResult::Computed(Ok(ComputedActions(NonEmpty::one(
                     ComputedAction {
@@ -118,8 +116,8 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
             world,
             moves_dest,
             *goal,
-            self.config.interrupt_right,
-            self.config.interrupt_left,
+            Self::interrupt_right(self.config.path_ranking, moves_dest, *goal),
+            Self::interrupt_left(self.config.path_ranking, moves_dest, *goal),
         );
 
         let successor = Self {
@@ -149,5 +147,44 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         StrategyComputationResult::Computed(Ok(ComputedActions(
             actions.non_empty().expect("Command have to be non_empty"),
         )))
+    }
+}
+
+impl<const N: usize> DepthFirst<N> {
+    pub fn interrupt_left(
+        path_ranking: PathRanking,
+        current: MouseTransform,
+        goal: GoalPosition,
+    ) -> bool {
+        if path_ranking != PathRanking::TowardsGoal {
+            return false;
+        }
+
+        let vec_to_goal = goal.0 - current.pos;
+
+        match current.dir {
+            Direction::PosX => vec_to_goal.d_y < 0,
+            Direction::PosY => vec_to_goal.d_x > 0,
+            Direction::NegX => vec_to_goal.d_y > 0,
+            Direction::NegY => vec_to_goal.d_x < 0,
+        }
+    }
+    pub fn interrupt_right(
+        path_ranking: PathRanking,
+        current: MouseTransform,
+        goal: GoalPosition,
+    ) -> bool {
+        if path_ranking != PathRanking::TowardsGoal {
+            return false;
+        }
+
+        let vec_to_goal = goal.0 - current.pos;
+
+        match current.dir {
+            Direction::PosX => vec_to_goal.d_y > 0,
+            Direction::PosY => vec_to_goal.d_x < 0,
+            Direction::NegX => vec_to_goal.d_y < 0,
+            Direction::NegY => vec_to_goal.d_x > 0,
+        }
     }
 }

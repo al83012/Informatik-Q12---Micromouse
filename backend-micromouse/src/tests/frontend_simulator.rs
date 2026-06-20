@@ -63,8 +63,6 @@ impl FrontendSimulator {
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::<10>::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::Undefined,
-                interrupt_right: false,
-                interrupt_left: false,
             })),
         });
 
@@ -164,8 +162,6 @@ impl FrontendSimulator {
         let next: &DynStrategyConfig<10> = &[
             DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::Undefined,
-                interrupt_left: false,
-                interrupt_right: false,
             }),
             // DynStrategyConfig::FollowWall(FollowWallConfig {
             //     follow_wall: WallDirection::Right,
@@ -176,8 +172,6 @@ impl FrontendSimulator {
             // }),
             DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::TowardsGoal,
-                interrupt_left: false,
-                interrupt_right: false,
             }),
             // DynStrategyConfig::FollowWall(FollowWallConfig {
             //     follow_wall: WallDirection::Right,

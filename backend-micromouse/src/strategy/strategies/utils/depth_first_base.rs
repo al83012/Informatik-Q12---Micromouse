@@ -3,8 +3,9 @@ use std::{
     u8, usize,
 };
 
+use console::Style;
 use serde::{Deserialize, Serialize};
-use tracing::instrument;
+use tracing::{debug, error, info, instrument};
 
 use crate::{
     comm::micromouse_message::{
@@ -20,7 +21,10 @@ use crate::{
         direction::{Direction, DirectionNormalizedVector, RelativeDirection},
         position::{MouseTransform, Position},
     },
-    utils::path::Path,
+    utils::{
+        map_display::{MapDisplay, MapDisplayWrite},
+        path::{Path, PathReference},
+    },
 };
 
 // The successor of the DepthFirstBase (Will create a clone of the DFB if the construction is
@@ -88,22 +92,56 @@ impl DepthFirstBase {
         let world_data = world.as_ref();
         let new_intersections =
             self.new_intersection_paths(world_data, Self::is_unvisited_and_open)?;
+        debug!(target: "strat/dfs", "Strat became expandable: \n{world_data}\nNew intersections: \n{new_intersections:#?}");
         let mut successor = self.clone();
         successor.path_from_start.connect_to(world_data.mouse);
+        successor.add_new_intersections(new_intersections.clone());
         successor.prune_zero_steps(world_data, goal);
-        successor.add_new_intersections(new_intersections);
+
+        let mut map_display = MapDisplay::from(&world_data.map);
+        let mut path_ref = PathReference::new(successor.path_from_start.clone(), &mut map_display);
+        path_ref.set_char('*');
+        for explored in successor.explored.iter() {
+            let Some(mut x) = map_display.wall_mut(explored.at_intersection, explored.in_direction)
+            else {
+                continue;
+            };
+            x.inner().apply_style(Style::new().on_red());
+        }
+        for (pos, dirs) in successor.intersections.iter() {
+            for dir in dirs.visitable_directions.iter() {
+                let Some(mut x) = map_display.wall_mut(*pos, *dir) else {
+                    continue;
+                };
+                x.inner().apply_style(Style::new().on_blue());
+            }
+        }
+        for intersection in new_intersections.iter() {
+            let Some(mut x) =
+                map_display.wall_mut(intersection.at_intersection, intersection.in_direction)
+            else {
+                continue;
+            };
+            x.inner().apply_style(Style::new().on_green());
+        }
+
+        let map_str = format!("\n{map_display}");
+        debug!(target: "strat/dfs", "Added expansion to path: {map_str}");
         Some(DepthFirstWithCurrent(successor))
         // todo!("Add the current pos to the path and update the intersection stack if there are any new intersections; Reject if there are not enough measures for the step to be fully complete")
     }
 
     pub fn add_new_intersections(&mut self, intersection_paths: Vec<IntersectionPath>) {
         for new_path in intersection_paths {
+            debug!(target: "strat/dfs", "ADDING PATH {:?} {:?}", new_path.at_intersection, new_path.in_direction);
             if self.explored.contains(&new_path) {
+                debug!(target: "strat/dfs", "   --> Already explored");
                 continue;
             }
             if let Some(existing_intersection) =
                 self.intersections.get_mut(&new_path.at_intersection)
             {
+                debug!(target: "strat/dfs", "   --> Added to existing");
                 existing_intersection
                     .visitable_directions
                     .insert(new_path.in_direction);
@@ -114,6 +152,7 @@ impl DepthFirstBase {
                 };
 
                 self.intersection_queue.push_front(pos);
+                debug!(target: "strat/dfs", "   --> Added new as next");
                 self.intersections.insert(pos, intersection);
             }
         }
@@ -124,6 +163,7 @@ impl DepthFirstBase {
         world: impl AsRef<Map<N>>,
         goal: GoalPosition,
     ) {
+        debug!(target:"strat/dfs", "Prune zero steps");
         let mut remove_intersections = vec![];
         for (i_pos, i_dirs) in self.intersections.iter_mut() {
             let prune_dirs = i_dirs
@@ -140,6 +180,7 @@ impl DepthFirstBase {
                 });
 
             for prune_dir in prune_dirs {
+                debug!(target:"strat/dfs", "Pruning {i_pos:?} in dir {prune_dir:?}");
                 i_dirs.visitable_directions.remove(&prune_dir);
                 self.explored.insert(IntersectionPath {
                     at_intersection: *i_pos,
@@ -185,13 +226,13 @@ impl DepthFirstBase {
             ] {
                 let dir = rel_dir.transform_by(&pos_at_step.dir);
                 let wall_in_dir = world.map.wall(&pos_at_step.pos, &dir);
-                let is_discoverd = match wall_in_dir {
+                let is_discovered = match wall_in_dir {
                     None => true,
                     Some(wall) if wall.is_discovered() => true,
                     _ => false,
                 };
 
-                if !is_discoverd {
+                if !is_discovered {
                     return None;
                 }
 
@@ -227,6 +268,9 @@ impl DepthFirstBase {
 
         let wall_in_dir = map.wall(&from_cell, &direction);
         if wall_in_dir == Some(&WallDiscoveryStatus::Exists(true)) {
+            return false;
+        }
+        if wall_in_dir.is_none() {
             return false;
         }
 
@@ -268,6 +312,7 @@ impl DepthFirstWithCurrent {
             .intersections
             .get_mut(move_back_to_pos)
             .expect("Intersection should exist if it was on the stack");
+        info!(target: "strat/dfs", "NEXT INTERSECTION = {move_back_to_pos:?}");
         let possible_directions = &move_back_to_intersection.visitable_directions;
         let mut best_ranking = usize::MAX;
         let mut best_ranked = None;
@@ -327,7 +372,12 @@ impl DepthFirstWithCurrent {
             .visitable_directions
             .remove(&transf_after.dir);
         if move_back_to_intersection.visitable_directions.is_empty() {
-            self.0.intersection_queue.pop_front();
+            let removed_pos = self
+                .0
+                .intersection_queue
+                .pop_front()
+                .expect("Was just in there");
+            self.0.intersections.remove(&removed_pos);
         }
 
         Ok((best_moves, transf_after))
@@ -447,31 +497,39 @@ pub fn max_steps_in_direction<const N: usize>(
 
     let map = map.as_ref();
 
+    info!(target: "strat/dfs", "Checking len from {transf_moves:?}");
+
     for i in 0..=N {
         let Some(current) = transf_moves.at_step(i) else {
+            error!(target: "strat/dfs", "Outside map at {i}");
             // The step is outside the map; should not happen
             return i - 1;
         };
         if current.pos == goal.0 {
+            debug!(target: "strat/dfs", " --> Stopping on goal at {i}: {current:?}");
             // Does not need to move further
             return i;
         }
+        let Some(current_cell) = map.cell(&current.pos) else {
+            // The step is outside the map; should not happen
+            error!(target: "strat/dfs", " --> Encountered cell outside bounds --> Should have stopped at {}", i - 1);
+            return i - 1;
+        };
+        if i != 0 && *current_cell == CellDiscoveryStatus::Visited {
+            debug!(target: "strat/dfs", " --> Encountered visited --> Should have stopped at {}", i - 1);
+            // We do not need to go this far; The cell after this is already discovered
+            return i - 1;
+        }
         let Some(wall_ahead) = map.wall(&current.pos, &current.dir) else {
+            debug!(target: "strat/dfs", " --> Hit map boundary --> Stopping at {i}: {current:?}");
             // wall does not exist / is a map boundary --> Is blocking
             return i;
         };
         if *wall_ahead == WallDiscoveryStatus::Exists(true) {
+            debug!(target: "strat/dfs", " --> Hit wall --> Stopping at {i}: {current:?}");
             return i;
         }
-
-        let Some(current_cell) = map.cell(&current.pos) else {
-            // The step is outside the map; should not happen
-            return i - 1;
-        };
-        if i != 0 && *current_cell == CellDiscoveryStatus::Visited {
-            // We do not need to go this far; The cell after this is already discovered
-            return i - 1;
-        }
     }
+    debug!(target: "strat/dfs", "ALLOWED FULL LEN {N}");
     N
 }

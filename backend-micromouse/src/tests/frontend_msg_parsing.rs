@@ -136,8 +136,6 @@ fn test_parse_frontend_msg() {
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::LowestMoves,
-                interrupt_right: false,
-                interrupt_left: false,
             })),
             set_goal: None
         })
