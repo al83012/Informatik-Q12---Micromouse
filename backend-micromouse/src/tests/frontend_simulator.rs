@@ -62,7 +62,7 @@ impl FrontendSimulator {
             set_goal: None,
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::<10>::DepthFirst(DepthFirstConfig {
-                path_ranking: PathRanking::Undefined,
+                path_ranking: PathRanking::TowardsGoal,
             })),
         });
 
