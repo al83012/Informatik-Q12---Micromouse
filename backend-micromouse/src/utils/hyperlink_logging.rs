@@ -453,7 +453,7 @@ where
         let ansii_event_str =
             format!("{info}{pad_str}   {RESET_COLOR} ] {level_color} {msg}{RESET_COLOR}");
 
-        println!("{ansii_event_str}");
+        // println!("{ansii_event_str}");
         let event_str = ansi_to_html::convert(ansii_event_str.as_str())
             .expect("unable to convert ANSI to HTML");
 
@@ -576,12 +576,13 @@ pub fn init_tree_logger() {
 
         tracing_reg.with(
             warn_fmt_layer
-                .with_filter(EnvFilter::new("info"))
-                .with_filter(FilterFn::new(|meta| {
-                    !meta.target().ends_with("apl")
-                        && !meta.target().contains("display")
-                        && !meta.target().contains("op")
-                })),
+                .with_filter(FilterFn::new(|meta| {meta.target().contains("dfs")}))
+                // .with_filter(EnvFilter::new("info"))
+                // .with_filter(FilterFn::new(|meta| {
+                //     !meta.target().ends_with("apl")
+                //         && !meta.target().contains("display")
+                //         && !meta.target().contains("op")
+                // })),
         )
     };
 
