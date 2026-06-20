@@ -160,7 +160,7 @@ pub fn test_path_return() {
             pos: Position { x: 7, y: 2 },
             dir: Direction::PosX,
         }),
-        Ok(vec![MovementType::Turn(1),])
+        Ok(vec![MovementType::Turn(-1),])
     );
     {
         let map = Map::<10>::new();
@@ -179,6 +179,24 @@ pub fn test_path_return() {
             dir: Direction::NegX,
         }),
         Ok(vec![MovementType::Turn(2),])
+    );
+    {
+        let map = Map::<10>::new();
+        let mut map_display = MapDisplay::from(&map);
+        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+
+        path_ref.set_char('*');
+
+        let map_str = format!("\n{map_display}");
+
+        info!(target: "test/path", "{}", map_str);
+    }
+    assert_eq!(
+        path.return_to(MouseTransform {
+            pos: Position { x: 5, y: 2 },
+            dir: Direction::PosY,
+        }),
+        Ok(vec![MovementType::Move(2),MovementType::Turn(1)])
     );
     {
         let map = Map::<10>::new();

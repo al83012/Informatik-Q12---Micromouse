@@ -63,7 +63,7 @@ impl Path {
         &mut self,
         goal_on_path: MouseTransform,
     ) -> Result<Vec<MovementType>, PathTraversalError> {
-        debug!(target: "path/op", "Return to {goal_on_path:?}");
+        debug!(target: "path/op", "Return to {goal_on_path:?} for {:#?}", self.nodes);
         if self.nodes.len() == 1 {
             debug!(target: "path/op", "Only 1 node");
             let only_node = self.nodes.pop().expect("Checked");
@@ -91,6 +91,7 @@ impl Path {
         }
 
         let mut moves = vec![];
+        let mut current_transf = *self.nodes.last().expect("len > 1");
 
         //INFO: Searching the right segment
 
@@ -102,11 +103,14 @@ impl Path {
             }
         }
 
-        let mut goal_before_entrance = None;
+        debug!(target: "path", "Cell entrances: \n{cell_entrance_directions:#?}");
+
+        let mut goal_before_entrance_id = None;
 
         for i in (1..cell_entrance_directions.len()).rev() {
             let (maybe_before_id, maybe_before_node) = cell_entrance_directions[i];
-            let (_, to_node) = cell_entrance_directions[i - 1];
+            let (maybe_after_or_on_id, to_node) = cell_entrance_directions[i - 1];
+            debug!(target: "path", "Checking entrance segment {maybe_before_id}..={maybe_after_or_on_id}");
 
             let dir_to_node = maybe_before_node
                 .pos
@@ -120,43 +124,182 @@ impl Path {
             let pos_y_range =
                 without_before.y.min(to_node.pos.y)..=without_before.y.max(to_node.pos.y);
 
+            debug!(target: "path", "X: {pos_x_range:?}, Y: {pos_y_range:?}");
+
             if pos_x_range.contains(&goal_pos.x) && pos_y_range.contains(&goal_pos.y) {
-                goal_before_entrance = Some(i);
+                goal_before_entrance_id = Some(i);
+                break;
             }
         }
+        debug!(target: "path", "Goal before entrance #{goal_before_entrance_id:?}");
 
-        let Some(goal_before_entrance) = goal_before_entrance else {
+        let Some(goal_before_entrance_id) = goal_before_entrance_id else {
+            debug!(target: "path", "--> Directly on last cell");
             let rotate_to = goal_on_path.dir;
             let entrance = cell_entrance_directions.last().expect("len > 1");
             let entrance_rotation = entrance.1.dir;
             let entrance_idx = entrance.0;
-            let final_rotation = self.nodes.last().expect("len > 1").dir;
+            let final_rotation = current_transf.dir;
 
             // remove up to the entrance:
             while self.nodes.len() > entrance_idx + 1 {
-                self.nodes.pop();
+                let removed = self.nodes.pop();
+                debug!(target: "path", "Removed: {removed:?}");
+            }
+
+            if rotate_to != entrance_rotation {
+                // Only if the goal actually changes sth
+                self.nodes.push(goal_on_path);
+                debug!(target: "path", "Added: {goal_on_path:?}");
             }
 
             let rotation_cmd = final_rotation.shortest_rotate_to(&rotate_to);
             if rotation_cmd != 0 {
+                debug!(target: "path", " --> Rotated {rotation_cmd}");
                 moves.push(MovementType::Turn(rotation_cmd));
             }
 
-
-
-
-            todo!("Goal is on last pos --> Remove up to the entrance + just rotate + add new (or not, if it is aligned with the entrance)");
-            todo!("Return");
+            return Ok(moves);
         };
-        todo!("reverse relative to last entrance");
-        todo!("Likewise --> move from 1 entrance to the other (in reverse) until reaching the entrance that is right after the goal");
-        todo!("(Delete all nodes on the way there; Add the respective moves)");
 
-        todo!("Once reaching the entrance after the goal: Move forward until reaching the goal");
-        todo!("Then: rotate to the right direction");
-        todo!("Delete all nodes after the entrance right before the goal, then place the goal in there");
+        let rotate_to = cell_entrance_directions
+            .last()
+            .expect("len > 1")
+            .1
+            .dir
+            .rotated(2);
 
-        Ok(moves)
+        let current_rotate = current_transf.dir;
+
+        let initial_rotation = current_rotate.shortest_rotate_to(&rotate_to);
+        if initial_rotation != 0 {
+            debug!(target: "path", " --> Turned around {initial_rotation}");
+            moves.push(MovementType::Turn(initial_rotation));
+        }
+        debug!(target: "path", " --> New dir = {rotate_to}");
+        current_transf.dir = rotate_to;
+
+        // INFO: Now the micromouse would be turned around to the opposite of the last entrance
+
+        for window in cell_entrance_directions.windows(2).rev() {
+            let mut window = window.iter();
+            let (move_to_id, prev_entrance) = window.next().expect("Window size > 0");
+            let (move_from_id, current_entrance) = window.next().expect("Window size > 1");
+            debug!(target: "path", "Processing segment ({prev_entrance:?} #{move_to_id} <-- {current_entrance:?} #{move_from_id})");
+            if *move_from_id == cell_entrance_directions[goal_before_entrance_id].0 {
+                debug!(target: "path", "At entrance after goal ({:?})", current_transf.pos);
+                // The goal is on the next segment
+                break;
+            }
+
+            let move_to_pos = prev_entrance.pos;
+            let current_pos = current_transf.pos;
+
+            let movement_len = current_pos
+                .distance_straight_line(move_to_pos)
+                .expect("Should be in straight line");
+            if movement_len != 0 {
+                debug!(target: "path", " --> Moved {movement_len}");
+                moves.push(MovementType::Move(movement_len as u8));
+            }
+
+            current_transf.pos = move_to_pos;
+
+            let rotate_to_dir = prev_entrance.dir.rotated(2);
+            let current_dir = current_transf.dir;
+
+            let rotation = current_dir.shortest_rotate_to(&rotate_to_dir);
+            if rotation != 0 {
+                debug!(target: "path", " --> Rotated {rotation}");
+                moves.push(MovementType::Turn(rotation));
+            }
+
+            current_transf.dir = rotate_to_dir;
+        }
+
+        // INFO: Move forward to goal:
+        let move_to_pos = goal_pos;
+        let current_pos = current_transf.pos;
+        let movement_len = current_pos
+            .distance_straight_line(move_to_pos)
+            .expect("Should be in straight line");
+        if movement_len != 0 {
+            debug!(target: "path", "Last move to goal: {movement_len}");
+            moves.push(MovementType::Move(movement_len as u8));
+        }
+
+        let rotate_to_dir = goal_on_path.dir;
+        let current_dir = current_transf.dir;
+
+        let rotation = current_dir.shortest_rotate_to(&rotate_to_dir);
+        if rotation != 0 {
+            debug!(target: "path", "Last rotate to goal: {rotation}");
+            moves.push(MovementType::Turn(rotation));
+        }
+
+        let (directly_after_entrance_node_id, directly_after_entrance_transf) =
+            cell_entrance_directions[goal_before_entrance_id - 1];
+
+        while self.nodes.len() > directly_after_entrance_node_id + 1 {
+            self.nodes.pop();
+        }
+
+        debug!(target: "path", "Current nodes: {:#?}", self.nodes);
+        if directly_after_entrance_transf.pos != goal_pos {
+            // Adding an exit from the entrance to the goal
+            let exit_direction = directly_after_entrance_transf
+                .pos
+                .direction_straight_line(goal_pos)
+                .expect("Should be in straight line");
+            debug!(target: "path", "Adding new exit {exit_direction}");
+            self.nodes.push(MouseTransform {
+                pos: directly_after_entrance_transf.pos,
+                dir: exit_direction,
+            });
+            self.nodes.push(MouseTransform {
+                pos: goal_pos,
+                dir: exit_direction,
+            });
+        }
+
+        let last_path_dir = self.nodes.last().expect("len > 1").dir;
+        let goal_dir = goal_on_path.dir;
+
+        if last_path_dir != goal_dir {
+            debug!(target: "path", "Adding goal: {goal_on_path:?}");
+            self.nodes.push(goal_on_path);
+        }
+
+        let mut move_to_combine = None;
+        let mut combined_moves = vec![];
+        for movement in moves.into_iter() {
+            if let Some(mc) = move_to_combine {
+                match (movement, mc) {
+                    (MovementType::Turn(t1), MovementType::Turn(t2)) => {
+                        move_to_combine = Some(MovementType::Turn(t1 + t2))
+                    }
+                    (MovementType::Move(m1), MovementType::Move(m2)) => {
+                        move_to_combine = Some(MovementType::Move(m1 + m2))
+                    }
+                    _ => {
+                        if mc.max_step_count() > 0 {
+                            combined_moves.push(mc);
+                        }
+                        move_to_combine = Some(movement);
+                    }
+                }
+            } else {
+                move_to_combine = Some(movement);
+            }
+        }
+
+        if let Some(move_to_combine) = move_to_combine {
+            if move_to_combine.max_step_count() > 0 {
+                combined_moves.push(move_to_combine);
+            }
+        }
+
+        Ok(combined_moves)
     }
 
     pub fn contains(&self, position: &Position) -> bool {
