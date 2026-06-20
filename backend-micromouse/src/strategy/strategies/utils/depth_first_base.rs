@@ -94,7 +94,9 @@ impl DepthFirstBase {
             self.new_intersection_paths(world_data, Self::is_unvisited_and_open)?;
         debug!(target: "strat/dfs", "Strat became expandable: \n{world_data}\nNew intersections: \n{new_intersections:#?}");
         let mut successor = self.clone();
-        successor.path_from_start.connect_to(world_data.mouse);
+        if !successor.path_from_start.connect_to(world_data.mouse) {
+            error!(target: "strat/dfs", "Failed to connect {:?}\nto {:#?}", world_data.mouse, successor.path_from_start);
+        }
         successor.add_new_intersections(new_intersections.clone());
         successor.prune_zero_steps(world_data, goal);
 
@@ -324,7 +326,7 @@ impl DepthFirstWithCurrent {
                 pos: *move_back_to_pos,
                 dir: *dir,
             };
-            let moves_to_return = self.0.path_from_start.return_to(return_to).map_err(|p| {
+            let moves_to_return = self.0.path_from_start.clone().return_to(return_to).map_err(|p| {
                 StrategyEndState::NoPossibleAction(format!(
                     "An intersection on the stack was not part of the path {p:?}"
                 ))
@@ -332,7 +334,9 @@ impl DepthFirstWithCurrent {
 
             let score = match path_ranking {
                 PathRanking::Undefined => {
-                    return Ok((moves_to_return, return_to));
+                    best_ranked = Some((moves_to_return, return_to));
+                    break;
+                    // return Ok((moves_to_return, return_to));
                 }
                 PathRanking::LowestMoves => moves_to_return.len(),
                 PathRanking::LowestCost {
@@ -369,6 +373,8 @@ impl DepthFirstWithCurrent {
             ));
         };
 
+        self.0.path_from_start.return_to(transf_after);
+
         move_back_to_intersection
             .visitable_directions
             .remove(&transf_after.dir);
@@ -380,6 +386,8 @@ impl DepthFirstWithCurrent {
                 .expect("Was just in there");
             self.0.intersections.remove(&removed_pos);
         }
+
+        info!(target: "strat/dfs", "After known moves: \n{:#?}", self.0.path_from_start.nodes());
 
         Ok((best_moves, transf_after))
 

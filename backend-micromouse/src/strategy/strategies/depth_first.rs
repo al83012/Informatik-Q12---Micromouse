@@ -78,6 +78,7 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         goal: &crate::strategy::strategy::GoalPosition,
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
         if world.mouse.pos == goal.0 {
+            info!(target: "strat/dfs", "REACHED GOAL for DFS");
             return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
         }
 
@@ -115,6 +116,7 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
                 Ok((moves, dest)) => (moves, dest),
                 Err(strat_end) => return StrategyComputationResult::Computed(Err(strat_end)),
             };
+        info!(target: "strat/dfs", "REACHING INTERSECTION {moves_dest:?} by doing\n{headless_moves:#?}");
         let (seeking_move, successor) = successor.move_forward_from(
             world,
             moves_dest,
