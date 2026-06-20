@@ -373,7 +373,7 @@ impl DepthFirstWithCurrent {
             ));
         };
 
-        self.0.path_from_start.return_to(transf_after);
+        self.0.path_from_start.return_to(transf_after).expect("Previously checked");
 
         move_back_to_intersection
             .visitable_directions
