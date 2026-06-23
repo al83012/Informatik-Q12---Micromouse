@@ -98,9 +98,10 @@ void Measurement::Sensors::sendSensorData(SensorData data, float value) {
 }
 
 void Measurement::IR::Emitters::initIR_LEDs() {
+    log_i("# Setting IR_LED_PINS to OUTPUT...");
+
     for (int i = 0; i < 4; i++)
     {
-        log_i("# Setting IR_LED_PINS to OUTPUT...");
         pinMode(EMITTERS[i], OUTPUT);
         digitalWrite(EMITTERS[i], LOW);
     }
@@ -108,9 +109,10 @@ void Measurement::IR::Emitters::initIR_LEDs() {
 }
 
 void Measurement::IR::Receivers::initPhotoSensors() {
+    log_i("# Setting PD_PINS to INPUT...");
+
     for (int i = 0; i < 4; i++)
     {
-        log_i("# Setting PD_PINS to INPUT...");
         pinMode(RECEIVERS[i], INPUT);
     }
 }

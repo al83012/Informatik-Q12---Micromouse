@@ -550,8 +550,8 @@ void I2CTOOL::I2CScanner(){
     log_i("Scanning for I2C devices...");
     log_i("Scanning I2C0...");
     for(address = 1; address < 127; address++){
-        Wire1.beginTransmission(address);
-        error = Wire1.endTransmission();
+        Wire.beginTransmission(address);
+        error = Wire.endTransmission();
 
         if(error == 0){
             Devices0++;
@@ -602,8 +602,8 @@ void I2CTOOL::I2CScanner(){
 void I2CTOOL::findComponent(uint8_t I2C_ADDRESS, Measurement::Sensors::SensorNames SensorName) {
     using namespace Measurement::Sensors;
 
-    Wire.beginTransmission(I2C_ADDRESS);
-    if (Wire.endTransmission() != 0) {
+    Wire1.beginTransmission(I2C_ADDRESS);
+    if (Wire1.endTransmission() != 0) {
         log_e("%s not found at address %d", Measurement::Sensors::to_string(SensorName), I2C_ADDRESS);
     } else {
         log_i("%s initialized successfully", Measurement::Sensors::to_string(SensorName));
@@ -613,8 +613,8 @@ void I2CTOOL::findComponent(uint8_t I2C_ADDRESS, Measurement::Sensors::SensorNam
 void I2CTOOL::findComponent(Measurement::Sensors::SensorNames SensorName) {
     using namespace Measurement::Sensors;
 
-    Wire.beginTransmission(Measurement::Sensors::getI2CAddress(SensorName));
-    if (Wire.endTransmission() != 0) {
+    Wire1.beginTransmission(Measurement::Sensors::getI2CAddress(SensorName));
+    if (Wire1.endTransmission() != 0) {
         log_e("%s not found at address %d", Measurement::Sensors::to_string(SensorName), Measurement::Sensors::getI2CAddress(SensorName));
     } else {
         log_i("%s initialized successfully", Measurement::Sensors::to_string(SensorName));

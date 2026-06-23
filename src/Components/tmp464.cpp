@@ -37,9 +37,11 @@ float TMP464::readRemoteTemperature(uint8_t channel) {
 }
 
 float TMP464::convertToCelsius(uint16_t rawValue) {
-    log_d("# (TMP464) Converting temperature... %d", rawValue );
+    //log_d("# (TMP464) Converting temperature... %d", rawValue );
     int16_t signedTemp = (int16_t)rawValue; 
-    return (signedTemp >> 3) * 0.0625f; //Shift 3 bits, since data is only stored in the upper 13 bits (resolution of 0.0625 - fixed)
+    //log_d("# Raw HEX (Shifted): %X", (signedTemp >> 3));
+    signedTemp >>=3;
+    return (static_cast<float>(signedTemp) * 0.0625f); //Shift 3 bits, since data is only stored in the upper 13 bits (resolution of 0.0625 - fixed)
 }
 
 void TMP464::setLocalThermLimit(uint16_t limit) {
@@ -143,9 +145,10 @@ void TMP464::setShutdownMode(bool enableShutDown) {
 }
 
 void TMP464::DbgPrintTemperatures() {
-    log_d("%d", readLocalTemperature());
-    log_d("%d", readRemoteTemperature(0x01));
+    log_i("# Local temperature: %f", readLocalTemperature());
+
+    /*log_d("%d", readRemoteTemperature(0x01));
     log_d("%d", readRemoteTemperature(0x02));
     log_d("%d", readRemoteTemperature(0x03));
-    log_d("%d", readRemoteTemperature(0x04));
+    log_d("%d", readRemoteTemperature(0x04));*/
 }

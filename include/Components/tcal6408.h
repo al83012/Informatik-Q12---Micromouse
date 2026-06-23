@@ -7,8 +7,8 @@ namespace TCAL6408 {
 namespace ComponentVars {
 
     //Adresses (2 Sperate expanders on pcb)
-    constexpr uint8_t I2C_ADDRESS_0 = 0x40; //MOTOR-DRIVER_CB -> SDA/SCL 1
-    constexpr uint8_t I2C_ADDRESS_1 = 0x42; //SENSOR_PCB -> SDA/SCL 1
+    constexpr uint8_t I2C_ADDRESS_0 = 0x20; //MOTOR-DRIVER_CB -> SDA/SCL 1
+    constexpr uint8_t I2C_ADDRESS_1 = 0x21; //SENSOR_PCB -> SDA/SCL 1
 
     //Register Map
     constexpr uint8_t REG_INPUT_PORT = 0x00; //Read state of input pins

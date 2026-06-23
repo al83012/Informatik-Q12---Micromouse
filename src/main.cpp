@@ -33,4 +33,5 @@ void loop() {
  // Network::checkNetwork();
  delay(2000);
  log_d(".");
+ TMP464::DbgPrintTemperatures();
 }

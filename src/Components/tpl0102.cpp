@@ -10,6 +10,7 @@ using namespace Measurement::Sensors;
 // Potentiometer
 
 void TPL0102::init(float highVoltage) {
+    ComponentVars::highVoltage = highVoltage;
     findComponent(SensorNames::TPL0102_POTENTIOMETER);
 
     int ex, en, di;
@@ -17,8 +18,10 @@ void TPL0102::init(float highVoltage) {
     ex = exitShutdown();
     en = enableNonVolatileWriting();
 
-    ComponentVars::DefaultWiperPosA, ComponentVars::wiperPosA =  getWiperA();
-    ComponentVars::DefaultWiperPosB, ComponentVars::wiperPosB =  getWiperB();
+    ComponentVars::DefaultWiperPosA =  getWiperA();
+    ComponentVars::wiperPosA =  getWiperA();
+    ComponentVars::DefaultWiperPosB =  getWiperB();
+    ComponentVars::wiperPosB =  getWiperB();
 
     di = disableNonVolatileWriting();
     
@@ -45,6 +48,7 @@ int TPL0102::SetVolatileWiperA(uint8_t position) {
 
     ComponentVars::wiperPosA = position;
     log_d("# WiperA set succesfully!");
+    return 0;
 }
 
 int TPL0102::SetVolatileWiperB(uint8_t position) {
@@ -56,9 +60,10 @@ int TPL0102::SetVolatileWiperB(uint8_t position) {
         e_sensor(SensorNames::TPL0102_POTENTIOMETER, "Failed to set WiperA!");
         return -1;
     }
-
+    
     ComponentVars::wiperPosB = position;
     log_d("# WiperB set succesfully!");
+    return 0;
 }
 
 

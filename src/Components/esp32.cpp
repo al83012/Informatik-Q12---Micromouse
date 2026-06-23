@@ -32,30 +32,25 @@ void Esp32::initESP32() {
 
 void Esp32::initSubComponents() {
     /*TCAL6408::init();
-    LSM6DSR::init();
     BQ76905::init();*/
     TMP464::init();
     //IIS2MDC::init();
     TPL0102::init(3.4); 
     //Fan::init();
-    Measurement::IR::init();
-   
+    LSM6DSR::init();   
 }
 
 void Esp32::initPinStates() {
     
     pinMode(FAN_EN, OUTPUT);
     pinMode(IRLED_0, OUTPUT);
-    pinMode(IRLED_1, OUTPUT);
-    pinMode(IRLED_2, OUTPUT);
-    pinMode(IRLED_3, OUTPUT);
     pinMode(LSM_INT_1, INPUT);
     pinMode(LSM_INT_2, INPUT);
     pinMode(VL_0_INT, INPUT);
     pinMode(VL_1_INT, INPUT);
     pinMode(VL_2_INT, INPUT);
     pinMode(BQ_INT, INPUT);
-
+    Measurement::IR::init();
 }
 
 
