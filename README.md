@@ -29,3 +29,8 @@ Da es sich hierbei um ein Gruppenprojekt handelt, haben wir uns dafür entschied
 - Darstellung der Backend-Prozesse
 - Eingabe für Lösungsstrategien und Nutzer-Befehlen
 
+### Sponsoring
+Wir möchten uns außerdem herzlichst bei den folgenden Sponsoren bedanken:
+
+`Dr. Fritz Faulhaber GmbH & Co. KG` Für das Bereitstellen der Motoren. <br>
+`JLCPCB` Für das Bereitstellen der PCBs
