@@ -18,7 +18,7 @@ void setup() {
 delay(1000);
 log_i("Initializing Setup");
 Esp32::initESP32();
- // Network::setup();
+ Network::setup();
 
  log_i("# Setup done!");
  I2CTOOL::I2CScanner();
@@ -30,8 +30,10 @@ Esp32::initESP32();
 }
 
 void loop() {
- // Network::checkNetwork();
+ Network::checkNetwork();
  delay(2000);
  log_d(".");
  TMP464::DbgPrintTemperatures();
+ Measurement::Sensors::reportTemperature();
+
 }

@@ -26,14 +26,14 @@ namespace ComponentVars {
     const uint16_t canWriteAutoRetryDelay = 50;
 }
 
-    void init(float highVoltage);
+    void init(float highVoltage, float currentLimitDriver, float currentLimitFan);
     int setVoltageA(float voltage);
     int setVoltageB(float voltage);
     int setDefaultVoltageA(float voltage);
     int setDefaultVoltageB(float voltage);
 
-    float getVoltageA();
-    float getVoltageB();
+    float getVoltageA(); // Fan
+    float getVoltageB(); // Driver
     float getDefaultVoltageA();
     float getDefaultVoltageB();
         
@@ -50,14 +50,17 @@ namespace ComponentVars {
     int SetNonVolatileWiperB(uint8_t position);
 
     int getWiperA();
-    int getWiperB();
+    int getWiperB(); 
 
     int enableNonVolatileWriting();
     int disableNonVolatileWriting();
 
     int canWrite();
     int canWriteAutoRetry();
-        
+    
+    void setCurrentLimitDriver(float Current);
+    void setCurrentLimitFan(float Current);
+
 
 
 

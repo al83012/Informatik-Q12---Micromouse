@@ -12,6 +12,9 @@ using namespace Measurement::Sensors;
 void TMP464::init() {
     // Initialize the TMP464 temperature sensor
     findComponent(Measurement::Sensors::SensorNames::TMP464_TEMPERATURE_SENSOR);
+    uint16_t remoteOpenChannels;
+    I2C1Read(ComponentVars::I2C_ADDRESS, 0x23, remoteOpenChannels);
+    log_d("Open remote channels, %d", remoteOpenChannels);
 
     setStandardConfiguration();
 
@@ -147,8 +150,8 @@ void TMP464::setShutdownMode(bool enableShutDown) {
 void TMP464::DbgPrintTemperatures() {
     log_i("# Local temperature: %f", readLocalTemperature());
 
-    /*log_d("%d", readRemoteTemperature(0x01));
-    log_d("%d", readRemoteTemperature(0x02));
-    log_d("%d", readRemoteTemperature(0x03));
-    log_d("%d", readRemoteTemperature(0x04));*/
+    log_i("# Remote temp 1: %f", readRemoteTemperature(0x01));
+    log_i("# Remote temp 2: %f", readRemoteTemperature(0x02));
+    log_i("# Remote temp 3: %f", readRemoteTemperature(0x03));
+    //log_d("%f", readRemoteTemperature(0x04));
 }

@@ -82,10 +82,11 @@ namespace Measurement {
     IR_3_DISTANCE,
 
     TMP_TEMP_LOCAL,
-    TMP_TEMP_REMOTE_0,
     TMP_TEMP_REMOTE_1,
     TMP_TEMP_REMOTE_2,
     TMP_TEMP_REMOTE_3,
+    TMP_TEMP_REMOTE_4,
+
 
     POT_WIPER_A,
     POT_WIPER_B,

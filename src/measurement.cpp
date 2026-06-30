@@ -40,7 +40,7 @@ void Measurement::Sensors::sendSensorData(SensorData data, float value) {
             case TOF_1_DISTANCE:       return "TOF_1_DISTANCE";
             case TOF_2_DISTANCE:       return "TOF_2_DISTANCE";
             case TMP_TEMP_LOCAL:       return "TMP_TEMP_LOCAL";
-            case TMP_TEMP_REMOTE_0:    return "TMP_TEMP_REMOTE_0";
+            case TMP_TEMP_REMOTE_4:    return "TMP_TEMP_REMOTE_4";
             case TMP_TEMP_REMOTE_1:    return "TMP_TEMP_REMOTE_1";
             case TMP_TEMP_REMOTE_2:    return "TMP_TEMP_REMOTE_2";
             case TMP_TEMP_REMOTE_3:    return "TMP_TEMP_REMOTE_3";
@@ -208,4 +208,15 @@ void Measurement::IR::init() {
     log_i("# Initializing IR-Sensor-System");
     Measurement::IR::Emitters::initIR_LEDs();
     Measurement::IR::Receivers::initPhotoSensors();
+}
+
+void Measurement::Sensors::reportTemperature() {
+
+    log_i("# Reporting temperature...");
+    Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_LOCAL, TMP464::readLocalTemperature());
+    Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_REMOTE_1, TMP464::readRemoteTemperature(0x01));
+    Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_REMOTE_2, TMP464::readRemoteTemperature(0x02));
+    Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_REMOTE_3, TMP464::readRemoteTemperature(0x03));
+
+    
 }

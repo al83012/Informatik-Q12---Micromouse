@@ -9,7 +9,7 @@ using namespace Measurement::Sensors;
 
 // Potentiometer
 
-void TPL0102::init(float highVoltage) {
+void TPL0102::init(float highVoltage, float currentLimitDriver, float currentLimitFan) {
     ComponentVars::highVoltage = highVoltage;
     findComponent(SensorNames::TPL0102_POTENTIOMETER);
 
@@ -32,6 +32,8 @@ void TPL0102::init(float highVoltage) {
         i_sensor(SensorNames::TPL0102_POTENTIOMETER, "Configured succesfully");
 
     }
+    setCurrentLimitDriver(currentLimitDriver);
+    setCurrentLimitFan(currentLimitFan);
 
 }
 
@@ -450,7 +452,6 @@ void TPL0102::DbgPrintVoltages() {
  float voltage = getVoltageA();
  
   log_i("VoltageA: %f", voltage);
-  setVoltageA(3.0f);
   voltage = getVoltageA();
   log_i("VoltageA: %f", voltage);
 
@@ -458,11 +459,32 @@ void TPL0102::DbgPrintVoltages() {
   voltage = getVoltageB();
   log_i("VoltageB: %f", voltage);
 
-  setVoltageB(3.3f);
   voltage = getVoltageB();
   log_i("VoltageB: %f", voltage);
 
   enterShutdown();
   delay(10000);
   exitShutdown();
+}
+
+void TPL0102::setCurrentLimitDriver(float currentLimit) {
+    if(currentLimit >= 0) {
+        log_d("Setting current-limit (Driver) to %f", currentLimit);
+        float voltage = currentLimit*1.32;
+        log_d("Calculated voltage : %f", voltage);
+        TPL0102::setVoltageB(voltage);
+    } else {
+        log_e("# Current limit may not be negative!");
+    }
+}
+
+void TPL0102::setCurrentLimitFan(float currentLimit) {
+    if(currentLimit >= 0) {
+        log_d("Setting current-limit (Fan) to %f", currentLimit);
+        float voltage = currentLimit*1200*(450e-6);
+        log_d("Calculated voltage : %f", voltage);
+        TPL0102::setVoltageA(voltage);
+    } else {
+        log_e("# Current limit may not be negative!");
+    }
 }
