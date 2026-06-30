@@ -365,8 +365,6 @@
     "Debug": "SENT COMMAND #21 Command { ty: Turn(1), interrupts: [] }"
   },
   {
-    "Debug": "SENT COMMAND #22 Command { ty: Move(2), interrupts: [MeasurementInterrupt { direction: Forward, at_step: Each, action: StopIfBlocked }, MeasurementInterrupt { direction: Left,
-    at_step: Each, action: Continue }, MeasurementInterrupt { direction: Right, at_step: Each, action: Continue }, MeasurementInterrupt { direction: Right, at_step: At(1), action: StopIfOpen }
-, MeasurementInterrupt { direction: Right, at_step: At(2), action: StopIfOpen }] }"
-}
+    "Debug": "SENT COMMAND #22 Command { ty: Move(2), interrupts: [MeasurementInterrupt { direction: Forward, at_step: Each, action: StopIfBlocked }, MeasurementInterrupt { direction: Left,at_step: Each, action: Continue }, MeasurementInterrupt { direction: Right, at_step: Each, action: Continue }, MeasurementInterrupt { direction: Right, at_step: At(1), action: StopIfOpen }, MeasurementInterrupt { direction: Right, at_step: At(2), action: StopIfOpen }] }"
+  }
 ]

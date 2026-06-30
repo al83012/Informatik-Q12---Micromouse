@@ -131,27 +131,35 @@ export class Index {
             request.send();
         }
 
-        this.ChartFunc({
+        this.ChartData = {
             type: 'line',
             data: {
-                labels: ['1', '2', '3', '4', '5', '6', '7', '5', '6', '7'],
+                labels: [],
                 datasets: [{
                     label: 'Temp 1',
                     backgroundColor: 'rgb(255, 99, 132)',
                     borderColor: 'rgb(255, 99, 132)',
-                    data: [0, 10, 5, 2, 20, 30, 45],
+                    data: [],
                 }]
             },
             options: {
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        suggestedMax: 45,
+                        suggestedMax: 100,
+                        suggestedMin: 0,
                     }
                 },
                 events: []
             }
-        });
+        };
+
+        for (let i = 60; i >= 0; i--) {
+            this.ChartData.data.labels.push(i);
+            this.ChartData.data.datasets.forEach((data, i) => {data.data.push(0);});
+        }
+
+        this.ChartFunc();
 
 
 

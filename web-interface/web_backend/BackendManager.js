@@ -224,8 +224,8 @@ export class BackendManager {
                     } else if (typeof event["PathVisualEvent"]["ty"] === "object") {
                         if (this.in_maze.top_path_node === -1) {
                             this.in_maze.path_tree[hash] = {
-                                from: [0,0],
-                                to: [0,0],
+                                from: [0, 0],
+                                to: [0, 0],
                                 children: [],
                                 changes: [],
                                 parent: -1,
@@ -257,6 +257,8 @@ export class BackendManager {
                         }
                     }
                 }
+            } else if (data["Debug"] !== undefined) {
+                this.f_sync.push(Actions.add_message(data["Debug"]));
             } else {
                 //this.b_sync(Actions.b_error("recv", "incorrect_data", ["type"]));
             }
