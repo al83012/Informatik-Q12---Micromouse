@@ -24,6 +24,8 @@ mod spans;
 mod test_map_discoveries;
 mod visual_tests;
 mod serialize_test;
+mod process_test_no_m_sim;
+mod process_test_no_f_sim;
 
 pub const TEST_MAP_SIZE: usize = 12;
 

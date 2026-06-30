@@ -92,11 +92,11 @@ impl FrontendVisuals {
             .expect("Should be open during execution");
     }
 
-    pub fn prune_path(&self, from_node: AbsoluteNodeId) {
+    pub fn prune_path(&self, from_including_node: AbsoluteNodeId) {
         self.event_sender
             .send(
                 PathVisualEvent {
-                    associated_node: from_node,
+                    associated_node: from_including_node,
                     ty: PathVisualEventType::Prune,
                 }
                 .into(),

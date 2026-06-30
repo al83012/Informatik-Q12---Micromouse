@@ -1,3 +1,4 @@
+use core::error;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
@@ -36,9 +37,23 @@ impl<const N: usize> MicromouseSimulator<N> {
     }
     #[instrument(skip(self), name = "run")]
     pub async fn run(&mut self, max_measure_depth: u8) {
-        let (mut ws_stream, response) = tokio_tungstenite::connect_async("ws://localhost:9001")
-            .await
-            .expect("Connection failed");
+        let success;
+        loop {
+            let res = tokio_tungstenite::connect_async("ws://localhost:9001").await;
+
+            if let Ok(o) = res {
+                success = Some(o);
+                break;
+            } else if let Err(e) = res {
+                error!(target: "test/sim/m", "Failed connection: {e:?}");
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                continue;
+            }
+        }
+
+        let (mut ws_stream, response) = success.expect("Guaranteed");
+
+        // .expect("Connection failed");
         info!(target: "test/sim", " < Connection Response = {response:?}");
 
         ws_stream
@@ -87,7 +102,7 @@ impl<const N: usize> MicromouseSimulator<N> {
                 info!(target: "test/sim", "AT CMD SIM {}", msg.cmd_id);
 
                 for i in 0..=current_cmd.max_step_count() {
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    tokio::time::sleep(Duration::from_millis(1000)).await;
                     let continue_next_cmd: bool = async {
                         info!(target: "test/sim", "Sim at step {i}");
                         let current_transf = transformed_move.at_step(i).expect("In valid range");
