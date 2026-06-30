@@ -139,7 +139,7 @@ client.on('connect', (conn) => {
     manager.backend_client = client;
     manager.f_sync.push(Actions.update_con_status(true));
 
-    conn.ping();
+    manager.b_sync(Actions.b_test());
 
     conn.on('error', (err) => {
         console.log("\x1b[33m[B] \x1b[31mImplement ERROR");
@@ -317,7 +317,7 @@ function input(string) {
             break;
         default:
             Utils.is(parts, "f:path:create:random", (rest) => {
-                let path = [];
+                /*let path = [];
 
                 let count = Math.floor(Math.random() * 5) + 1;
 
@@ -333,7 +333,41 @@ function input(string) {
                     } else if (dir === 1) {
 
                     }
+                }*/
+
+                const target = { x: 8, y: 8 };
+
+                const path = [{ x: 0, y: 0 }];
+                const visited = new Set(["0,0"]);
+
+                while (path.at(-1).x !== 8 || path.at(-1).y !== 8) {
+                    const { x, y } = path.at(-1);
+
+                    const moves = [
+                        [1, 0], [-1, 0], [0, 1], [0, -1]
+                    ]
+                        .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
+                        .filter(p =>
+                            p.x >= 0 && p.x < 16 &&
+                            p.y >= 0 && p.y < 16 &&
+                            !visited.has(`${p.x},${p.y}`)
+                        )
+                        .sort(() => Math.random() - 0.5)
+                        .sort((a, b) =>
+                            Math.abs(a.x - target.x) + Math.abs(a.y - target.y) -
+                            Math.abs(b.x - target.x) - Math.abs(b.y - target.y)
+                        );
+
+                    if (moves.length) {
+                        path.push(moves[0]);
+                        visited.add(`${moves[0].x},${moves[0].y}`);
+                    } else {
+                        visited.delete(`${x},${y}`); //run into a non-solvable state
+                        path.pop();
+                    }
                 }
+
+
             });
             break;
     }

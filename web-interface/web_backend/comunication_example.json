@@ -1,0 +1,372 @@
+[
+  {
+    "MicromouseEvent": {
+      "UpdatePosition": {
+        "pos": {
+          "x": 4,
+          "y": 5
+        },
+        "dir": "PosY"
+      }
+    }
+  },
+  {
+    "MicromouseEvent": {
+      "UpdatedMap": {
+        "cell_discoveries": [
+          {
+            "new_status": "Visited",
+            "at_cell": {
+              "x": 4,
+              "y": 5
+            }
+          },
+          {
+            "new_status": "Discovered",
+            "at_cell": {
+              "x": 4,
+              "y": 6
+            }
+          },
+          {
+            "new_status": "Discovered",
+            "at_cell": {
+              "x": 4,
+              "y": 7
+            }
+          }
+        ],
+        "wall_discoveries": [
+          {
+            "new_status": {
+              "Exists": false
+            },
+            "from_cell": {
+              "x": 4,
+              "y": 5
+            },
+            "in_direction": "PosY"
+          },
+          {
+            "new_status": {
+              "Exists": false
+            },
+            "from_cell": {
+              "x": 4,
+              "y": 6
+            },
+            "in_direction": "PosY"
+          },
+          {
+            "new_status": {
+              "Exists": true
+            },
+            "from_cell": {
+              "x": 4,
+              "y": 7
+            },
+            "in_direction": "PosY"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "MicromouseEvent": {
+      "RejectedOutcomes": {
+        "rejected_outcome_ids": [
+          {
+            "at_step": 3,
+            "from_interrupt": {
+              "InterruptAtIndex": 5
+            }
+          },
+          {
+            "at_step": 4,
+            "from_interrupt": {
+              "InterruptAtIndex": 0
+            }
+          }
+        ]
+      }
+    }
+  },
+  {
+    "MicromouseEvent": {
+      "UpdatedMap": {
+        "cell_discoveries": [
+          {
+            "new_status": "Discovered",
+            "at_cell": {
+              "x": 5,
+              "y": 5
+            }
+          },
+          {
+            "new_status": "Discovered",
+            "at_cell": {
+              "x": 6,
+              "y": 5
+            }
+          }
+        ],
+        "wall_discoveries": [
+          {
+            "new_status": {
+              "Exists": false
+            },
+            "from_cell": {
+              "x": 4,
+              "y": 5
+            },
+            "in_direction": "PosX"
+          },
+          {
+            "new_status": {
+              "Exists": false
+            },
+            "from_cell": {
+              "x": 5,
+              "y": 5
+            },
+            "in_direction": "PosX"
+          },
+          {
+            "new_status": {
+              "Exists": true
+            },
+            "from_cell": {
+              "x": 6,
+              "y": 5
+            },
+            "in_direction": "PosX"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "VisualEvent": {
+      "PathVisualEvent": {
+        "associated_node": {
+          "layer_id": 21,
+          "node_id": 10
+        },
+        "ty": "Prune"
+      }
+    }
+  },
+  {
+    "VisualEvent": {
+      "PathVisualEvent": {
+        "associated_node": {
+          "layer_id": 21,
+          "node_id": 5
+        },
+        "ty": "Prune"
+      }
+    }
+  },
+  {
+    "MicromouseEvent": {
+      "UpdatedMap": {
+        "cell_discoveries": [],
+        "wall_discoveries": [
+          {
+            "new_status": {
+              "Exists": true
+            },
+            "from_cell": {
+              "x": 4,
+              "y": 5
+            },
+            "in_direction": "NegX"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "MicromouseEvent": {
+      "UpdatedMap": {
+        "cell_discoveries": [
+          {
+            "new_status": "Discovered",
+            "at_cell": {
+              "x": 5,
+              "y": 5
+            }
+          },
+          {
+            "new_status": "Discovered",
+            "at_cell": {
+              "x": 6,
+              "y": 5
+            }
+          }
+        ],
+        "wall_discoveries": [
+          {
+            "new_status": {
+              "Exists": false
+            },
+            "from_cell": {
+              "x": 4,
+              "y": 5
+            },
+            "in_direction": "PosX"
+          },
+          {
+            "new_status": {
+              "Exists": false
+            },
+            "from_cell": {
+              "x": 5,
+              "y": 5
+            },
+            "in_direction": "PosX"
+          },
+          {
+            "new_status": {
+              "Exists": true
+            },
+            "from_cell": {
+              "x": 6,
+              "y": 5
+            },
+            "in_direction": "PosX"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "VisualEvent": {
+      "PathVisualEvent": {
+        "associated_node": {
+          "layer_id": 21,
+          "node_id": 4
+        },
+        "ty": {
+          "Create": {
+            "path": {
+              "from": {
+                "pos": {
+                  "x": 4,
+                  "y": 5
+                },
+                "dir": "PosY"
+              },
+              "to": {
+                "pos": {
+                  "x": 4,
+                  "y": 5
+                },
+                "dir": "PosX"
+              }
+            },
+            "leads_to_child_node": {
+              "layer_id": 22,
+              "node_id": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "VisualEvent": {
+      "PathVisualEvent": {
+        "associated_node": {
+          "layer_id": 22,
+          "node_id": 0
+        },
+        "ty": {
+          "Create": {
+            "path": {
+              "from": {
+                "pos": {
+                  "x": 4,
+                  "y": 5
+                },
+                "dir": "PosX"
+              },
+              "to": {
+                "pos": {
+                  "x": 5,
+                  "y": 5
+                },
+                "dir": "PosX"
+              }
+            },
+            "leads_to_child_node": {
+              "layer_id": 23,
+              "node_id": 0
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "VisualEvent": {
+      "PathVisualEvent": {
+        "associated_node": {
+          "layer_id": 22,
+          "node_id": 0
+        },
+        "ty": {
+          "Create": {
+            "path": {
+              "from": {
+                "pos": {
+                  "x": 4,
+                  "y": 5
+                },
+                "dir": "PosX"
+              },
+              "to": {
+                "pos": {
+                  "x": 6,
+                  "y": 5
+                },
+                "dir": "PosX"
+              }
+            },
+            "leads_to_child_node": {
+              "layer_id": 23,
+              "node_id": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "MicromouseEvent": {
+      "FinishedCommand": {
+        "cmd_id": 20,
+        "require_new": true
+      }
+    }
+  },
+  {
+    "VisualEvent": {
+      "PathVisualEvent": {
+        "associated_node": {
+          "layer_id": 20,
+          "node_id": 0
+        },
+        "ty": "Remove"
+      }
+    }
+  },
+  {
+    "Debug": "SENT COMMAND #21 Command { ty: Turn(1), interrupts: [] }"
+  },
+  {
+    "Debug": "SENT COMMAND #22 Command { ty: Move(2), interrupts: [MeasurementInterrupt { direction: Forward, at_step: Each, action: StopIfBlocked }, MeasurementInterrupt { direction: Left,
+    at_step: Each, action: Continue }, MeasurementInterrupt { direction: Right, at_step: Each, action: Continue }, MeasurementInterrupt { direction: Right, at_step: At(1), action: StopIfOpen }
+, MeasurementInterrupt { direction: Right, at_step: At(2), action: StopIfOpen }] }"
+}
+]

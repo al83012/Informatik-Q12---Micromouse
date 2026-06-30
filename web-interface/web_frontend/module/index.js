@@ -32,6 +32,8 @@ export class Index {
     static Chart;
     static ChartData;
 
+    static pathUpdateIds = [];
+
     static eventLoad() {
         //creating error feedback to backend
         if (has_backend) {
@@ -150,6 +152,22 @@ export class Index {
                 events: []
             }
         });
+
+
+
+        /*window.onerror(
+        {
+            error: " Hallo Test" + window.visualViewport.scale,*/
+            /*innerWidth: window.innerWidth,
+            outerWidth: window.outerWidth,
+            visualViewport: window.visualViewport?.width,
+            scale: window.visualViewport?.scale,
+
+            stack: "",*/
+        /*});*/
+
+        document.documentElement.style.zoom = '1';//'0.9159';
+        //throw new Error(" " + window.visualViewport.scale);
     }
 
     static handleUpdate(response) {
@@ -181,7 +199,11 @@ export class Index {
                     reset_maze(data["animation"] === "true");
                     break;
                 case "update_path":
-                    Index.animHandler.addImmediate(displayPathChange(data["path"]));
+                    //Index.pathUpdateIds += data["id"];
+                    Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], false));
+                    break;
+                case "complete_path":
+                    Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], true));
                     break;
                 case "discover_tile":
                     if (data["others"] === true) {
@@ -203,6 +225,11 @@ export class Index {
                     break;
                 case "hide_loading":
                     Index.hide_loading_animation();
+                    break;
+                case "discover_wall":
+                    let wall = document.getElementById("sys-wall_wall-" +
+                        data["x"] + ":" + data["y"] + "-" + data["x_other"] + ":" + data["y_other"]);
+                    Index.animHandler.addImmediate(new AnimCssChange(10, wall, ["off"], "on"));
                     break;
             }
         });
@@ -313,6 +340,17 @@ export class Index {
     static hide_loading_animation() {
         document.getElementById("loading-container").style.display = "none";
         Index.animHandler.removeRepeating("loading_animation");
+    }
+
+    static send(data) {
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.open("POST", document.location.origin + "/action");
+            request.addEventListener("load", function () {
+            });
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify(data));
+        }
     }
 }
 
@@ -454,34 +492,50 @@ function init_maze() {
     //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1,
     // 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
     /*let path = [
-        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
-        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1],
-        [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1],
-        [9, 9, 9, 10, 10, 10, 0]
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0, 1],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1, 1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1, 0],
+        [9, 9, 9, 10, 10, 10, 0, 1]
     ];
     let animation = displayPathChange(path);
     let path_second = [
-        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
-        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 9, 9, 9, 10, 10, 10, -1],
-        [5, 6, 5, 7, 5, 8, 5, 9, 5, 10, 5, 11, 6, 11, 7, 11, 8, 11, 9, 11, 10, 11, 1]
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0, 1],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 9, 9, 9, 10, 10, 10, -1, 1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 5, 10, 5, 11, 6, 11, 7, 11, 8, 11, 9, 11, 10, 11, 1, 0]
     ];
     let animation_second = displayPathChange(path_second);
     Index.animHandler.add(animation);
     Index.animHandler.add(animation_second);*/
 }
 
-function displayPathChange(changed_path) {
+function displayPathChange(path_data, id, ignore_group) {
+    /*if (Index.pathUpdateIds.some(e => e === id)) {
+        Index.send({action: "double_path_update", id: id});
+        return;
+    }*/
+    let uncomputed_path = path_data.data;
+    let changed_path = [];
+
+    for (let part of uncomputed_path) {
+        if (changed_path.some(e => e[e.length-4] === part[0] && e[e.length-3] === part[1])) {
+            part.shift();
+            part.shift();
+        }
+        changed_path.push(part);
+    }
+
+    Index.send({action: "path_update", id: id, state: "started"});
     let tiles = [];
     let group_points = [];
     for (let g = 0; g < changed_path.length; g++) {
-        group_points.push([changed_path[g][0], changed_path[g][1], changed_path[g][changed_path[g].length-1]]);
-        group_points.push([changed_path[g][changed_path[g].length-3], changed_path[g][changed_path[g].length-2],
-            changed_path[g][changed_path[g].length-1]]);
+        group_points.push([changed_path[g][0], changed_path[g][1], changed_path[g][changed_path[g].length-2]]);
+        group_points.push([changed_path[g][changed_path[g].length-4], changed_path[g][changed_path[g].length-3],
+            changed_path[g][changed_path[g].length-2]]);
 
         let group = changed_path[g];
         let prev = [group[0], group[1]];
         tiles[[prev[0], prev[1]]] = [document.getElementById("sys-arm_node_" + co_crds_i([prev[0], prev[1]]))];
-        for (let i = 2; i < group.length -1; i+=2) { //-1 to skip the group type
+        for (let i = 2; i < group.length -2; i+=2) { //-2 to skip the change type and is_new_group
             if (prev[0] < group[i]) {
                 tiles[[prev[0], prev[1]]].push(document.getElementById("sys-arm_arm-e_" + co_crds_i([prev[0], prev[1]])));
                 tiles[[group[i], group[i+1]]] = [
@@ -576,11 +630,11 @@ function displayPathChange(changed_path) {
         }
     }
 
-    return generatePathAnimGroup(changed_path, tiles);
+    return generatePathAnimGroup(changed_path, tiles, ignore_group, ()=>{Index.send({action: "path_update", id: id, state: "finished"});});
 }
 
 //deprecated function
-//moved function to backend and awaiting server protocol to rewrite the function
+//moved function to backend and awaiting server protocol to rewrite the function,
 //according to data received from server
 function dep_displayPathChange(path_old, path_new) {
     let groups = [];

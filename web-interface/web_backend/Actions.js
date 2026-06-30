@@ -1,12 +1,21 @@
 export class Action {
     constructor(action, data) {
-        this.action = action;
-        this.data = data;
+        if (data !== undefined) {
+            this.action = action;
+            this.data = data;
+        } else {
+            this.string = JSON.stringify(action);
+        }
     }
 
     getData() {
+        if (this.data === undefined) {
+            return this.string;
+        }
         let result = "";
-        this.data.forEach((item, key) => {result += `"${key}":${item},`;});
+        this.data.forEach((item, key) => {
+            result += `"${key}":${item},`;
+        });
         if (result.length > 0) {
             result += '||';
         }
@@ -15,9 +24,23 @@ export class Action {
     }
 
     getString() {
+        if (this.data === undefined) {
+            return this.string;
+        }
         return `{"action":"${this.action}", "data":{${this.getData()}}}`;
     }
 }
+
+/** Info to everyone reading through my terrible code:
+ * I actually just realized that I just could have written all the sending code
+ * with objects and directly written structure :)
+ * This is not that bad, since this part of the project was chosen by me bc
+ * I wanted to learn about web development and js. I never used it before and
+ * learned everything through this project. I never actually looked at how to
+ * write good js code, but that doesn't matter.
+ * No, I won't rewrite this part, but future code added after the 17th of June
+ * will be better. I promise (or hope to promise)
+*/
 
 export class Actions {
     static toString(actions) {
@@ -69,13 +92,75 @@ export class Actions {
         return new Action("reset_maze", new Map([["animation", play_anim]]));
     }
 
-    static update_path(path) {
-        //path must follow this pattern:
+    static complete_path(changes, path_tree) {
+        let new_changes = changes.map((change) => {
+            let n = [];
+            let node = path_tree[change[0]];
+            if (node.to[0] - node.from[0] !== 0) {
+                for (let i = 0; i <= node.to[0] - node.from[0] && node.to[0] - node.from[0] > 0; i++) {
+                    n.push(node.from[0] + i);
+                    n.push(node.from[1]);
+                }
+                for (let i = 0; i >= node.to[0] - node.from[0] && node.to[0] - node.from[0] < 0; i--) {
+                    n.push(node.from[0] + i);
+                    n.push(node.from[1]);
+                }
+            } else if (node.to[1] - node.from[1] !== 0) {
+                for (let i = 0; i <= node.to[1] - node.from[1] && node.to[1] - node.from[1] > 0; i++) {
+                    n.push(node.from[0]);
+                    n.push(node.from[1] + i);
+                }
+                for (let i = 0; i >= node.to[1] - node.from[1] && node.to[1] - node.from[1] < 0; i--) {
+                    n.push(node.from[0]);
+                    n.push(node.from[1] + i);
+                }
+            }
+            n.push(change[1]);
+            n.push(change[2]);
+            return n;
+        });
+
+        return new Action({action: "complete_path", data: {path: {data: new_changes}, id: changes[changes.length-1][0]}});
+    }
+
+    static update_path(changes, path_tree) {
+        //changes must follow this pattern:
         //[<path parts>]
-        //<path part>: [<coord x>, <coord y>, <coord x>, <coord y>, ..., <change id>]
-        //<coord x/y>: number between 0 and 15
+        //<path part>: [<node id>, <change id>, <group end>]
+        //<node id>: id of node in path_tree
         //<change id>: 0=same/keep 1=add -1=remove
-        return new Action("update_path", new Map([["path", path]]));
+        //<group end>: 0=no 1=yes -> all changes up until the next 1 will be simultaneous
+
+        let new_changes = changes.map((change) => {
+            let n = [];
+            let node = path_tree[change[0]];
+            if (node.to[0] - node.from[0] !== 0) {
+                for (let i = 0; i < node.to[0] - node.from[0]; i++) {
+                    n.push(node.from[0] + i);
+                    n.push(node.from[1]);
+                }
+                for (let i = 0; i < node.to[0] - node.from[0]; i--) {
+                    n.push(node.from[0] - i);
+                    n.push(node.from[1]);
+                }
+            } else if (node.to[1] - node.from[1] !== 0) {
+                for (let i = 0; i < node.to[1] - node.from[1]; i++) {
+                    n.push(node.from[0]);
+                    n.push(node.from[1] + i);
+                }
+                for (let i = 0; i < node.to[1] - node.from[1]; i--) {
+                    n.push(node.from[0]);
+                    n.push(node.from[1] - i);
+                }
+            }
+            n.push(change[1]);
+            n.push(change[2]);
+            return n;
+        });
+
+        return new Action({action: "update_path", path: new_changes, id: changes[0][0]});
+
+        //return new Action("update_path", new Map([["path", path]]));
     }
 
     static move_mouse(x, y, x_new, y_new) {
@@ -163,6 +248,10 @@ export class Actions {
 
         return new Action("discover_tile", new Map([["x", x], ["y", y],
             ["directions", dir_string], ["others", others], ["other_tiles_x", other_tiles_x], ["other_tiles_y", other_tiles_y]]));
+    }
+
+    static discover_wall(x, y, x_other, y_other) {
+        return new Action({action: "discover_wall", data: {x: x, y: y, x_other: x_other, y_other: y_other}});
     }
 
     static show_loading() {
@@ -258,19 +347,28 @@ export class Actions {
     }
 
     static b_test() {
+        /*
         let obj = new Object(null);
         obj.StrategyChange = new Object(null);
 
-        obj.StrategyChange.set_position = new Object(null);
-        obj.StrategyChange.set_position.pos = new Object(null);
-        obj.StrategyChange.set_position.pos.x = 0;
-        obj.StrategyChange.set_position.pos.y = 0;
-        obj.StrategyChange.set_position.dir = "PosX";
-        obj.StrategyChange.set_strategy = null;
-        obj.StrategyChange.set_goal = null;
-        obj.StrategyChange.reset_map = true;
+        obj.StrategyChange.set_strategy = new Object(null);
+        obj.StrategyChange.set_strategy.FollowWall = new Object(null);
+        obj.StrategyChange.set_strategy.FollowWall.follow_wall = "Right";
 
-        return obj;
+        //obj.StrategyChange.set_goal = null;
+        obj.StrategyChange.reset_map = true;*/
+
+        return {
+            StrategyChange: {
+                set_strategy: {
+                    FollowWall: {
+                        follow_wall: "Right",
+                        measure_all: false
+                    }
+                },
+                reset_map: true
+            }
+        };
     }
 
 

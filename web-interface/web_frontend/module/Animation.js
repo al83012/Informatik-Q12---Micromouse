@@ -517,10 +517,13 @@ export class AnimGroup extends Animation {
     animations = [];
     rem_animations = [];
 
-    constructor(delay) {
+    constructor(delay, action) {
         super(-1, null); //ignore
         this.delay = delay;
         this.current_delay = delay;
+        if (action !== undefined) {
+            this.action = action;
+        }
     }
 
     add(animation) {
@@ -583,13 +586,16 @@ export class AnimGroup extends Animation {
 
         if (all_finished) {
             this.finished = true;
+            if (this.action !== undefined) {
+                this.action();
+            }
         }
 
         this.current_delay++;
     }
 }
 
-export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are all arms tied to respective coords
+export function generatePathAnimGroup(path_in/*: int[][]*/, tiles, ignore_group, fnc) { //tiles are all arms tied to respective coords
     const anim_time = 5;
     let complete_group = -1, complete_time = 0;
     for (let doub = 0; doub < 2; doub++) {
@@ -599,8 +605,12 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
         let changed_group;
         let changed_group_time = 0;
 
+        let adder_group = new AnimGroup(0);
+        let adder_group_time_max = 0;
+
         for (let i = path.length - 1; i >= 0; i--) {
             let part = structuredClone(path[i]);
+            let is_group = (part.pop() === 0); //0: no ; 1: yes
             let type = part.pop() //0: same ; -1: remove ; +1: add
 
             let duration = 0; //add 5 to the end to make it seamless
@@ -608,7 +618,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                 duration += tiles[[part[j], part[j + 1]]].length * anim_time;
             }
             duration /= 3;
-            duration -= 10; //remove the last few child_times
+            duration -= 5; //remove the last few child_times
             complete_time += duration;
 
             /*console.log("type:" + type)
@@ -630,10 +640,10 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                             //fix: cant be displayed on page load, only with a timeout of 1000
                         }
                     }
-                    n_group = new AnimGroup(duration);
+                    /*n_group = new AnimGroup(duration);
                     n_group.add(group);
                     n_group.add(c_group);
-                    c_group = n_group;
+                    c_group = n_group;*/
                     break;
                 case 1:
                     for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
@@ -643,7 +653,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                                 (doub === 0 ? "add" : "on")));
                         }
                     }
-                    if (!was_change) {
+                    /*if (!was_change) {
                         changed_group = group;
                         changed_group_time = duration;
                         was_change = true;
@@ -656,7 +666,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                         n_group.add(c_group);
                         c_group = n_group;
                         was_change = false;
-                    }
+                    }*/
                     break;
                 case -1:
                     for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
@@ -666,7 +676,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                                 (doub === 0 ? "remove" : "repl")));
                         }
                     }
-                    if (!was_change) {
+                    /*if (!was_change) {
                         changed_group = group;
                         changed_group_time = duration;
                         was_change = true;
@@ -679,8 +689,19 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                         n_group.add(c_group);
                         c_group = n_group;
                         was_change = false;
-                    }
+                    }*/
                     break;
+            }
+
+            adder_group_time_max = Math.max(adder_group_time_max, duration);
+            adder_group.add(group);
+
+            if (!is_group) {
+                n_group = new AnimGroup(adder_group_time_max);
+                n_group.add(adder_group);
+                n_group.add(c_group);
+                c_group = n_group;
+                adder_group = new AnimGroup(0);
             }
 
 
@@ -694,7 +715,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
         }
 
         if (complete_group === -1) {
-            complete_group = new AnimGroup((complete_time-30 < 10 ? complete_time : complete_time-20));
+            complete_group = new AnimGroup((complete_time-30 < 10 ? complete_time : complete_time-20), fnc);
         }
         complete_group.add(c_group);
     }
