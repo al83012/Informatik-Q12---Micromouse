@@ -195,8 +195,8 @@ export class BackendManager {
                 if (event["UpdatePosition"] !== undefined) {
                     this.b_updateMousePosition(event["UpdatePosition"]);
                     continue main;
-                } else if (event["UpdateMap"] !== undefined) {
-                    this.b_updateMap(event["UpdateMap"]);
+                } else if (event["UpdatedMap"] !== undefined) {
+                    this.b_updatedMap(event["UpdatedMap"]);
                     continue main;
                 }
             } else if (data["VisualEvent"] !== undefined) {
@@ -276,7 +276,7 @@ export class BackendManager {
         }
     }
 
-    b_updateMap(data) {
+    b_updatedMap(data) {
         let cell_disc = data["cell_discoveries"];
         let wall_disc = data["wall_discoveries"];
 
