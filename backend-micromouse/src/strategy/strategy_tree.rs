@@ -883,7 +883,10 @@ where
             }
             NodeExpansionResult::NotYetExpandable => {
                 error!(target: "strat", link_node_id = successor.link(), "Successor can never be expanded; Waiting for more measurements, but there are no more coming");
-                let successor_world = &self.node(successor).expect("Successor exists").on_basis_of_world;
+                let successor_world = &self
+                    .node(successor)
+                    .expect("Successor exists")
+                    .on_basis_of_world;
                 error!(target: "strat", "WORLD NOT ENOUGH: \n{successor_world}");
                 return Err(FinishRootError::SuccessorNotYetExpandable);
             }
@@ -1412,8 +1415,8 @@ where
         //INFO: We also need to include the last layer which was not yet sent, but was expanded
         //from the last sent layer; it is our grafting-point
         let highest_sent_layer_and_exp = match highest_sent_layer {
-            MarkerLayerId::NotExistant => 0,
-            MarkerLayerId::AtLayer(l) if l < self.first_layer_absolute_id => {
+            MarkerLayerId::NotExistant => {
+                info!(target: "strat", "No highest sent layer");
                 let root_world = self
                     .node(self.root_node())
                     .as_ref()
@@ -1426,8 +1429,27 @@ where
                     SentUnfinishedCommands::HasBlockingRoot { world: root_world },
                 );
             }
-            MarkerLayerId::AtLayer(l) => (l - self.first_layer_absolute_id).expect("Checked").0 + 1,
+            MarkerLayerId::AtLayer(l) if l < self.first_layer_absolute_id => {
+                info!(target: "strat", "Highest sent layer {l:?} < {:?} --> Blocking root / current could not be sent", self.first_layer_absolute_id);
+                let root_world = self
+                    .node(self.root_node())
+                    .as_ref()
+                    .expect("Root must exist")
+                    .on_basis_of_world
+                    .deref()
+                    .clone();
+                return (
+                    self.visuals,
+                    SentUnfinishedCommands::HasBlockingRoot { world: root_world },
+                );
+            }
+            MarkerLayerId::AtLayer(l) => {
+                info!(target: "strat", "Highest sent layer {l:?} >= {:?} --> During tree execution", self.first_layer_absolute_id);
+                (l - self.first_layer_absolute_id).expect("Checked").0
+            }
         };
+
+        info!(target: "strat", "Highest Sent (which also must have a full layer behind it as grafting point) = {highest_sent_layer_and_exp}");
 
         if highest_sent_layer <= MarkerLayerId::AtLayer(self.first_layer_absolute_id)
             && self

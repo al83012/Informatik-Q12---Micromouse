@@ -39,6 +39,7 @@ impl<const N: usize> MicromouseSimulator<N> {
     pub async fn run(&mut self, max_measure_depth: u8) {
         let success;
         loop {
+            info!(target: "test/sim/m", "Connecting M-Sim to localhost:9001");
             let res = tokio_tungstenite::connect_async("ws://localhost:9001").await;
 
             if let Ok(o) = res {

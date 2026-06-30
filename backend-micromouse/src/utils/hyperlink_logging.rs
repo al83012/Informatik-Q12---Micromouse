@@ -119,8 +119,7 @@ pub struct RoutingLayer {
 }
 
 impl RoutingLayer {
-    pub fn new() -> Self {
-        let run_id = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
+    pub fn new(run_id: String) -> Self {
         let root = PathBuf::from("logs").join(run_id);
         Self {
             files: Mutex::new(HashMap::new()),
@@ -476,6 +475,29 @@ where
             .ok();
             writeln!(main_log_file, "</dl></div></details>").ok();
         }
+
+        // if *event.metadata().level() <= Level::WARN {
+        //     {
+        //         let mut err_log_file = self.get_file(&self.run_root.join("err.html"));
+        //
+        //         let link_to_file =
+        //             diff_paths(&current_file, &self.run_root).expect("No link to file");
+        //
+        //         writeln!(err_log_file, "<details class='log-entry'><summary>").ok();
+        //         writeln!(err_log_file, "  <pre>{}</pre>", event_str).ok();
+        //         writeln!(err_log_file, "</summary><div class='expanded-entry'><dl>").ok();
+        //         writeln!(
+        //             err_log_file,
+        //             "    <dt>SOURCE</dt><dd><code>{}</code></dd>",
+        //             link_str(
+        //                 link_to_file.to_string_lossy(),
+        //                 current_file.to_string_lossy()
+        //             )
+        //         )
+        //         .ok();
+        //         writeln!(err_log_file, "</dl></div></details>").ok();
+        //     }
+        // }
         let mut file = self.get_file(&current_file);
 
         let all_empty = visitor.links.is_empty() && visitor.fields.is_empty();
@@ -552,6 +574,7 @@ pub fn init_tree_logger() {
     use tracing_subscriber::prelude::*;
 
     let tracing_reg = tracing_subscriber::registry();
+    let run_id = Local::now().format("%Y-%m-%d_%H-%M-%S").to_string();
 
     #[cfg(feature = "tokio_console")]
     let tracing_reg = {
@@ -560,7 +583,8 @@ pub fn init_tree_logger() {
     };
 
     #[cfg(feature = "hyperlink_logging")]
-    let tracing_reg = { tracing_reg.with(RoutingLayer::new().with_filter(EnvFilter::new("info"))) };
+    let tracing_reg =
+        { tracing_reg.with(RoutingLayer::new(run_id.clone()).with_filter(EnvFilter::new("info"))) };
 
     #[cfg(feature = "term_logging")]
     let tracing_reg = {
@@ -575,23 +599,61 @@ pub fn init_tree_logger() {
             .event_format(MyFormatter::new());
 
         tracing_reg.with(
-            warn_fmt_layer
-            .with_filter(EnvFilter::new("info"))
-            //     .with_filter(FilterFn::new(|meta| {
-            //
-            //     meta.target().contains("dfs")
-            //         || meta.target().eq("proc")
-            //         || *meta.level() < Level::INFO
-            // })), // .with_filter(EnvFilter::new("info"))
-                 // .with_filter(FilterFn::new(|meta| {
-                 //     !meta.target().ends_with("apl")
-                 //         && !meta.target().contains("display")
-                 //         && !meta.target().contains("op")
-                 // })),
-            // .with_filter(FilterFn::new(|meta| {
-            //         meta.target().eq("webs/serialized")
-            //     }))
+            warn_fmt_layer.with_filter(EnvFilter::new("info")), //     .with_filter(FilterFn::new(|meta| {
+                                                                //
+                                                                //     meta.target().contains("dfs")
+                                                                //         || meta.target().eq("proc")
+                                                                //         || *meta.level() < Level::INFO
+                                                                // })), // .with_filter(EnvFilter::new("info"))
+                                                                // .with_filter(FilterFn::new(|meta| {
+                                                                //     !meta.target().ends_with("apl")
+                                                                //         && !meta.target().contains("display")
+                                                                //         && !meta.target().contains("op")
+                                                                // })),
+                                                                // .with_filter(FilterFn::new(|meta| {
+                                                                //         meta.target().eq("webs/serialized")
+                                                                //     }))
         )
+    };
+
+    #[cfg(feature = "err_logging")]
+    let tracing_reg = {
+        use std::fs;
+
+        use tracing_subscriber::filter::FilterFn;
+
+        use crate::utils::logging::{HtmlFormatter, MyFormatter};
+
+        let e_log_folder_path = PathBuf::from("logs").join(run_id);
+        let e_log_file_path = e_log_folder_path.join("warnings").with_extension("html");
+        fs::create_dir_all(e_log_folder_path).expect("Error while creating log folder");
+        let mut e_log_file =
+            File::create(e_log_file_path).expect("Creating error log file caused an error");
+
+        e_log_file
+            .write_all(
+                r#"<style>
+            html, body {
+                background-image: radial-gradient(circle at top right, #1a1a2e, #0a0a0c);
+                color: #e0e0e0;
+                margin: 0; padding: 20px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                line-height: 1.5;
+            }
+            </style>
+                "#
+                .as_bytes(),
+            )
+            .expect("Failed writing error log style");
+
+        let warn_fmt_layer = fmt::layer()
+            .with_writer(Mutex::from(e_log_file))
+            .with_file(true)
+            .with_target(true)
+            .with_ansi(true)
+            .event_format(HtmlFormatter::new());
+
+        tracing_reg.with(warn_fmt_layer.with_filter(FilterFn::new(|m| *m.level() <= Level::WARN)))
     };
 
     tracing_reg.init();

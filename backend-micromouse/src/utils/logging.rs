@@ -270,3 +270,68 @@ pub fn run_test<T>(env_filter: &str, f: impl FnOnce() -> T) -> T {
     let (subscriber, _guards) = test_logging(env_filter);
     tracing::subscriber::with_default(subscriber, f)
 }
+
+pub struct HtmlFormatter {
+    start_time: Instant,
+}
+
+impl Default for HtmlFormatter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HtmlFormatter {
+    pub fn new() -> Self {
+        Self {
+            start_time: Instant::now(),
+        }
+    }
+}
+
+impl<S, N> FormatEvent<S, N> for HtmlFormatter
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+    N: for<'a> FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        _ctx: &FmtContext<'_, S, N>,
+        mut writer: Writer<'_>,
+        event: &Event<'_>,
+    ) -> std::fmt::Result {
+        let meta = event.metadata();
+        let module = meta.module_path().unwrap_or("");
+        let module = module.rsplit("::").next().unwrap_or("");
+        let target = meta.target();
+        let level = meta.level();
+        let time = self.start_time.elapsed().as_secs_f64();
+
+        let level_color = level_color(level);
+        let level_bg_color = level_bg_color(level);
+
+        let level = format!("{level_bg_color} {level:<6} {STD_BG}");
+
+        let info = format!("[{time:>8.2}] [{BLACK} {level} {module:<10} {target:<6}");
+
+        let info_len = console::measure_text_width(info.as_str());
+
+        let target_len = 55;
+        let pad = target_len - usize::min(target_len, info_len);
+
+        let pad_str = " ".repeat(pad);
+
+        let mut visitor = MessageVisitor { msg: None };
+        event.record(&mut visitor);
+        let msg = visitor.msg.unwrap_or_default();
+
+        let ansii_event_str =
+            format!("{info}{pad_str}   {RESET_COLOR} ] {level_color} {msg}{RESET_COLOR}");
+
+        let html_event_str =
+            ansi_to_html::convert(&ansii_event_str).expect("Unable to convert ansi to html");
+
+        writeln!(writer, "<pre>{html_event_str}</pre><br>")?;
+        writeln!(writer)
+    }
+}
