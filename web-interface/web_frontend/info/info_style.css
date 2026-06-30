@@ -88,3 +88,53 @@ body {
     border: darkgray 2px solid;
     box-shadow: darkgray 0 0 3px 1px;
 }
+
+/*
+ *  Css for model-viewer
+ */
+
+.anchor {
+    display: none;
+}
+
+.lineContainer {
+    pointer-events: none;
+    display: block;
+}
+
+.annotation-line {
+    stroke: #13dac4;
+    stroke-width: 2;
+    stroke-dasharray: 2;
+}
+
+#container {
+    position: absolute;
+    display: flex;
+    justify-content: space-evenly !important;
+    bottom: 8px;
+    left: 8px;
+    width: 100%;
+}
+
+.label {
+    background: #fff;
+    border-radius: 4px;
+    border: none;
+    box-sizing: border-box;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    color: rgba(0, 0, 0, 0.8);
+    display: block;
+    font-family: Futura, Helvetica Neue, sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    max-width: 128px;
+    padding: 0.5em 1em;
+    bottom: 10px;
+    pointer-events: none;
+    /*TODO: change label design*/
+}
+
+:not(:defined)>* {
+    display: none;
+}
