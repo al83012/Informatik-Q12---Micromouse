@@ -1,4 +1,4 @@
-use std::{ops::Deref, os::windows::process, time::Duration};
+use std::time::Duration;
 
 use tokio::time::{self, Instant, Interval};
 use tokio_util::sync::CancellationToken;
@@ -22,7 +22,6 @@ use crate::{
     transform::direction::RelativeDirection,
     utils::{
         hyperlink_logging::{enter_process, init_tree_logger},
-        logging::{init_logging, run_test},
     },
 };
 
