@@ -47,7 +47,7 @@ impl FrontendSimulator {
     #[instrument(name = "new FrontendSimulator")]
     pub fn new(strategy_change_interval: Duration) -> Self {
         Self {
-            current_strat_id: 0,
+            current_strat_id: 1,
             paths: HashMap::new(),
             routine_strategy_change_interval: strategy_change_interval,
         }
@@ -74,6 +74,7 @@ impl FrontendSimulator {
             let Some(frontend_msg_batch) = (tokio::select! {
                 msg = ws_stream.next() => msg,
                 _ = tick.tick() => {
+                    warn!(target: "tests/sim/webs", "ROUTINE STRATEGY CHANGE");
 
                         let next_strat = self.other_strategy();
                         // panic!("NEXT STRAT: {next_strat:?}");

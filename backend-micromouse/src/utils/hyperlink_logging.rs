@@ -599,20 +599,19 @@ pub fn init_tree_logger() {
             .event_format(MyFormatter::new());
 
         tracing_reg.with(
-            warn_fmt_layer.with_filter(EnvFilter::new("info")), //     .with_filter(FilterFn::new(|meta| {
-                                                                //
-                                                                //     meta.target().contains("dfs")
-                                                                //         || meta.target().eq("proc")
-                                                                //         || *meta.level() < Level::INFO
-                                                                // })), // .with_filter(EnvFilter::new("info"))
-                                                                // .with_filter(FilterFn::new(|meta| {
-                                                                //     !meta.target().ends_with("apl")
-                                                                //         && !meta.target().contains("display")
-                                                                //         && !meta.target().contains("op")
-                                                                // })),
-                                                                // .with_filter(FilterFn::new(|meta| {
-                                                                //         meta.target().eq("webs/serialized")
-                                                                //     }))
+            warn_fmt_layer
+                .with_filter(EnvFilter::new("debug")) //     .with_filter(FilterFn::new(|meta| {
+                //
+                //     meta.target().contains("dfs")
+                //         || meta.target().eq("proc")
+                //         || *meta.level() < Level::INFO
+                // })), // .with_filter(EnvFilter::new("info"))
+                // .with_filter(FilterFn::new(|meta| {
+                //     !meta.target().ends_with("apl")
+                //         && !meta.target().contains("display")
+                //         && !meta.target().contains("op")
+                // })),
+                .with_filter(FilterFn::new(|meta| meta.target().eq("strat") || meta.target().contains("dfs"))),
         )
     };
 
