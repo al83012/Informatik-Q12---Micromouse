@@ -64,19 +64,22 @@ impl<const N: usize> Process<N> {
     pub const FRONTEND_PORT: u16 = 8090;
     #[instrument(name = "new Process", fields(description = "Create the main process"))]
     pub async fn new() -> Result<Self, ProcessError> {
-        let frontend_manager = FrontendManager::new(
+        let frontend_manager_future = FrontendManager::new(
             Self::FRONTEND_PORT,
             FrontendConnectionConfig {
                 batching_duration: Duration::from_millis(50),
                 ws_channel_config: WsChannelConfig::default(),
             },
-        )
-        .await
-        .map_err(ProcessError::frontend_conn)?;
+        );
 
-        let micromouse_manager = MicromouseManager::new(Self::MICROMOUSE_PORT)
-            .await
-            .map_err(ProcessError::micromouse_conn)?;
+        let micromouse_manager_future = MicromouseManager::new(Self::MICROMOUSE_PORT);
+
+        let (frontend_manager_res, micromouse_manager_res) =
+            tokio::join!(frontend_manager_future, micromouse_manager_future);
+
+        let frontend_manager = frontend_manager_res.map_err(ProcessError::frontend_conn)?;
+
+        let micromouse_manager = micromouse_manager_res.map_err(ProcessError::micromouse_conn)?;
 
         let (tree_visuals, tree_visual_recv) = FrontendVisuals::visual_event_channel().await;
 
