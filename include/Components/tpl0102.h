@@ -58,8 +58,8 @@ namespace ComponentVars {
     int canWrite();
     int canWriteAutoRetry();
     
-    void setCurrentLimitDriver(float Current);
-    void setCurrentLimitFan(float Current);
+    bool setCurrentLimitDriver(float Current);
+    bool setCurrentLimitFan(float Current);
 
 
 

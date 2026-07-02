@@ -467,24 +467,35 @@ void TPL0102::DbgPrintVoltages() {
   exitShutdown();
 }
 
-void TPL0102::setCurrentLimitDriver(float currentLimit) {
+bool TPL0102::setCurrentLimitDriver(float currentLimit) {
     if(currentLimit >= 0) {
         log_d("Setting current-limit (Driver) to %f", currentLimit);
         float voltage = currentLimit*1.32;
         log_d("Calculated voltage : %f", voltage);
-        TPL0102::setVoltageB(voltage);
+        if(TPL0102::setVoltageB(voltage) == -1){
+            log_e("# Failed to set current-limit (Driver)!");
+            return false;
+        }
+        return true;
+
     } else {
         log_e("# Current limit may not be negative!");
+        return false;
     }
 }
 
-void TPL0102::setCurrentLimitFan(float currentLimit) {
+bool TPL0102::setCurrentLimitFan(float currentLimit) {
     if(currentLimit >= 0) {
         log_d("Setting current-limit (Fan) to %f", currentLimit);
         float voltage = currentLimit*1200*(450e-6);
         log_d("Calculated voltage : %f", voltage);
-        TPL0102::setVoltageA(voltage);
+        if(TPL0102::setVoltageA(voltage) == -1){
+            log_e("# Failed to set current-limit (Fan)!");
+            return false;
+        }
+        return true;
     } else {
         log_e("# Current limit may not be negative!");
+        return false;
     }
 }

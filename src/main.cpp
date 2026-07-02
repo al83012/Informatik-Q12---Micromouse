@@ -11,6 +11,7 @@
 #include "components/tpl0102.h"
 #include "components/tmp464.h"
 #include "measurement.h"
+#include "Components/drv8424.h"
 
 #include "i2ctool.h"
 
@@ -35,5 +36,6 @@ void loop() {
  log_d(".");
  TMP464::DbgPrintTemperatures();
  Measurement::Sensors::reportTemperature();
+ DRV8424::debugPrintEncoderCounts();
 
 }
