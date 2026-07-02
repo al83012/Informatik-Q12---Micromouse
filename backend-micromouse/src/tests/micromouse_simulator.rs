@@ -23,15 +23,17 @@ use crate::{
 pub struct MicromouseSimulator<const N: usize> {
     full_map: WorldData<N>,
     is_restarting: bool,
+    step_delay: Duration,
 }
 
 impl<const N: usize> MicromouseSimulator<N> {
-    pub fn new(full_map: Map<N>) -> Self {
+    pub fn new(full_map: Map<N>, step_delay: Duration) -> Self {
         Self {
             full_map: WorldData {
                 map: full_map,
                 mouse: MouseTransform::default(),
             },
+            step_delay,
             is_restarting: false,
         }
     }
@@ -103,7 +105,7 @@ impl<const N: usize> MicromouseSimulator<N> {
                 info!(target: "test/sim", "AT CMD SIM {}", msg.cmd_id);
 
                 for i in 0..=current_cmd.max_step_count() {
-                    tokio::time::sleep(Duration::from_millis(1000)).await;
+                    tokio::time::sleep(self.step_delay).await;
                     let continue_next_cmd: bool = async {
                         info!(target: "test/sim", "Sim at step {i}");
                         let current_transf = transformed_move.at_step(i).expect("In valid range");

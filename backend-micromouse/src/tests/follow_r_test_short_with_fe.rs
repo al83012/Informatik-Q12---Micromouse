@@ -32,7 +32,7 @@ pub fn follow_r() {
     init_tree_logger();
     let _s = enter_process("test");
     info!(target: "tests/map", "TEST WORLD:\n{world}");
-    let mut micromouse_simulator = MicromouseSimulator::new(world);
+    let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::ZERO);
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     let mut cancel = CancellationToken::new();

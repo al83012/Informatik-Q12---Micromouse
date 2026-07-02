@@ -26,7 +26,8 @@ pub fn process_test_no_f_sim() {
 
     let m_handle = rt.spawn(
         async move {
-            let mut micromouse_simulator = MicromouseSimulator::new(world);
+            let mut micromouse_simulator =
+                MicromouseSimulator::new(world, Duration::from_millis(500));
             micromouse_simulator.run(3).await;
         }
         .instrument(process_span("micromouse_sim")),

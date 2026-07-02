@@ -27,7 +27,7 @@ pub fn process_test_short() {
     let m_handle = rt.spawn(
         async move {
             tokio::time::sleep(Duration::from_secs(3)).await;
-            let mut micromouse_simulator = MicromouseSimulator::new(world);
+            let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::ZERO);
             micromouse_simulator.run(3).await;
         }
         .instrument(process_span("micromouse_sim")),
