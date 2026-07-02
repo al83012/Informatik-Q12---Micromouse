@@ -127,6 +127,10 @@ impl DepthFirstBase {
             x.inner().apply_style(Style::new().on_green());
         }
 
+        if let Some(mut goal) = map_display.cell_mut(goal.0) {
+            goal.apply_style(Style::new().on_cyan());
+        }
+
         let map_str = format!("\n{map_display}");
         debug!(target: "strat/dfs", "Added expansion to path: {map_str}");
         Some(DepthFirstWithCurrent(successor))
@@ -326,11 +330,16 @@ impl DepthFirstWithCurrent {
                 pos: *move_back_to_pos,
                 dir: *dir,
             };
-            let moves_to_return = self.0.path_from_start.clone().return_to(return_to).map_err(|p| {
-                StrategyEndState::NoPossibleAction(format!(
-                    "An intersection on the stack was not part of the path {p:?}"
-                ))
-            })?;
+            let moves_to_return = self
+                .0
+                .path_from_start
+                .clone()
+                .return_to(return_to)
+                .map_err(|p| {
+                    StrategyEndState::NoPossibleAction(format!(
+                        "An intersection on the stack was not part of the path {p:?}"
+                    ))
+                })?;
 
             let score = match path_ranking {
                 PathRanking::Undefined => {
@@ -373,7 +382,10 @@ impl DepthFirstWithCurrent {
             ));
         };
 
-        self.0.path_from_start.return_to(transf_after).expect("Previously checked");
+        self.0
+            .path_from_start
+            .return_to(transf_after)
+            .expect("Previously checked");
 
         move_back_to_intersection
             .visitable_directions

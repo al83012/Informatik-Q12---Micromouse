@@ -611,7 +611,9 @@ pub fn init_tree_logger() {
                 //         && !meta.target().contains("display")
                 //         && !meta.target().contains("op")
                 // })),
-                .with_filter(FilterFn::new(|meta| meta.target().eq("strat") || meta.target().contains("dfs"))),
+                .with_filter(FilterFn::new(|meta| {
+                    meta.target().eq("strat") || meta.target().contains("dfs")
+                })),
         )
     };
 
@@ -624,8 +626,11 @@ pub fn init_tree_logger() {
         use crate::utils::logging::{HtmlFormatter, MyFormatter};
 
         let e_log_folder_path = PathBuf::from("logs").join(run_id);
-        let e_log_file_path = e_log_folder_path.join("warnings").with_extension("html");
-        fs::create_dir_all(e_log_folder_path).expect("Error while creating log folder");
+        let e_log_file_path = e_log_folder_path
+            .clone()
+            .join("warnings")
+            .with_extension("html");
+        fs::create_dir_all(e_log_folder_path.clone()).expect("Error while creating log folder");
         let mut e_log_file =
             File::create(e_log_file_path).expect("Creating error log file caused an error");
 
@@ -652,7 +657,44 @@ pub fn init_tree_logger() {
             .with_ansi(true)
             .event_format(HtmlFormatter::new());
 
-        tracing_reg.with(warn_fmt_layer.with_filter(FilterFn::new(|m| *m.level() <= Level::WARN)))
+        let tracing_reg = tracing_reg
+            .with(warn_fmt_layer.with_filter(FilterFn::new(|m| *m.level() <= Level::WARN)));
+
+        let e_log_dbg_path = e_log_folder_path.join("dbg_out").with_extension("html");
+        fs::create_dir_all(e_log_folder_path).expect("Error while creating log folder");
+        let mut e_dbg_out_file =
+            File::create(e_log_dbg_path).expect("Creating error log file caused an error");
+
+        e_dbg_out_file
+            .write_all(
+                r#"<style>
+            html, body {
+                background-image: radial-gradient(circle at top right, #1a1a2e, #0a0a0c);
+                color: #e0e0e0;
+                margin: 0; padding: 20px;
+                font-family: 'Consolas', 'Monaco', monospace;
+                line-height: 1.5;
+            }
+            </style>
+                "#
+                .as_bytes(),
+            )
+            .expect("Failed writing error log style");
+
+        let warn_fmt_layer = fmt::layer()
+            .with_writer(Mutex::from(e_dbg_out_file))
+            .with_file(true)
+            .with_target(true)
+            .with_ansi(true)
+            .event_format(HtmlFormatter::new());
+
+        tracing_reg.with(
+            warn_fmt_layer
+                .with_filter(FilterFn::new(|m| {
+                    m.target().eq("strat") || m.target().contains("dfs")
+                }))
+                .with_filter(EnvFilter::new("debug")),
+        )
     };
 
     tracing_reg.init();

@@ -20,9 +20,9 @@ use crate::{
         },
         strategy::{FromConfig, GoalPosition, Strategy, StrategyEndState},
         strategy_tree::{
-            self, FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
-            StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationInitialEffect,
-            TreeCreationSuccess,
+            self, FinishRootError, GraftingFilter, PruneError, SentUnfinishedCommands,
+            StrategyStart, StrategyTree, StrategyTreeConfig, StrategyTreeError, TreeCreationError,
+            TreeCreationInitialEffect, TreeCreationSuccess,
         },
         visuals::FrontendVisuals,
     },
@@ -66,6 +66,37 @@ pub enum DynStrategyConfig<const N: usize> {
     RandomMove(<RandomMove<N> as FromConfig<N>>::Config),
     DbgKnownPath(<DbgKnownPath<N> as FromConfig<N>>::Config),
     Closed,
+}
+
+impl<const N: usize> DynStrategyConfig<N> {
+    pub fn require_grafting_filter(&self) -> GraftingFilter {
+
+        macro_rules! require_grafting_filter {
+            ([$($variant:ident),+]) => {
+                {
+                use super::strategy::FromConfig;
+                match self {
+                        $(DynStrategyConfig::$variant(val) => {
+                        val.require_grafting_filter()
+                    })+
+                    DynStrategyConfig::Closed => {
+                        GraftingFilter::None
+                    }
+                }
+
+                }
+                }
+            }
+
+        require_grafting_filter!([
+            DepthFirst,
+            BreadthFirst,
+            FollowWall,
+            FloodFill,
+            RandomMove,
+            DbgKnownPath
+        ])
+    }
 }
 
 #[derive(Deserialize, Clone, Debug, PartialEq, Serialize)]
@@ -422,7 +453,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "modify",
         fields(description = "Freely change the current strategy (erasing old one)")
     )]
-    pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<Option<StrategyEndState>, TreeCreationError> {
+    pub fn modify(
+        &mut self,
+        change: StrategyChangeCommand<N>,
+    ) -> Result<Option<StrategyEndState>, TreeCreationError> {
         info!(target: "strat", "MODIFY {change:?}");
         let StrategyChangeCommand {
             reset_map,
@@ -440,7 +474,11 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
         let strategy_start = StrategyStart::ContinueAfterDoing {
             after_cmds: erased,
-            reset_world: reset_map,
+            grafting_filter: if reset_map {
+                GraftingFilter::RemoveAll
+            } else {
+                self.strat_config()
+            },
         };
 
         if reset_map {

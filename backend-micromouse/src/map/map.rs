@@ -350,6 +350,31 @@ impl<const N: usize> Map<N> {
         (position.x == 0 && *direction == Direction::NegX)
             || (position.y == 0 && *direction == Direction::NegY)
     }
+
+    pub fn without_visited(&self) -> Self {
+        let mut cloned = self.clone();
+        for x in 0..N {
+            for y in 0..N {
+                let pos = Position {
+                    x: x as u32,
+                    y: y as u32,
+                };
+                let Some(cell) = cloned.cell_mut(&pos) else {
+                    continue;
+                };
+                if *cell == CellDiscoveryStatus::Visited {
+                    *cell = CellDiscoveryStatus::Discovered;
+                }
+            }
+        }
+        cloned
+    }
+}
+
+impl<const N: usize> AsRef<Map<N>> for &Map<N> {
+    fn as_ref(&self) -> &Map<N> {
+        self
+    }
 }
 
 impl<const N: usize> Default for Map<N> {

@@ -26,7 +26,7 @@ use crate::{
         strategy::{
             ComputedAction, ComputedActions, FromConfig, GoalPosition, Strategy,
             StrategyComputationResult, StrategyEndState,
-        },
+        }, strategy_tree::GraftingFilter,
     },
     transform::{
         direction::{Direction, DirectionNormalizedVector, RelativeDirection},
@@ -61,6 +61,9 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
             df: MaybeInitDepthFirst::HasInitialStep(DepthFirstWithCurrent::new(starting_state)),
             config: config.clone(),
         }
+    }
+    fn require_grafting_filter(&self) -> crate::strategy::strategy_tree::GraftingFilter {
+        GraftingFilter::RemoveVisited
     }
 }
 

@@ -95,6 +95,47 @@ pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     node_count: usize,
     node_id_counter: RelativeNodeIdCounter,
     is_sent: bool,
+    grafting_filter: GraftingFilter,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+pub enum GraftingFilter {
+    RemoveAll,
+    RemoveVisited,
+    None,
+}
+
+impl Ord for GraftingFilter {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (x, y) if x == y => std::cmp::Ordering::Equal,
+            (GraftingFilter::None, _) => std::cmp::Ordering::Less,
+            (GraftingFilter::RemoveAll, _) => std::cmp::Ordering::Greater,
+            (_, GraftingFilter::None) => std::cmp::Ordering::Greater,
+            (_, GraftingFilter::RemoveAll) => std::cmp::Ordering::Less,
+            _ => panic!("Should not be needed"),
+        }
+    }
+}
+
+impl GraftingFilter {
+    pub fn apply_on_world<const N: usize>(&self, world: impl AsRef<WorldData<N>>) -> WorldData<N> {
+        let world: &WorldData<N> = world.as_ref();
+        match self {
+            GraftingFilter::RemoveAll => world.only_pos(),
+            GraftingFilter::RemoveVisited => world.without_visited(),
+            GraftingFilter::None => world.clone(),
+        }
+    }
+
+    pub fn apply_on_map<const N: usize>(&self, map: impl AsRef<Map<N>>) -> Map<N> {
+        let map: &Map<N> = map.as_ref();
+        match self {
+            GraftingFilter::RemoveAll => Map::new(),
+            GraftingFilter::RemoveVisited => map.without_visited(),
+            GraftingFilter::None => map.clone(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -105,6 +146,7 @@ pub struct SentTreeLayer<const N: usize> {
     // is always merged (as it was sent)
     node_count: usize,
     eq: Command,
+    grafting_filter: GraftingFilter,
 }
 
 // Always counting up
@@ -185,7 +227,7 @@ pub struct TreeExpansionSuccess {
 pub enum StrategyStart<const N: usize> {
     ContinueAfterDoing {
         after_cmds: SentUnfinishedCommands<N>,
-        reset_world: bool,
+        grafting_filter: GraftingFilter,
     },
     // Will create a root node from this world and the strategy-initializer
     DirectlyAtState(WorldData<N>),
@@ -234,7 +276,7 @@ where
         match starting_condition {
             StrategyStart::ContinueAfterDoing {
                 after_cmds: SentUnfinishedCommands::HasQueue { layers },
-                reset_world,
+                grafting_filter,
             } => {
                 info!(target: "strat", "Continue after doing");
                 // let num_of_unfinished_cmds = layers.len();
@@ -251,6 +293,7 @@ where
                     .collect::<Vec<_>>();
 
                 let last_layer = transformed_layers.last_mut().expect("layers are nonempty");
+                last_layer.grafting_filter = grafting_filter;
                 let last_layer_id = last_layer.absolute_layer_id;
                 info!(target: "strat", link_layer_id = last_layer_id.link(), "Last layer which was sent, but not finished = {last_layer_id:?}");
 
@@ -259,14 +302,15 @@ where
                 // not yet sent, but is the expansion of the last sent layer; This means, that this
                 // is the grafting point
                 last_layer.nodes.iter_mut().for_each(|(_n, val)| {
-                    let world = if reset_world {
-                        &val.on_basis_of_world.only_pos()
-                    } else {
-                        &val.on_basis_of_world
-                    };
+                    // let world = if reset_world {
+                    //     &val.on_basis_of_world.only_pos()
+                    // } else {
+                    //     &val.on_basis_of_world
+                    // };
+                    let world = grafting_filter.apply_on_world(&val.on_basis_of_world);
                     val.applied_strategy = None;
                     val.on_basis_of_state =
-                        Some(S::from_config(&tree_config.strategy_config, world));
+                        Some(S::from_config(&tree_config.strategy_config, &world));
                 });
 
                 let highest_sent_marker =
@@ -293,14 +337,10 @@ where
                 let starting_state = match x {
                     StrategyStart::ContinueAfterDoing {
                         after_cmds: SentUnfinishedCommands::HasBlockingRoot { world },
-                        reset_world,
+                        grafting_filter,
                     } => {
                         info!(target: "strat", "Continue after blocking root");
-                        if reset_world {
-                            world.only_pos()
-                        } else {
-                            world
-                        }
+                        grafting_filter.apply_on_world(&world)
                     }
                     StrategyStart::DirectlyAtState(world) => world,
                     _ => panic!("Covered previously"),
@@ -934,6 +974,7 @@ where
         self.node_count -= 1;
 
         let new_first_layer = self.layers.first_mut().expect("Has Successor");
+        new_first_layer.grafting_filter = GraftingFilter::None;
         // new_first_layer.is_full = true;
         self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
 
@@ -948,10 +989,8 @@ where
     }
 
     #[instrument(
-        name = "prune_not_potentially_eq",
-        fields(
-            description = "Prunes all command-outcomes of all paths which do not match the given filter; ALSO: Apply the full filter if it could lead a node to becoming expandable",
-        ),
+        name = "tree_structure_str",
+        fields(description = "Returns a str showing the structure of the tree",),
         skip(self)
     )]
     fn tree_structure_str(&self) -> String {
@@ -959,7 +998,14 @@ where
         let mut res = "".to_string();
         nodes.push_front(self.root_node());
         while let Some(node_id) = nodes.pop_front() {
-            let children = self.node(node_id).expect("Should exist").children();
+            let layer = self.layer(node_id.layer_id).expect("Should exist");
+            let grafting_filter = match layer.grafting_filter {
+                GraftingFilter::None => "",
+                GraftingFilter::RemoveVisited => "V",
+                GraftingFilter::RemoveAll => "X",
+            };
+            let node = self.node(node_id).expect("Should exist");
+            let children = node.children();
             if let Some(children) = children {
                 for child in children.values() {
                     nodes.push_front(*child);
@@ -968,12 +1014,17 @@ where
 
             let depth = node_id.layer_id - self.first_layer_absolute_id;
             let indent = " ".repeat(depth.map(|d| d.0).unwrap_or(0) * 4);
-            res = format!("{res}\n{indent}> {node_id:?}");
+            let layer_id = node_id.layer_id.0;
+            let node_id = node_id.node_id.0;
+            let pos_x = node.on_basis_of_world.mouse.pos.x;
+            let pos_y = node.on_basis_of_world.mouse.pos.y;
+            let dir = node.on_basis_of_world.mouse.dir;
+            res = format!("{res}\n{indent} > {grafting_filter} L{layer_id}N{node_id} at ({pos_x}|{pos_y})|{dir}");
         }
         res
     }
     pub fn prune_not_potentially_eq(&mut self, filter: &Map<N>) -> Result<(), PruneError> {
-        // println!("Prune");
+        let mut maximum_grafting_filter = GraftingFilter::None;
         for layer_offset in 1..self.layers.len() {
             let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset);
             let Some(layer) = self.layer_mut(layer_id) else {
@@ -982,6 +1033,8 @@ where
                     node_id: RelativeNodeId(0),
                 }));
             };
+            maximum_grafting_filter = maximum_grafting_filter.max(layer.grafting_filter);
+            let additional_map_information = maximum_grafting_filter.apply_on_map(&filter);
             let prune_nodes = layer
                 .nodes
                 .iter_mut()
@@ -992,7 +1045,7 @@ where
                             node.on_basis_of_world.map = node
                                 .on_basis_of_world
                                 .map
-                                .union(filter)
+                                .union(&additional_map_information)
                                 .expect("Is potentially_eq");
                         }
                         None
@@ -1387,7 +1440,7 @@ where
             .expect("Index should be valid")
             .on_basis_of_world
             .map
-            .potentially_eq(&map)
+            .potentially_eq(map)
         {
             self.prune_not_potentially_eq(map)?;
             let _ = self.expand_fully()?;
@@ -1608,6 +1661,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
             is_full: true,
             eq: Some(sent_layer.eq),
             node_count: sent_layer.node_count,
+            grafting_filter: sent_layer.grafting_filter,
             // This is not technically correct, but it should not be used after this
             // point, so creating a nonsense value is ok
             node_id_counter: RelativeNodeIdCounter(0),
@@ -1630,6 +1684,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
             eq: None,
             node_count: 0,
             is_sent: false,
+            grafting_filter: GraftingFilter::None,
         }
     }
 
@@ -1860,6 +1915,7 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTr
             nodes,
             absolute_layer_id: value.absolute_layer_id,
             node_count: node_len,
+            grafting_filter: value.grafting_filter,
         })
     }
 }

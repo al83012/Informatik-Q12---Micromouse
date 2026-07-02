@@ -33,7 +33,7 @@ pub fn process_test_no_m_sim() {
     // );
     let f_handle = rt.spawn(
         async {
-            let mut frontend_simulator = FrontendSimulator::new(Duration::MAX);
+            let mut frontend_simulator = FrontendSimulator::new(Duration::from_hours(200));
             frontend_simulator.run().await;
         }
         .instrument(process_span("frontend_sim")),

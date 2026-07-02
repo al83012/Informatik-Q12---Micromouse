@@ -1,7 +1,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::strategy::strategy::{FromConfig, Strategy};
+use crate::strategy::{strategy::{FromConfig, Strategy}, strategy_tree::GraftingFilter};
 
 #[derive(Clone, Debug)]
 pub struct FloodFill<const N: usize>;
@@ -17,6 +17,9 @@ impl<const N: usize> FromConfig<N> for FloodFill<N> {
         starting_state: &crate::map::world_data::WorldData<N>,
     ) -> Self {
         todo!()
+    }
+    fn require_grafting_filter(&self) -> crate::strategy::strategy_tree::GraftingFilter {
+        GraftingFilter::None
     }
 }
 

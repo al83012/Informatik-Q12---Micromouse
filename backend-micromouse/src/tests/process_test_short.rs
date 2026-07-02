@@ -27,14 +27,14 @@ pub fn process_test_short() {
     let m_handle = rt.spawn(
         async move {
             tokio::time::sleep(Duration::from_secs(3)).await;
-            let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::ZERO);
+            let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::from_millis(100));
             micromouse_simulator.run(3).await;
         }
         .instrument(process_span("micromouse_sim")),
     );
     let f_handle = rt.spawn(
         async {
-            let mut frontend_simulator = FrontendSimulator::new(Duration::from_secs(5));
+            let mut frontend_simulator = FrontendSimulator::new(Duration::from_hours(500));
             frontend_simulator.run().await;
         }
         .instrument(process_span("frontend_sim")),

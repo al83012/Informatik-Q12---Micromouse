@@ -195,7 +195,7 @@ impl FrontendSimulator {
             // }),
         ][current_strat_id];
 
-        let next_pos = [Position { x: 0, y: 0 }, Position { x: 5, y: 5 }][current_strat_id];
+        let next_pos = [Position { x: 0, y: 0 }, Position { x: 8, y: 8 }][current_strat_id];
 
         self.current_strat_id = current_strat_id + 1;
 
