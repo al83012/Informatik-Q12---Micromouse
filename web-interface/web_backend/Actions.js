@@ -135,12 +135,12 @@ export class Actions {
             let n = [];
             let node = path_tree[change[0]];
             if (node.to[0] - node.from[0] !== 0) {
-                for (let i = 0; i < node.to[0] - node.from[0]; i++) {
+                for (let i = 0; i <= node.to[0] - node.from[0]; i++) {
                     n.push(node.from[0] + i);
                     n.push(node.from[1]);
                 }
-                for (let i = 0; i < node.to[0] - node.from[0]; i--) {
-                    n.push(node.from[0] - i);
+                for (let i = 0; i > node.to[0] - node.from[0]; i--) {
+                    n.push(node.from[0] + i);
                     n.push(node.from[1]);
                 }
             } else if (node.to[1] - node.from[1] !== 0) {
@@ -148,15 +148,17 @@ export class Actions {
                     n.push(node.from[0]);
                     n.push(node.from[1] + i);
                 }
-                for (let i = 0; i < node.to[1] - node.from[1]; i--) {
+                for (let i = 0; i > node.to[1] - node.from[1]; i--) {
                     n.push(node.from[0]);
-                    n.push(node.from[1] - i);
+                    n.push(node.from[1] + i);
                 }
             }
             n.push(change[1]);
             n.push(change[2]);
             return n;
         });
+
+        console.log(new_changes);
 
         return new Action({action: "update_path", path: new_changes, id: changes[0][0]});
 

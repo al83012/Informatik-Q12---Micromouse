@@ -214,6 +214,7 @@ export class Index {
                     Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], true));
                     break;
                 case "discover_tile":
+                    console.log(data);
                     if (data["others"] === true) {
                         discoverTile(data["x"], data["y"], data["directions"], data.other_tiles_x, data.other_tiles_y);
                     } else {

@@ -110,7 +110,7 @@ console.log("\x1b[33m[B] Found Gateway on: " + gateway_f + "; version: " + versi
 console.log("\x1b[33m[B] Requiring Websocket");
 const WebsocketClient = require('websocket').client;
 const back_port = 8090;
-const host = '192.168.137.1';
+const host = '127.0.0.1'//'192.168.137.1';
 console.log("\x1b[33m[B] Creating Client");
 const client = new WebsocketClient();
 

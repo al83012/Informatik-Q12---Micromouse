@@ -2,7 +2,7 @@
   "name": "web_backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "index.cjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -13,5 +13,6 @@
     "express": "^5.2.1",
     "iproute": "^2.3.0",
     "websocket": "^1.0.35"
-  }
+  },
+  "type": "module"
 }
