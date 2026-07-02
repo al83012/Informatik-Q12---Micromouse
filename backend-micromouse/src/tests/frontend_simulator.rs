@@ -40,14 +40,16 @@ use crate::{
 pub struct FrontendSimulator {
     current_strat_id: usize,
     paths: HashMap<AbsolutePathId, PathSegment>,
+    routine_strategy_change_interval: Duration,
 }
 
 impl FrontendSimulator {
     #[instrument(name = "new FrontendSimulator")]
-    pub fn new() -> Self {
+    pub fn new(strategy_change_interval: Duration) -> Self {
         Self {
             current_strat_id: 0,
             paths: HashMap::new(),
+            routine_strategy_change_interval: strategy_change_interval,
         }
     }
     #[instrument(skip(self), name = "run")]
@@ -58,21 +60,34 @@ impl FrontendSimulator {
         info!(target: "test/sim", " < Connection Response = {response:?}");
 
         tokio::time::sleep(Duration::from_secs(2)).await;
-        let msg = FrontendResponse::StrategyChange(StrategyChangeCommand {
-            set_goal: None,
-            reset_map: true,
-            set_strategy: Some(DynStrategyConfig::<10>::DepthFirst(DepthFirstConfig {
-                path_ranking: PathRanking::TowardsGoal,
-            })),
-        });
+        // let initial_msg = FrontendResponse::StrategyChange(StrategyChangeCommand {
+        //     set_goal: None,
+        //     reset_map: true,
+        //     set_strategy: Some(DynStrategyConfig::<10>::DepthFirst(DepthFirstConfig {
+        //         path_ranking: PathRanking::TowardsGoal,
+        //     })),
+        // });
 
-        ws_stream
-            .send(Message::Text(Utf8Bytes::from(
-                serde_json::ser::to_string_pretty(&msg).expect("Should be parseable"),
-            )))
-            .await;
+        let mut tick = tokio::time::interval(self.routine_strategy_change_interval);
 
-        while let Some(frontend_msg_batch) = ws_stream.next().await {
+        loop {
+            let Some(frontend_msg_batch) = (tokio::select! {
+                msg = ws_stream.next() => msg,
+                _ = tick.tick() => {
+
+                        let next_strat = self.other_strategy();
+                        // panic!("NEXT STRAT: {next_strat:?}");
+                        ws_stream
+                            .send(Message::Text(Utf8Bytes::from(next_strat)))
+                            .await
+                            .expect("Sending should not just panic");
+                    continue;
+                }
+
+            }) else {
+                error!(target: "tests/sim/webs", "Received channel close");
+                break;
+            };
             let Ok(frontend_msg_batch) = frontend_msg_batch else {
                 error!(target: "tests/sim/webs", "Error while receiving from backend {:#?}", frontend_msg_batch.expect_err("Checked"));
                 ws_stream
