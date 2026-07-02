@@ -21,7 +21,8 @@ use crate::{
         strategy::{FromConfig, GoalPosition, Strategy, StrategyEndState},
         strategy_tree::{
             self, FinishRootError, PruneError, SentUnfinishedCommands, StrategyStart, StrategyTree,
-            StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationSuccess,
+            StrategyTreeConfig, StrategyTreeError, TreeCreationError, TreeCreationInitialEffect,
+            TreeCreationSuccess,
         },
         visuals::FrontendVisuals,
     },
@@ -110,6 +111,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         fields(description = "Erase the last strategy, enabling the application of a new one")
     )]
     unsafe fn erase_strat(&mut self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
+        info!(target: "strat", "ERASING STRATEGY");
         macro_rules! erase_strat {
             ([$($variant:ident),+]) => {
                 {
@@ -128,14 +130,16 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             };
         }
 
-        erase_strat!([
+        let e = erase_strat!([
             DepthFirst,
             BreadthFirst,
             FollowWall,
             FloodFill,
             RandomMove,
             DbgKnownPath
-        ])
+        ]);
+        info!(target: "strat", "FINISHED ERASING");
+        e
     }
 
     #[instrument(
@@ -151,7 +155,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         desired_depth: usize,
         max_nodes: usize,
         visuals: FrontendVisuals,
-    ) -> Result<(), StrategyTreeError> {
+    ) -> Result<Option<StrategyEndState>, TreeCreationError> {
         info!(target: "strat", "SET STARTING CONDITION for {strategy_config:?}");
         macro_rules! new_tree {
             ([$($variant:ident),+]) => {
@@ -163,17 +167,17 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                             max_nodes
                         };
                         let tree = StrategyTree::new(starting_condition, strat_conf, goal_position, visuals)?;
-                        let TreeCreationSuccess{tree, origin_command} = tree;
-                        (DynStrategyTree::<N>::$variant(tree), origin_command)
+                        let TreeCreationSuccess{tree, origin_command_or_end} = tree;
+                        (DynStrategyTree::<N>::$variant(tree), origin_command_or_end)
                     })+
                     DynStrategyConfig::Closed => {
-                        (DynStrategyTree::Closed(visuals), None)
+                        (DynStrategyTree::Closed(visuals), TreeCreationInitialEffect::OriginCommand(None))
                     }
                 }
             };
         }
 
-        let (new_tree, cmd) = new_tree!([
+        let (new_tree, cmd_or_end) = new_tree!([
             DepthFirst,
             BreadthFirst,
             FollowWall,
@@ -182,13 +186,21 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             DbgKnownPath
         ]);
 
+        let variant = std::mem::discriminant(&new_tree);
+        info!(target: "strat", "NEW DYN TREE: {variant:?}");
         self.strategy_tree = new_tree;
 
-        if let Some(cmd) = cmd {
-            self.send_cmd(cmd.clone());
+        match cmd_or_end {
+            TreeCreationInitialEffect::ImmediateEnd(strategy_end) => {
+                return Ok(Some(strategy_end));
+            }
+            TreeCreationInitialEffect::OriginCommand(Some(cmd)) => {
+                self.send_cmd(cmd.clone());
+            }
+            _ => {}
         }
 
-        Ok(())
+        Ok(None)
     }
 
     #[instrument(
@@ -326,13 +338,6 @@ impl<const N: usize> DynStrategyTreeManager<N> {
 
     #[instrument(
         skip(self),
-        name = "reset_queue",
-        fields(description = "Clear the internal cmd queue")
-    )]
-    pub fn reset_queue(&mut self) {}
-
-    #[instrument(
-        skip(self),
         name = "set_pos_to_start_and_restart",
         fields(
             description = "Clear the entire strategy state and make it assume the default starting position (Does not reset command queue of the micromouse); Restarts current strategy"
@@ -342,7 +347,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         info!(target: "strat", "RESTART STRATEGY MANAGER");
         let (visuals, _erased) = unsafe { self.erase_strat() };
         let strat_config = self.strat_config.clone();
-        let goal_pos = self.goal_pos.clone();
+        let goal_pos = self.goal_pos;
         let default_world = WorldData::default().only_pos();
         *self = Self::new(
             default_world,
@@ -417,7 +422,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         name = "modify",
         fields(description = "Freely change the current strategy (erasing old one)")
     )]
-    pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<(), StrategyTreeError> {
+    pub fn modify(&mut self, change: StrategyChangeCommand<N>) -> Result<Option<StrategyEndState>, TreeCreationError> {
         info!(target: "strat", "MODIFY {change:?}");
         let StrategyChangeCommand {
             reset_map,
@@ -442,13 +447,15 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             self.send_reset_map();
         }
 
-        self.set_starting_cond(
+        let res = self.set_starting_cond(
             strategy_start,
             self.strat_config.clone(),
             self.goal_pos,
             self.desired_depth,
             self.max_nodes,
             visuals,
-        )
+        );
+        info!(target: "strat", "FINISHED MODIFY: {:?}", std::mem::discriminant(&self.strategy_tree));
+        res
     }
 }

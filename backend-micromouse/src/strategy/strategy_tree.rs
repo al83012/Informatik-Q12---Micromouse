@@ -159,10 +159,20 @@ pub enum NodeExpansionResult {
 }
 
 #[derive(Debug, Clone, Serialize, Error, Deserialize)]
-#[error("At node {node:?} with result {expansion:?}")]
+pub enum NodeExpansionError {
+    #[error(
+        "Expected the node to be expandable, but it does not have the neccessary strategy data"
+    )]
+    ExpectedExpandable,
+    #[error("Expected the node to be expandable, but the strategy refused due to not having enough information")]
+    ExpectedAlreadyExpandable,
+}
+
+#[derive(Debug, Clone, Serialize, Error, Deserialize)]
+#[error("At node {node:?} with result {expansion_error:?}")]
 pub struct TreeExpansionError {
     node: AbsoluteNodeId,
-    expansion: NodeExpansionResult,
+    expansion_error: NodeExpansionError,
 }
 
 #[derive(Debug)]
@@ -183,12 +193,15 @@ pub enum StrategyStart<const N: usize> {
 
 #[derive(Debug, Clone, Serialize, Error, Deserialize)]
 pub enum TreeCreationError {
-    #[error("Strategy ended at start {0:?}")]
-    StrategyError(#[from] StrategyEndState),
     #[error("Failed expanding the root")]
     ExpansionError(#[from] TreeExpansionError),
     #[error("Root was not expanded after attempt to do so")]
     RootNotExpanded,
+}
+
+pub enum TreeCreationInitialEffect {
+    OriginCommand(Option<Command>),
+    ImmediateEnd(StrategyEndState),
 }
 
 pub struct TreeCreationSuccess<
@@ -196,7 +209,7 @@ pub struct TreeCreationSuccess<
     S: Strategy<N> + Clone + std::fmt::Debug + FromConfig<N>,
 > {
     pub tree: StrategyTree<N, S>,
-    pub origin_command: Option<Command>,
+    pub origin_command_or_end: TreeCreationInitialEffect,
 }
 
 impl<const N: usize, S> StrategyTree<N, S>
@@ -217,7 +230,7 @@ where
         tree_config: StrategyTreeConfig<N, S>,
         goal_position: GoalPosition,
         visuals: FrontendVisuals,
-    ) -> Result<TreeCreationSuccess<N, S>, StrategyTreeError> {
+    ) -> Result<TreeCreationSuccess<N, S>, TreeCreationError> {
         match starting_condition {
             StrategyStart::ContinueAfterDoing {
                 after_cmds: SentUnfinishedCommands::HasQueue { layers },
@@ -273,7 +286,7 @@ where
 
                 Ok(TreeCreationSuccess {
                     tree,
-                    origin_command: None,
+                    origin_command_or_end: TreeCreationInitialEffect::OriginCommand(None),
                 })
             }
             x => {
@@ -329,21 +342,28 @@ where
                     .as_ref()
                     .ok_or(TreeCreationError::RootNotExpanded);
                 let root_send = root_send?;
-                let root_send = root_send
-                    .as_ref()
-                    .map_err(StrategyEndState::clone)
-                    .map_err(TreeCreationError::from)?;
-                let first_cmd = root_send.command.command().clone();
 
-                // Actually mark layers as eq
-                res.update_equal_layers();
+                let init_effect = match root_send {
+                    Ok(root_send) => {
+                        let init_effect = TreeCreationInitialEffect::OriginCommand(Some(
+                            root_send.command.command().clone(),
+                        ));
+                        // Actually mark layers as eq
+                        res.update_equal_layers();
 
-                // By returning the origin_command, it is basically the same as sending that layer
-                res.highest_sent_layer = MarkerLayerId::AtLayer(first_layer_id);
+                        // By returning the origin_command, it is basically the same as sending that layer
+                        res.highest_sent_layer = MarkerLayerId::AtLayer(first_layer_id);
+                        init_effect
+                    }
+                    Err(strategy_end) => {
+                        info!(target: "strat", "Expanded strategy, but encountered StrategyEnd immediately");
+                        TreeCreationInitialEffect::ImmediateEnd(strategy_end.clone())
+                    }
+                };
 
                 Ok(TreeCreationSuccess {
                     tree: res,
-                    origin_command: Some(first_cmd),
+                    origin_command_or_end: init_effect,
                 })
             }
         }
@@ -443,7 +463,7 @@ where
                         error!(target: "strat", "Cannot expand node");
                         return Err(TreeExpansionError {
                             node: abs_node_id,
-                            expansion: node_expansion_result,
+                            expansion_error: NodeExpansionError::ExpectedExpandable,
                         });
                     }
                     NodeExpansionResult::NotYetExpandable => {
@@ -455,10 +475,6 @@ where
                     NodeExpansionResult::AlreadyExpanded => {
                         error!(target: "strat", "Already expanded, but not marked as such");
                         // This shouldn't happen, we already filtered them
-                        return Err(TreeExpansionError {
-                            node: abs_node_id,
-                            expansion: node_expansion_result,
-                        });
                     }
                     NodeExpansionResult::EndState(_s) => {
                         // That is alright, we will throw the error once this part of the tree is

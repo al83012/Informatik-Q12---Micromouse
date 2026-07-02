@@ -342,13 +342,19 @@ impl<const N: usize> Process<N> {
     pub async fn handle_frontend_command(&mut self, frontend_command: FrontendResponse<N>) {
         match frontend_command {
             FrontendResponse::StrategyChange(strategy_change_command) => {
-                let Err(e) = self.strategy_tree_manager.modify(strategy_change_command) else {
-                    return;
-                };
-
-                self.frontend_manager
-                    .send(FrontendMessage::StrategyTreeError(e))
-                    .await;
+                match self.strategy_tree_manager.modify(strategy_change_command) {
+                    Ok(Some(strat_end)) => {
+                        self.frontend_manager
+                            .send(FrontendMessage::StrategyEnd(strat_end))
+                            .await;
+                    }
+                    Err(e) => {
+                        self.frontend_manager
+                            .send(FrontendMessage::StrategyTreeError(e.into()))
+                            .await;
+                    }
+                    _ => {}
+                }
             }
             FrontendResponse::Pause => {
                 self.micromouse_manager

@@ -313,8 +313,8 @@ impl<const N: usize> MicromouseManager<N> {
             }
             MicromouseResponse::Restart => {
                 let _s = process_span("process_restart");
-                info!(target: "comm/mng", "RESTARTED");
                 self.restart().await;
+                info!(target: "comm/mng", "RESTARTED");
                 // *self.mode.lock().await = MicromouseMode::Running;
                 Ok(vec![MicromouseEvent::Restart])
             }
