@@ -5,7 +5,7 @@ use tokio::sync::{
     broadcast::{Receiver, Sender},
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
-use tracing::{info, instrument};
+use tracing::{info, instrument, warn};
 
 use crate::{
     comm::micromouse_message::{Command, NonIndexMicromouseMessage},
@@ -35,7 +35,8 @@ pub enum DynStrategyTree<const N: usize> {
     FloodFill(StrategyTree<N, FloodFill<N>>),
     RandomMove(StrategyTree<N, RandomMove<N>>),
     DbgKnownPath(StrategyTree<N, DbgKnownPath<N>>),
-    Closed(Option<FrontendVisuals>),
+    Closed(FrontendVisuals),
+    CurrentlyChanging,
 }
 
 pub struct DynStrategyTreeManager<const N: usize> {
@@ -87,7 +88,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         visuals: FrontendVisuals,
     ) -> Self {
         // WARN: Will only become active once .modify is called the first time
-        let strategy_tree = DynStrategyTree::Closed(Some(visuals));
+        let strategy_tree = DynStrategyTree::Closed(visuals);
 
         let (command_sender, command_receiver) = tokio::sync::mpsc::unbounded_channel();
         Self {
@@ -112,7 +113,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
         macro_rules! erase_strat {
             ([$($variant:ident),+]) => {
                 {
-                    let mut current_val = DynStrategyTree::<N>::Closed(None);
+                    let mut current_val = DynStrategyTree::<N>::CurrentlyChanging;
                     std::mem::swap(&mut self.strategy_tree, &mut current_val);
                     match current_val {
                         $(
@@ -120,8 +121,8 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                                 val.close()
                             }
                         )*
-                        DynStrategyTree::<N>::Closed(Some(visuals)) => (visuals, SentUnfinishedCommands::HasBlockingRoot{world: self.current_world.clone()}),
-                        _ => panic!("When erasing strat, there should be visuals")
+                        DynStrategyTree::<N>::Closed(visuals) => (visuals, SentUnfinishedCommands::HasBlockingRoot{world: self.current_world.clone()}),
+                        DynStrategyTree::<N>::CurrentlyChanging => panic!("Erasing an already changing strategy tree; NOT ALLOWED"),
                     }
                 }
             };
@@ -166,7 +167,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                         (DynStrategyTree::<N>::$variant(tree), origin_command)
                     })+
                     DynStrategyConfig::Closed => {
-                        (DynStrategyTree::Closed(Some(visuals)), None)
+                        (DynStrategyTree::Closed(visuals), None)
                     }
                 }
             };
@@ -249,9 +250,10 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                             // tree.prune_not_potentially_eq(&partial)
                         },)+
                         DynStrategyTree::Closed(ref _visuals) => {
-                            info!(target: "strat", "Updating closed tree");
+                            warn!(target: "strat", "Updating closed tree");
                             return Ok(());
                         },
+                        DynStrategyTree::CurrentlyChanging => panic!("Strategy Tree is currently changing; NOT ALLOWED"),
                     };
                 prune_result
                 }
@@ -297,6 +299,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                             info!(target: "strat", "Pruning closed tree");
                             return Ok(())
                         }
+                        DynStrategyTree::CurrentlyChanging => panic!("Pruning tree which is currently changing; NOT ALLOWED")
                 ,
                     };
                 prune_result
@@ -375,7 +378,8 @@ impl<const N: usize> DynStrategyTreeManager<N> {
                         $(DynStrategyTree::$variant(ref mut tree) => {
                             tree.handle_finish_root()
                         },)+
-                        DynStrategyTree::Closed(ref _visuals) => panic!("Closed is not a proper state; It should only appear in operations and not be constructable"),
+                        DynStrategyTree::Closed(ref _visuals) => panic!("Closed has no root to be finished"),
+                        DynStrategyTree::CurrentlyChanging => panic!("Finishing Root on tree that is currently changing")
                     };
                 finish_root_result
                 }
