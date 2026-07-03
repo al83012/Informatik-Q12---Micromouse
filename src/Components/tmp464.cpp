@@ -148,10 +148,13 @@ void TMP464::setShutdownMode(bool enableShutDown) {
 }
 
 void TMP464::DbgPrintTemperatures() {
-    log_i("# TMP_TEMP_LOCAL: %f", readLocalTemperature());
-    log_i("# TMP_TEMP_REMOTE_1: %f", readRemoteTemperature(0x01));
-    log_i("# TMP_TEMP_REMOTE_2: %f", readRemoteTemperature(0x02));
-    log_i("# TMP_TEMP_REMOTE_3: %f", readRemoteTemperature(0x03));
-   // log_i("# TMP_TEMP_REMOTE_4: %f", readRemoteTemperature(0x04)); Not connected
+    log_i("---------TEMPERATURES (TMP464)---------");
+    log_i("# LOCAL: %f", readLocalTemperature());
+    log_i("# REMOTE_1: %f", readRemoteTemperature(0x01));
+    log_i("# REMOTE_2: %f", readRemoteTemperature(0x02));
+    log_i("# REMOTE_3: %f", readRemoteTemperature(0x03));
+   // log_i("# REMOTE_4: %f", readRemoteTemperature(0x04)); Not connected
+    log_i("---------------------------------------");
+
 
 }

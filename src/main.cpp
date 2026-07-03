@@ -17,25 +17,30 @@
 
 void setup() {
 delay(1000);
-log_i("Initializing Setup");
+log_i("# Initializing Setup");
 Esp32::initESP32();
- Network::setup();
+// Network::setup();
 
  log_i("# Setup done!");
  I2CTOOL::I2CScanner();
 
  TPL0102::DbgPrintVoltages();
  TMP464::DbgPrintTemperatures(); 
+
+ log_i("# Setup done!");
  //Measurement::IR::debugPrintRawDistance(0);
+
+ DRV8424::setDutyCycle2(100);
 
 }
 
 void loop() {
- Network::checkNetwork();
+ //Network::checkNetwork();
  delay(2000);
  log_d(".");
  TMP464::DbgPrintTemperatures();
- Measurement::Sensors::reportTemperature();
+ //Measurement::Sensors::reportTemperature();
  DRV8424::debugPrintEncoderCounts();
+
 
 }

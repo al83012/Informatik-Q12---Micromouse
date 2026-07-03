@@ -32,15 +32,15 @@ void Esp32::initESP32() {
 }
 
 void Esp32::initSubComponents() {
-    /*TCAL6408::init();
-    BQ76905::init();*/
+    TCAL6408::init();
+    //BQ76905::init();
     TMP464::init();
     //IIS2MDC::init();
     TPL0102::init(3.4, 0.3, 0.1); 
     //Fan::init();
     LSM6DSR::init();   
     
-    DRV8424::init(30000);
+    DRV8424::init(50000);
 
 }
 

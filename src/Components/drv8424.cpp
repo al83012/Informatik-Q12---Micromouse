@@ -3,7 +3,7 @@
 #include "components/tpl0102.h"
 #include "Arduino.h"
 #include "Wire.h"
-
+#include "Components/tcal6408.h"
 
 namespace DRV8424 {
     volatile long encoderCount1 = 0;
@@ -19,16 +19,18 @@ namespace DRV8424 {
     
 void DRV8424::init(int frequency) {
     log_d("# (DRV8424) Initializing DRV8424 with frequency: %d", frequency);
-    pinMode(ENC_A1, INPUT_PULLUP);
-    pinMode(ENC_A2, INPUT_PULLUP); 
+    pinMode(ENC_A1, INPUT);
+    pinMode(ENC_A2, INPUT); 
 
-    pinMode(ENC_B1, INPUT_PULLUP);
-    pinMode(ENC_B2, INPUT_PULLUP); 
+    pinMode(ENC_B1, INPUT);
+    pinMode(ENC_B2, INPUT); 
 
     pinMode(DRV_AIN1, OUTPUT);
     pinMode(DRV_AIN2, OUTPUT);
     pinMode(DRV_BIN1, OUTPUT);
     pinMode(DRV_BIN2, OUTPUT);
+
+    TCAL6408::setDriverAwake(true);
 
     attachInterrupt(digitalPinToInterrupt(ENC_A1), DRV8424::readEncoder1, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ENC_A2), DRV8424::readEncoder2, CHANGE);
@@ -53,6 +55,8 @@ void DRV8424::readEncoder1() {
         encoderCount1--;
         direction1 = false;
     }
+    
+    log_i("Interrupt: ENC_A1 changed. Encoder Count 1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
 }
 
 void DRV8424::readEncoder2() {
@@ -67,11 +71,15 @@ void DRV8424::readEncoder2() {
         direction2 = false;
     }
 
+    log_i("Interrupt: ENC_A2 changed. Encoder Count 2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
+
 }
 
 void DRV8424::debugPrintEncoderCounts() {
-    log_i("# (DRV8424) Encoder Count 1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
-    log_i("# (DRV8424) Encoder Count 2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
+    log_i("---------DRV8424 ENCODER COUNTS (DRV8424)---------");
+    log_i("# ENC_1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
+    log_i("# ENC_2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
+    log_i("---------------------------------------");
 }
 
 void DRV8424::setDutyCycle1(int dutyCycle) {

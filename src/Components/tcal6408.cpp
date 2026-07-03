@@ -92,6 +92,7 @@ void TCAL6408::setFanAwake(bool state) {
 }
 
 void TCAL6408::setDriverAwake(bool state) {
+    log_i("# (TCAL6408) Setting Driver Awake State to: %s", state ? "Awake" : "Sleep");
     setPinStateDriver(ComponentVars::PIN_DRV_NSLEEP, state);
 }
 
