@@ -25,8 +25,9 @@ use crate::{
         },
         strategy::{
             ComputedAction, ComputedActions, FromConfig, GoalPosition, Strategy,
-            StrategyComputationResult, StrategyEndState,
-        }, strategy_tree::GraftingFilter,
+            StrategyComputationResult, StrategyEndState, WithGraftingFilter,
+        },
+        strategy_tree::GraftingFilter,
     },
     transform::{
         direction::{Direction, DirectionNormalizedVector, RelativeDirection},
@@ -62,6 +63,9 @@ impl<const N: usize> FromConfig<N> for DepthFirst<N> {
             config: config.clone(),
         }
     }
+}
+
+impl WithGraftingFilter for DepthFirstConfig {
     fn require_grafting_filter(&self) -> crate::strategy::strategy_tree::GraftingFilter {
         GraftingFilter::RemoveVisited
     }

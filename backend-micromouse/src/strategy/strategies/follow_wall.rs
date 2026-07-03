@@ -7,10 +7,13 @@ use crate::{
     comm::micromouse_message::{
         Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType, StepNum,
     },
-    strategy::{strategy::{
-        ComputedAction, ComputedActions, FromConfig, Strategy, StrategyComputationResult,
-        StrategyEndState,
-    }, strategy_tree::GraftingFilter},
+    strategy::{
+        strategy::{
+            ComputedAction, ComputedActions, FromConfig, Strategy, StrategyComputationResult,
+            StrategyEndState, WithGraftingFilter,
+        },
+        strategy_tree::GraftingFilter,
+    },
     transform::{direction::RelativeDirection, position::MouseTransform},
     utils::nonempty::NonEmpty,
 };
@@ -65,6 +68,9 @@ impl<const N: usize> FromConfig<N> for FollowWall<N> {
             visited: HashSet::new(),
         }
     }
+}
+
+impl WithGraftingFilter for FollowWallConfig {
     fn require_grafting_filter(&self) -> crate::strategy::strategy_tree::GraftingFilter {
         GraftingFilter::None
     }

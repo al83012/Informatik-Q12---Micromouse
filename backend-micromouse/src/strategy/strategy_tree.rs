@@ -26,6 +26,7 @@ use crate::{
         },
         visuals::{FrontendVisuals, PathSegment},
     },
+    transform::position::MouseTransform,
     utils::{
         hyperlink_logging::LinkFileName,
         nonempty::{NonEmpty, PotentiallyNonEmpty},
@@ -85,6 +86,7 @@ pub struct StrategyTree<const N: usize, S: Strategy<N> + Clone + FromConfig<N>> 
     visuals: FrontendVisuals,
 }
 
+#[derive(Debug)]
 pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     nodes: HashMap<RelativeNodeId, StrategyTreeNode<N, S>>,
     absolute_layer_id: AbsoluteLayerId,
@@ -98,7 +100,7 @@ pub struct StrategyTreeLayer<const N: usize, S: Strategy<N>> {
     grafting_filter: GraftingFilter,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GraftingFilter {
     RemoveAll,
     RemoveVisited,
@@ -115,6 +117,12 @@ impl Ord for GraftingFilter {
             (_, GraftingFilter::RemoveAll) => std::cmp::Ordering::Less,
             _ => panic!("Should not be needed"),
         }
+    }
+}
+
+impl PartialOrd for GraftingFilter {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -165,6 +173,7 @@ pub struct StrategyTreeConfig<const N: usize, S: Strategy<N> + Clone + FromConfi
 }
 
 // = Layer 1..
+#[derive(Debug)]
 pub struct StrategyTreeNode<const N: usize, S: Strategy<N>> {
     pub on_basis_of_world: PartialWorldData<N>,
     pub on_basis_of_state: Option<S>, // Could be none if it is a step taken over from another tree
@@ -181,6 +190,21 @@ pub struct SentCommandNode<const N: usize> {
     pub on_basis_of_world: PartialWorldData<N>,
     pub applied_strategy: NodeActionResult<N>,
     as_branch_from_parent: Option<AbsolutePathId>,
+}
+
+#[derive(Debug)]
+pub struct GraftableNode<const N: usize> {
+    pub on_basis_of_world: PartialWorldData<N>,
+    pub as_branch_from_parent: AbsolutePathId,
+}
+
+#[derive(Debug)]
+pub struct GraftableLayer<const N: usize> {
+    pub nodes: HashMap<RelativeNodeId, GraftableNode<N>>,
+    pub layer_id: AbsoluteLayerId,
+    // is full
+    // ?eq
+    // is not sent
 }
 
 type NodeActionResult<const N: usize> = Result<NodeAction<N>, StrategyEndState>;
@@ -273,60 +297,101 @@ where
         goal_position: GoalPosition,
         visuals: FrontendVisuals,
     ) -> Result<TreeCreationSuccess<N, S>, TreeCreationError> {
+        info!(target: "strat", "################################### NEW #####################################");
         match starting_condition {
             StrategyStart::ContinueAfterDoing {
-                after_cmds: SentUnfinishedCommands::HasQueue { layers },
+                after_cmds:
+                    SentUnfinishedCommands::HasQueue {
+                        layers: sent_layers,
+                        grafting_layer,
+                    },
                 grafting_filter,
             } => {
                 info!(target: "strat", "Continue after doing");
                 // let num_of_unfinished_cmds = layers.len();
-                let node_count = layers.iter().map(|l| l.node_count).sum::<usize>();
-                let first_layer_absolute_id = layers
+                let node_count = sent_layers.iter().map(|l| l.node_count).sum::<usize>()
+                    + grafting_layer.nodes.len();
+                let first_layer_absolute_id = sent_layers
                     .first()
                     .map(|l| l.absolute_layer_id)
                     .unwrap_or(AbsoluteLayerId(0));
+                info!(target: "strat", "First layer = L{}", first_layer_absolute_id.0);
                 info!(target: "strat", link_layer_id = first_layer_absolute_id.link(), "First layer which was sent, but not finished = {first_layer_absolute_id:?}");
 
-                let layers = layers.into_inner().into_iter();
+                let layers = sent_layers.into_inner().into_iter();
                 let mut transformed_layers = layers
                     .map(StrategyTreeLayer::<N, S>::non_expandable_from_cleaned)
                     .collect::<Vec<_>>();
+                info!(target: "strat", "Took over {} layers + 1 Grafting layer", transformed_layers.len());
 
-                let last_layer = transformed_layers.last_mut().expect("layers are nonempty");
-                last_layer.grafting_filter = grafting_filter;
-                let last_layer_id = last_layer.absolute_layer_id;
-                info!(target: "strat", link_layer_id = last_layer_id.link(), "Last layer which was sent, but not finished = {last_layer_id:?}");
-
+                let last_layer = grafting_layer
+                    .nodes
+                    .into_iter()
+                    .map(|(rel_node_id, graftable_node)| {
+                        (
+                            rel_node_id,
+                            StrategyTreeNode {
+                                on_basis_of_state: Some(S::from_config(
+                                    &tree_config.strategy_config,
+                                    &graftable_node.on_basis_of_world,
+                                )),
+                                on_basis_of_world: graftable_node.on_basis_of_world,
+                                as_branch_from_parent: Some(graftable_node.as_branch_from_parent),
+                                applied_strategy: None,
+                            },
+                        )
+                    })
+                    .collect::<HashMap<_, _>>();
+                let node_count_last_layer = last_layer.len();
+                let grafted_layer = StrategyTreeLayer {
+                    nodes: last_layer,
+                    absolute_layer_id: grafting_layer.layer_id,
+                    eq: None,
+                    is_full: true,
+                    is_sent: false,
+                    node_count: node_count_last_layer,
+                    node_id_counter: RelativeNodeIdCounter(node_count_last_layer),
+                    grafting_filter,
+                };
+                let grafted_layer_id = grafted_layer.absolute_layer_id;
+                info!(target: "strat", link_layer_id = grafted_layer_id.link(), "Grafting layer = L{}", grafted_layer_id.0);
+                info!(target: "strat", "Grafting layer = L{}, WITH FILTER = {grafting_filter:?}", grafted_layer_id.0);
                 // WARN:
                 // The last layer contained in the sent unfinished commands is a layer, which was
                 // not yet sent, but is the expansion of the last sent layer; This means, that this
                 // is the grafting point
-                last_layer.nodes.iter_mut().for_each(|(_n, val)| {
-                    // let world = if reset_world {
-                    //     &val.on_basis_of_world.only_pos()
-                    // } else {
-                    //     &val.on_basis_of_world
-                    // };
-                    let world = grafting_filter.apply_on_world(&val.on_basis_of_world);
-                    val.applied_strategy = None;
-                    val.on_basis_of_state =
-                        Some(S::from_config(&tree_config.strategy_config, &world));
-                });
+                //
+                // grafted.nodes.iter_mut().for_each(|(_n, val)| {
+                //     let world = grafting_filter.apply_on_world(&val.on_basis_of_world);
+                //     info!(target: "strat", "World with grafting_filter\n{world}");
+                //     val.applied_strategy = None;
+                //     val.on_basis_of_state =
+                //         Some(S::from_config(&tree_config.strategy_config, &world));
+                // });
 
                 let highest_sent_marker =
-                    MarkerLayerId::AtLayer(last_layer_id - RelativeLayerId(1));
+                    MarkerLayerId::AtLayer(grafted_layer_id - RelativeLayerId(1));
 
-                let tree = Self {
+                info!(target: "strat", "New highest sent = {highest_sent_marker:?}");
+
+                transformed_layers.push(grafted_layer);
+
+                let mut tree = Self {
                     config: tree_config,
                     layers: transformed_layers,
                     highest_sent_layer: highest_sent_marker,
                     highest_eq_layer: highest_sent_marker,
-                    highest_full_layer: highest_sent_marker,
+                    highest_full_layer: MarkerLayerId::AtLayer(grafted_layer_id),
                     first_layer_absolute_id,
                     node_count,
                     goal_position,
                     visuals,
                 };
+
+                tree.expand_fully().map_err(TreeCreationError::from)?;
+                tree.update_equal_layers();
+
+                info!(target: "strat", "New tree: \n{}", tree.tree_structure_str());
 
                 Ok(TreeCreationSuccess {
                     tree,
@@ -350,12 +415,15 @@ where
                 let first_strategy = S::from_config(&tree_config.strategy_config, &starting_state);
 
                 let first_layer_id = AbsoluteLayerId(0);
+                let mut first_layer = StrategyTreeLayer::new(AbsoluteLayerId(0));
+                first_layer.is_sent = true;
+                first_layer.is_full = true;
 
                 let mut res = Self {
                     config: tree_config,
-                    layers: vec![StrategyTreeLayer::new(AbsoluteLayerId(0))],
-                    highest_sent_layer: MarkerLayerId::NotExistant,
-                    highest_eq_layer: MarkerLayerId::NotExistant,
+                    layers: vec![first_layer],
+                    highest_sent_layer: MarkerLayerId::AtLayer(first_layer_id),
+                    highest_eq_layer: MarkerLayerId::AtLayer(first_layer_id),
                     highest_full_layer: MarkerLayerId::AtLayer(first_layer_id),
                     first_layer_absolute_id: AbsoluteLayerId(0),
                     node_count: 0,
@@ -374,6 +442,7 @@ where
                 res.layer_mut(first_layer_id).expect("Checked").is_full = true;
 
                 res.expand_fully().map_err(TreeCreationError::from)?;
+                res.update_equal_layers();
 
                 let root_send = res
                     .node(first_node_id)
@@ -592,6 +661,13 @@ where
         let mut nodes_created = 0;
         let goal_position = self.goal_position;
 
+        info!(target: "strat", "Expanding node: L{}N{}", node_id.layer_id.0, node_id.node_id.0);
+
+        let grafting_filter = self
+            .layer(node_id.layer_id)
+            .expect("Node exists and so should layer")
+            .grafting_filter
+            .clone();
         // INFO: ############# Getting the node ##############################
         let node = self
             .node_mut(node_id)
@@ -615,8 +691,9 @@ where
         //     return NodeExpansionResult::AlreadyExpanded;
         // }
 
-        let basis_world = &node.on_basis_of_world;
-        info!(target: "strat", "BASED ON WORLD: \n{basis_world}");
+        let basis_world =
+            PartialWorldData::from(grafting_filter.apply_on_world(&node.on_basis_of_world));
+        info!(target: "strat", "BASED ON WORLD ({:?}): \n{basis_world}", grafting_filter);
 
         // INFO: ############# Checking that it has a strategy needed for expansion ##############################
         let Some(basis_strategy_state) = &node.on_basis_of_state else {
@@ -627,7 +704,7 @@ where
 
         // INFO: ############# If the strategy does not return a proper value, it is just not yet ready ##############################
         let StrategyComputationResult::Computed(expansion_actions) =
-            basis_strategy_state.next_cmd(basis_world, &goal_position)
+            basis_strategy_state.next_cmd(&basis_world, &goal_position)
         else {
             info!(target: "strat", "Not yet expandable");
             return NodeExpansionResult::NotYetExpandable;
@@ -661,13 +738,18 @@ where
             // At the first step there should only be one node to expand, but further down the line
             // there could be an entire collection of them
             let mut new_apply_on_node = vec![];
-            for parent_node in apply_on_node {
-                info!(target: "strat",link_node_id = parent_node.link(), "Based on node {parent_node:?}");
-                let child_node_layer = parent_node.layer_id + RelativeLayerId(1);
+            for parent_node_id in apply_on_node {
+                info!(target: "strat",link_node_id = parent_node_id.link(), "Based on node {parent_node_id:?}");
+                let child_node_layer = parent_node_id.layer_id + RelativeLayerId(1);
                 let (parent_pos, cmd_application) = {
                     let basis_world = {
-                        let parent_node = self.node(parent_node).expect("Checked");
-                        &parent_node.on_basis_of_world
+                        let parent_node = self.node(parent_node_id).expect("Checked");
+                        if parent_node_id == node_id {
+                            // Using the filtered world
+                            &basis_world
+                        } else {
+                            &parent_node.on_basis_of_world
+                        }
                     };
 
                     (
@@ -686,7 +768,7 @@ where
                     .potential_outcomes
                 {
                     let path_id = AbsolutePathId {
-                        from_node: parent_node,
+                        from_node: parent_node_id,
                         branch: child_path_id,
                     };
 
@@ -700,7 +782,7 @@ where
                     self.visuals.create_path(
                         PathSegment::new(parent_pos, child_world.mouse)
                             .expect("Child should form valid path"),
-                        parent_node,
+                        parent_node_id,
                         child_node_id,
                     );
                     info!(target: "strat", link_node_id = child_node_id.link(), "CHILD NODE {child_node_id:?}\n{child_world}");
@@ -716,7 +798,7 @@ where
                 };
 
                 //Lastly, add the actual children-information to the parent
-                let parent_node = self.node_mut(parent_node).expect("Checked");
+                let parent_node = self.node_mut(parent_node_id).expect("Checked");
                 parent_node.applied_strategy = Some(Ok(action));
             }
             apply_on_node = new_apply_on_node;
@@ -974,6 +1056,10 @@ where
         self.node_count -= 1;
 
         let new_first_layer = self.layers.first_mut().expect("Has Successor");
+        let grafting_filter = new_first_layer.grafting_filter;
+        new_first_layer.nodes.iter_mut().for_each(|(_k, v)| {
+            v.on_basis_of_world = grafting_filter.apply_on_world(&v.on_basis_of_world).into();
+        });
         new_first_layer.grafting_filter = GraftingFilter::None;
         // new_first_layer.is_full = true;
         self.first_layer_absolute_id = new_first_layer.absolute_layer_id;
@@ -1004,7 +1090,27 @@ where
                 GraftingFilter::RemoveVisited => "V",
                 GraftingFilter::RemoveAll => "X",
             };
+            let is_full = match layer.is_full {
+                true => "F",
+                false => "!F",
+            };
+
+            let is_sent = match layer.is_sent {
+                true => "S",
+                false => "!S",
+            };
+
+            let is_eq = match layer.eq.is_some() {
+                true => "E",
+                false => "!E",
+            };
+
             let node = self.node(node_id).expect("Should exist");
+            let is_end = match &node.applied_strategy {
+                None => "?".to_string(),
+                Some(Err(e)) => "END".to_string(),
+                Some(Ok(c)) => format!("{:?}", c.command.command()),
+            };
             let children = node.children();
             if let Some(children) = children {
                 for child in children.values() {
@@ -1019,7 +1125,7 @@ where
             let pos_x = node.on_basis_of_world.mouse.pos.x;
             let pos_y = node.on_basis_of_world.mouse.pos.y;
             let dir = node.on_basis_of_world.mouse.dir;
-            res = format!("{res}\n{indent} > {grafting_filter} L{layer_id}N{node_id} at ({pos_x}|{pos_y})|{dir}");
+            res = format!("{res}\n{indent} > {grafting_filter} {is_full} {is_eq} {is_sent} L{layer_id}N{node_id} at ({pos_x}|{pos_y})|{dir} {is_end}");
         }
         res
     }
@@ -1154,6 +1260,12 @@ where
         self.prune_node(first_delete_node)
     }
 
+    /// .
+    ///
+    ///
+    /// # Safety
+    /// Fucks up the tree if left on its own
+    /// .
     // Returns the nodes children
     #[instrument(
         name = "delete_node_no_clean",
@@ -1189,11 +1301,11 @@ where
         let highest_full_layer_offset = match self.highest_full_layer {
             MarkerLayerId::NotExistant => {
                 error!(target: "strat", "There is not a single full layer while updating eq layers; Should only be the case at startup");
-                -1
+                0
             }
             MarkerLayerId::AtLayer(l) if l + RelativeLayerId(1) == self.first_layer_absolute_id => {
                 info!(target: "strat", "highest full layer is directly below the current first_layer");
-                -1
+                0
             }
             MarkerLayerId::AtLayer(l) => {
                 info!(target: "strat", "highest_full_layer = {highest_full_layer:?}");
@@ -1205,11 +1317,11 @@ where
         let highest_eq_layer_offset = match self.highest_eq_layer {
             MarkerLayerId::NotExistant => {
                 // error!(target: "strat", "There is not a single eq layer while updating eq layers; Should only be the case at startup");
-                -1
+                0
             }
             MarkerLayerId::AtLayer(l) if l + RelativeLayerId(1) == self.first_layer_absolute_id => {
                 info!(target: "strat", "highest eq layer is directly below the current first_layer");
-                -1
+                0
             }
             MarkerLayerId::AtLayer(l) => {
                 info!(target: "strat", "highest_eq_layer = {highest_eq_layer:?}");
@@ -1219,9 +1331,9 @@ where
             }
         };
 
-        info!(target: "strat", "Rechecking layer[{}..={}]", highest_eq_layer_offset + 1, highest_full_layer_offset);
+        info!(target: "strat", "Rechecking layer[{}..={}]", highest_eq_layer_offset, highest_full_layer_offset);
 
-        for layer_offset in highest_eq_layer_offset + 1..=highest_full_layer_offset {
+        for layer_offset in highest_eq_layer_offset..=highest_full_layer_offset {
             let layer_id = self.first_layer_absolute_id + RelativeLayerId(layer_offset as usize);
             if !self
                 .layer_mut(layer_id)
@@ -1316,8 +1428,12 @@ where
         if highest_sent_layer_offset < highest_sendable_layer_offset {
             let l = self.layers
                 [(highest_sent_layer_offset + 1) as usize..=highest_sendable_layer_offset as usize]
-                .iter()
-                .map(|l| l.eq.as_ref().expect("Explicitly should exist").clone())
+                .iter_mut()
+                .map(|l| {
+                    l.is_sent = true;
+                    info!(target: "strat", "SENT LAYER L{}", l.absolute_layer_id.0);
+                    l.eq.as_ref().expect("Explicitly should exist").clone()
+                })
                 .collect();
 
             self.highest_sent_layer = MarkerLayerId::AtLayer(
@@ -1477,13 +1593,14 @@ where
         ),
         skip(self)
     )]
-    pub fn close(self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
+    pub fn close(mut self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
         info!(target: "strat", "CLOSE");
+        info!(target: "strat", "Of tree \n{}", self.tree_structure_str());
         let highest_sent_layer = self.highest_sent_layer;
 
         //INFO: We also need to include the last layer which was not yet sent, but was expanded
         //from the last sent layer; it is our grafting-point
-        let highest_sent_layer_and_exp = match highest_sent_layer {
+        let highest_sent_layer_offset = match highest_sent_layer {
             MarkerLayerId::NotExistant => {
                 info!(target: "strat", "No highest sent layer");
                 let root_world = self
@@ -1518,9 +1635,10 @@ where
             }
         };
 
-        info!(target: "strat", "Highest Sent (which also must have a full layer behind it as grafting point) = {highest_sent_layer_and_exp}");
+        // info!(target: "strat", "Of tree \n{}", self.tree_structure_str());
+        info!(target: "strat", "Highest Sent (which also must have a full layer behind it as grafting point) = {highest_sent_layer_offset}");
 
-        if highest_sent_layer <= MarkerLayerId::AtLayer(self.first_layer_absolute_id)
+        if highest_sent_layer < MarkerLayerId::AtLayer(self.first_layer_absolute_id)
             && self
                 .node(self.root_node())
                 .expect("HAS TO EXIST")
@@ -1530,6 +1648,8 @@ where
         {
             //INFO: The current root is blocking; it appears to be sent, but  it is not / cannot be
             //(A blocking root is the only root that is not sendable)
+
+            info!(target: "strat", "The highest sent layer is smaller than or equal to the first layer and has a strategy end state --> Blocking root");
 
             let world = self
                 .node(self.root_node())
@@ -1544,23 +1664,59 @@ where
             );
         }
 
-        let mut layers = vec![];
-        let mut inner_layers = self.layers;
-        for _i in 0..=highest_sent_layer_and_exp {
+        // info!(target: "strat", "Of tree \n{}", self.tree_structure_str());
+        let mut sent_layers = vec![];
+        for i in 0..=highest_sent_layer_offset {
+            info!(target: "strat",  "ADDING TO CLOSED: {i}/{highest_sent_layer_offset}+1");
             // Remove the lowest layer
-            let layer = inner_layers.remove(0);
+            let layer = self.layers.remove(0);
+            info!(target: "strat", "  = L{}, {:?}", layer.absolute_layer_id.0, layer.eq);
 
-            layers.push(layer.try_into().expect(
-                "Within highest sent layer, should fulfil all the properties of the sent layer",
+            // info!(target: "strat", "LAYER : {layer:#?}");
+
+            sent_layers.push(layer.try_into().expect(
+                "Within highest sent layer, should fulfill all the properties of the sent layer",
             ))
         }
+        let grafting_layer = self.layers.remove(0);
+
+        info!(target: "strat", "Processing grafting layer L{}", grafting_layer.absolute_layer_id.0);
+
+        let grafting_layer = grafting_layer
+            .try_into()
+            .expect("Layer should be full, but not sent");
 
         (
             self.visuals,
             SentUnfinishedCommands::HasQueue {
-                layers: layers.non_empty().expect("Root layer has to have been sent; meaning that it and its children can form highest_sent + exp"),
+                layers: sent_layers.non_empty().expect("Root layer has to have been sent; meaning that it and its children can form highest_sent + exp"),
+                grafting_layer,
             }
         )
+    }
+
+    fn prune_successor_by_orientation(
+        &mut self,
+        expected_world_transform: MouseTransform,
+    ) -> Result<(), PruneError> {
+        let Some(successors) = self.layers.get(1) else {
+            return Err(PruneError::SourceHasNoChildren(self.root_node()));
+        };
+
+        let successor_layer_id = successors.absolute_layer_id;
+        let prune_nodes = successors
+            .nodes
+            .iter()
+            .filter(|(_k, v)| v.on_basis_of_world.mouse != expected_world_transform)
+            .map(|(k, v)| AbsoluteNodeId {
+                layer_id: successor_layer_id,
+                node_id: *k,
+            })
+            .collect::<Vec<_>>();
+        for n in prune_nodes {
+            self.prune_node(n)?
+        }
+        Ok(())
     }
 }
 
@@ -1576,7 +1732,7 @@ pub enum PruneError {
     SourceDoesNotHaveThisChild(AbsolutePathId),
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AbsoluteNodeId {
     layer_id: AbsoluteLayerId,
     node_id: RelativeNodeId,
@@ -1606,6 +1762,7 @@ pub enum SentUnfinishedCommands<const N: usize> {
         // They are Strategy-Agnostic by not allowing the nodes to expand, which allows us to leave out
         // the strategy-state, which is needed for expansion
         layers: NonEmpty<Vec<SentTreeLayer<N>>>,
+        grafting_layer: GraftableLayer<N>,
     },
     // WARN: If there is no queue here, it would mean that the tree is not entirely empty (it
     // cannot be), but there is a root which is blocking (i.e. it marks a StrategyEndState)
@@ -1768,7 +1925,7 @@ impl<const N: usize, S: Strategy<N>> StrategyTreeLayer<N, S> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RelativeNodeIdCounter(pub usize);
 
 #[derive(Debug, Clone, Serialize, Error, Deserialize)]
@@ -1876,6 +2033,7 @@ pub enum LayerReductionError {
     LayerNotFull,
     LayerNotEq,
     LayerNotSent,
+    LayerSent,
 }
 
 impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTreeLayer<N> {
@@ -1883,14 +2041,17 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for SentTr
     #[instrument(name = "try_from StrategyTreeLayer", skip(value), fields(link_layer_id = value.absolute_layer_id.link(), description = "Erase layer's strategy"))]
     fn try_from(value: StrategyTreeLayer<N, S>) -> Result<Self, Self::Error> {
         if !value.is_full {
+            error!(target: "strat", "!value.is_full");
             error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not full");
             return Err(LayerReductionError::LayerNotFull);
         }
         if value.eq.is_none() {
+            error!(target: "strat", "value.eq.is_none()");
             error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not equal");
             return Err(LayerReductionError::LayerNotEq);
         }
-        if value.is_sent {
+        if !value.is_sent {
+            error!(target: "strat", "!value.is_sent");
             error!(target: "strat", link_layer_id = value.absolute_layer_id.link(), "Layer that is erased is not sent");
             return Err(LayerReductionError::LayerNotSent);
         }
@@ -1928,5 +2089,38 @@ impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeNode<N, S>> for SentCom
             applied_strategy: value.applied_strategy.ok_or(())?,
             as_branch_from_parent: value.as_branch_from_parent,
         })
+    }
+}
+
+impl<const N: usize, S: Strategy<N>> TryFrom<StrategyTreeLayer<N, S>> for GraftableLayer<N> {
+    type Error = LayerReductionError;
+
+    fn try_from(value: StrategyTreeLayer<N, S>) -> Result<Self, Self::Error> {
+        if value.is_sent {
+            return Err(LayerReductionError::LayerSent);
+        }
+        if !value.is_full {
+            return Err(LayerReductionError::LayerNotFull);
+        }
+
+        Ok(GraftableLayer {
+            nodes: value
+                .nodes
+                .into_iter()
+                .map(|(k, v)| (k, GraftableNode::from(v)))
+                .collect(),
+            layer_id: value.absolute_layer_id,
+        })
+    }
+}
+
+impl<const N: usize, S: Strategy<N>> From<StrategyTreeNode<N, S>> for GraftableNode<N> {
+    fn from(value: StrategyTreeNode<N, S>) -> Self {
+        Self {
+            on_basis_of_world: value.on_basis_of_world,
+            as_branch_from_parent: value
+                .as_branch_from_parent
+                .expect("Graftable node HAS TO BE a child from"),
+        }
     }
 }

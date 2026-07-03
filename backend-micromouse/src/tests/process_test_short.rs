@@ -34,7 +34,7 @@ pub fn process_test_short() {
     );
     let f_handle = rt.spawn(
         async {
-            let mut frontend_simulator = FrontendSimulator::new(Duration::from_hours(500));
+            let mut frontend_simulator = FrontendSimulator::new(Duration::from_secs(5));
             frontend_simulator.run().await;
         }
         .instrument(process_span("frontend_sim")),

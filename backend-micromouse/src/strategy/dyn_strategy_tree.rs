@@ -70,14 +70,13 @@ pub enum DynStrategyConfig<const N: usize> {
 
 impl<const N: usize> DynStrategyConfig<N> {
     pub fn require_grafting_filter(&self) -> GraftingFilter {
-
         macro_rules! require_grafting_filter {
             ([$($variant:ident),+]) => {
                 {
-                use super::strategy::FromConfig;
+                use super::strategy::WithGraftingFilter;
                 match self {
-                        $(DynStrategyConfig::$variant(val) => {
-                        val.require_grafting_filter()
+                        $(DynStrategyConfig::<N>::$variant(val) => {
+                        WithGraftingFilter::require_grafting_filter(val)
                     })+
                     DynStrategyConfig::Closed => {
                         GraftingFilter::None
@@ -477,7 +476,7 @@ impl<const N: usize> DynStrategyTreeManager<N> {
             grafting_filter: if reset_map {
                 GraftingFilter::RemoveAll
             } else {
-                self.strat_config()
+                self.strat_config.require_grafting_filter()
             },
         };
 

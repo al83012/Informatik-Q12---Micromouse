@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::strategy::{
-    strategy::{FromConfig, Strategy},
+    strategy::{FromConfig, Strategy, WithGraftingFilter},
     strategy_tree::GraftingFilter,
 };
 
@@ -20,6 +20,9 @@ impl<const N: usize> FromConfig<N> for BreadthFirst<N> {
     ) -> Self {
         todo!()
     }
+}
+
+impl WithGraftingFilter for BreadthFirstConfig {
     fn require_grafting_filter(&self) -> crate::strategy::strategy_tree::GraftingFilter {
         GraftingFilter::None
     }

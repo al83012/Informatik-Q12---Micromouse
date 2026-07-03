@@ -1,7 +1,9 @@
-
 use serde::{Deserialize, Serialize};
 
-use crate::strategy::{strategy::{FromConfig, Strategy}, strategy_tree::GraftingFilter};
+use crate::strategy::{
+    strategy::{FromConfig, Strategy, WithGraftingFilter},
+    strategy_tree::GraftingFilter,
+};
 
 #[derive(Clone, Debug)]
 pub struct DbgKnownPath<const N: usize>;
@@ -18,6 +20,9 @@ impl<const N: usize> FromConfig<N> for DbgKnownPath<N> {
     ) -> Self {
         todo!()
     }
+}
+
+impl WithGraftingFilter for DbgKnownPathConfig {
     fn require_grafting_filter(&self) -> crate::strategy::strategy_tree::GraftingFilter {
         GraftingFilter::None
     }

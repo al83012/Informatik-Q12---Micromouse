@@ -2,7 +2,14 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    comm::micromouse_message::Command, map::{map::PartialMap, world_data::{PartialWorldData, WorldData}}, strategy::strategy_tree::GraftingFilter, transform::position::Position, utils::nonempty::NonEmpty
+    comm::micromouse_message::Command,
+    map::{
+        map::PartialMap,
+        world_data::{PartialWorldData, WorldData},
+    },
+    strategy::strategy_tree::GraftingFilter,
+    transform::position::Position,
+    utils::nonempty::NonEmpty,
 };
 
 #[derive(Clone, Debug, Serialize, Error, Deserialize)]
@@ -10,7 +17,7 @@ pub enum StrategyEndState {
     #[error("No possible action to reach goal ({0})")]
     NoPossibleAction(String),
     #[error("Reached goal; Strategy not further expandable")]
-    ReachedGoal
+    ReachedGoal,
 }
 
 pub enum StrategyComputationResult<const N: usize, S: Strategy<N>> {
@@ -34,11 +41,12 @@ pub struct ComputedAction<const N: usize, S: Strategy<N>> {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GoalPosition(pub Position);
 
-
-
 pub trait FromConfig<const N: usize> {
-    type Config: std::fmt::Debug;
+    type Config: std::fmt::Debug + WithGraftingFilter;
     fn from_config(config: &Self::Config, starting_state: &WorldData<N>) -> Self;
+}
+
+pub trait WithGraftingFilter {
     fn require_grafting_filter(&self) -> GraftingFilter;
 }
 
@@ -53,12 +61,7 @@ pub trait Strategy<const N: usize>: Sized {
     /// --> Even if the world is not yet at the finished state of the step, this step could be used
     /// to process a NotYetExpandable strategy state into one that is expandable (even before the
     /// finishing of a step)
-    fn map_update(
-        &self,
-        world: &PartialMap<N>,
-    ) {
-        
-    }
+    fn map_update(&self, world: &PartialMap<N>) {}
 }
 
 pub trait SerializeInformationView<const N: usize>: Strategy<N> {
