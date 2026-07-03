@@ -1,6 +1,9 @@
 use std::time::Duration;
 
+use crossterm::event::EventStream;
+use futures_util::StreamExt;
 use tracing::{error, info, span, Instrument};
+use crossterm::event::{Event, KeyCode, KeyModifiers, KeyEvent};
 
 use crate::{
     process::Process,
@@ -24,17 +27,29 @@ pub fn process_test_short() {
     info!(target: "tests", "Fully shorted process test");
     let rt = tokio::runtime::Runtime::new().unwrap();
 
+    let keyboard_step_signal = Box::pin(EventStream::new().filter_map(async move |e| {
+        if e.ok()
+            == Some(Event::Key(KeyEvent::new(
+                KeyCode::Right,
+                KeyModifiers::NONE,
+            )))
+        {
+            Some(())
+        } else {
+            None
+        }
+    }));
     let m_handle = rt.spawn(
         async move {
             tokio::time::sleep(Duration::from_secs(3)).await;
             let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::from_millis(100));
-            micromouse_simulator.run(3).await;
+            micromouse_simulator.run(3, Some(keyboard_step_signal)).await;
         }
         .instrument(process_span("micromouse_sim")),
     );
     let f_handle = rt.spawn(
         async {
-            let mut frontend_simulator = FrontendSimulator::new(Duration::from_secs(20));
+            let mut frontend_simulator = FrontendSimulator::new(Duration::from_secs(5000));
             frontend_simulator.run().await;
         }
         .instrument(process_span("frontend_sim")),

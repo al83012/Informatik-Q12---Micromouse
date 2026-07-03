@@ -1,10 +1,10 @@
 use core::error;
 use std::time::Duration;
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{SinkExt, Stream, StreamExt};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument, span, warn, Instrument, Level};
-use tungstenite::{Message, Utf8Bytes};
+use tungstenite::{Bytes, Message, Utf8Bytes};
 
 use crate::{
     comm::micromouse_message::{
@@ -37,8 +37,12 @@ impl<const N: usize> MicromouseSimulator<N> {
             is_restarting: false,
         }
     }
-    #[instrument(skip(self), name = "run")]
-    pub async fn run(&mut self, max_measure_depth: u8) {
+    #[instrument(skip(self, step_signal), name = "run")]
+    pub async fn run(
+        &mut self,
+        max_measure_depth: u8,
+        mut step_signal: Option<impl Stream<Item = ()> + Unpin>,
+    ) {
         let success;
         loop {
             info!(target: "test/sim/m", "Connecting M-Sim to localhost:9001");
@@ -70,6 +74,7 @@ impl<const N: usize> MicromouseSimulator<N> {
             .expect("Error sending opening msg");
 
         'next_cmd: while let Some(msg) = ws_stream.next().await {
+            info!(target: "test/sim/m", "Received message: {msg:?}");
             let msg = match msg {
                 Ok(o) => o,
                 Err(e) => {
@@ -106,6 +111,20 @@ impl<const N: usize> MicromouseSimulator<N> {
 
                 for i in 0..=current_cmd.max_step_count() {
                     tokio::time::sleep(self.step_delay).await;
+                    if let Some(ref mut step_signal) = step_signal {
+                        info!(target: "test/sim/m", "Awaiting Step Signal");
+                        let mut timer = tokio::time::interval(Duration::from_secs(1));
+                        loop {
+                            tokio::select! {
+                                    _ = step_signal.next() => {break;}
+                                    _ = timer.tick() => {
+                                        info!(target: "test/sim/m", "Waiting ticker");
+                                        ws_stream.send(Message::Pong(Bytes::new())).await.expect("Nooooooo");
+                                    }
+                                };
+                        }
+                        info!(target: "test/sim/m", "Received Step Signal");
+                    }
                     let continue_next_cmd: bool = async {
                         info!(target: "test/sim", "Sim at step {i}");
                         let current_transf = transformed_move.at_step(i).expect("In valid range");
@@ -140,6 +159,7 @@ impl<const N: usize> MicromouseSimulator<N> {
                                 ))))
                                 .await
                                 .expect("Panic on sending measurement");
+                            info!(target: "test/sim/m", "Sent measurement");
 
                             if (interrupt.action == InterruptAction::StopIfBlocked && depth == 0)
                                 || (interrupt.action == InterruptAction::StopIfOpen && depth != 0)

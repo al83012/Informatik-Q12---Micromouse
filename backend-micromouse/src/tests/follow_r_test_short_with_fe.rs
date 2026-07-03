@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use futures_util::stream::BoxStream;
 use tokio::time::{self, Instant, Interval};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -42,7 +43,7 @@ pub fn follow_r() {
         async move {
             tokio::select! {
                 _ = cancel.cancelled() => {},
-                _ = micromouse_simulator.run(2) => {},
+                _ = micromouse_simulator.run(2, None as Option<BoxStream<()>>) => {},
             }
         }
         .instrument(process_span("simulator")),
