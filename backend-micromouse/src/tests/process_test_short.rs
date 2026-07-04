@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crossterm::event::EventStream;
-use futures_util::StreamExt;
+use futures_util::{StreamExt, stream::BoxStream};
 use tracing::{error, info, span, Instrument};
 use crossterm::event::{Event, KeyCode, KeyModifiers, KeyEvent};
 
@@ -43,7 +43,7 @@ pub fn process_test_short() {
         async move {
             tokio::time::sleep(Duration::from_secs(3)).await;
             let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::from_millis(100));
-            micromouse_simulator.run(3, Some(keyboard_step_signal)).await;
+            micromouse_simulator.run(3, None as Option<BoxStream<()>>/* Some(keyboard_step_signal) */).await;
         }
         .instrument(process_span("micromouse_sim")),
     );

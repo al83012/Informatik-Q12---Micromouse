@@ -123,8 +123,7 @@ fn test_parse_frontend_msg() {
             "set_strategy": {
                 "DepthFirst" : {
                     "path_ranking": "LowestMoves",
-                    "interrupt_right": false,
-                    "interrupt_left": false
+                    "prune_dead_ends": true,
                 }
             }
         }
@@ -136,6 +135,7 @@ fn test_parse_frontend_msg() {
             reset_map: true,
             set_strategy: Some(DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::LowestMoves,
+                prune_dead_ends: true,
             })),
             set_goal: None
         })

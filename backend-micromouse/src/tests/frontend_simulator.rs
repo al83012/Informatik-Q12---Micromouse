@@ -178,6 +178,7 @@ impl FrontendSimulator {
         let next: &DynStrategyConfig<10> = &[
             DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::Undefined,
+                prune_dead_ends: false,
             }),
             // DynStrategyConfig::FollowWall(FollowWallConfig {
             //     follow_wall: WallDirection::Right,
@@ -188,6 +189,7 @@ impl FrontendSimulator {
             // }),
             DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 path_ranking: PathRanking::TowardsGoal,
+                prune_dead_ends: true,
             }),
             // DynStrategyConfig::FollowWall(FollowWallConfig {
             //     follow_wall: WallDirection::Right,

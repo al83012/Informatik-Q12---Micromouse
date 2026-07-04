@@ -5,7 +5,7 @@ use std::{
 
 use console::Style;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     comm::micromouse_message::{
@@ -88,6 +88,7 @@ impl DepthFirstBase {
         &self,
         world: impl AsRef<WorldData<N>>,
         goal: GoalPosition,
+        prune_dead_ends: bool,
     ) -> Option<DepthFirstWithCurrent> {
         let world_data = world.as_ref();
         let new_intersections =
@@ -95,13 +96,14 @@ impl DepthFirstBase {
         debug!(target: "strat/dfs", "Strat became expandable: \n{world_data}\nNew intersections: \n{new_intersections:#?}");
         let mut successor = self.clone();
         if !successor.path_from_start.connect_to(world_data.mouse) {
-            error!(target: "strat/dfs", "Failed to connect {:?}\nto {:#?}", world_data.mouse, successor.path_from_start);
+            warn!(target: "strat/dfs", "Failed to connect {:?}\nto {:#?}", world_data.mouse, successor.path_from_start);
         }
         successor.add_new_intersections(new_intersections.clone());
         successor.prune_zero_steps(world_data, goal);
 
         let mut map_display = MapDisplay::from(&world_data.map);
         let mut path_ref = PathReference::new(successor.path_from_start.clone(), &mut map_display);
+
         path_ref.set_char('*');
         for explored in successor.explored.iter() {
             let Some(mut x) = map_display.wall_mut(explored.at_intersection, explored.in_direction)
@@ -125,6 +127,10 @@ impl DepthFirstBase {
                 continue;
             };
             x.inner().apply_style(Style::new().on_green());
+        }
+
+        if prune_dead_ends {
+            successor.prune_dead_ends(world_data, goal, Some(&mut map_display));
         }
 
         if let Some(mut goal) = map_display.cell_mut(goal.0) {
@@ -192,6 +198,98 @@ impl DepthFirstBase {
                     at_intersection: *i_pos,
                     in_direction: prune_dir,
                 });
+            }
+
+            if i_dirs.visitable_directions.is_empty() {
+                remove_intersections.push(*i_pos)
+            }
+        }
+        for remove in &remove_intersections {
+            self.intersections.remove(remove);
+        }
+        self.intersection_queue = self
+            .intersection_queue
+            .iter()
+            .filter(|p| !remove_intersections.contains(p))
+            .cloned()
+            .collect();
+    }
+
+    pub fn prune_dead_ends<const N: usize>(
+        &mut self,
+        world: impl AsRef<Map<N>>,
+        goal: GoalPosition,
+        mut display: Option<&mut MapDisplay>,
+    ) {
+        let expand_from = goal.0;
+        let mut to_expand = vec![expand_from];
+        let mut could_access_goal = HashSet::new();
+
+        let map = world.as_ref();
+
+        while let Some(cell_to_expand) = to_expand.pop() {
+            if !could_access_goal.insert(cell_to_expand) {
+                continue;
+            }
+            if let Some(ref mut display) = display {
+                if let Some(mut cell) = display.cell_mut(cell_to_expand) {
+                    cell.apply_style(Style::new().on_blue());
+                }
+            }
+            let neighbor_dirs = vec![
+                Direction::PosX,
+                Direction::PosY,
+                Direction::NegX,
+                Direction::NegY,
+            ];
+            for dir in neighbor_dirs {
+                let pos_offset = dir.steps_in_dir(1);
+                let Some(neighbor_pos) = cell_to_expand + pos_offset else {
+                    continue;
+                };
+                let wall_to_neighbor = map.wall(&cell_to_expand, &dir);
+                if wall_to_neighbor.is_none_or(|wall| {
+                    *wall == WallDiscoveryStatus::Exists(true)
+                        || *wall == WallDiscoveryStatus::Visited
+                }) {
+                    continue;
+                }
+                let neighbor_cell = map.cell(&neighbor_pos);
+                if neighbor_cell.is_none_or(|c| *c == CellDiscoveryStatus::Visited) {
+                    continue;
+                }
+
+                to_expand.push(neighbor_pos);
+            }
+        }
+
+        let mut remove_intersections = vec![];
+        for (i_pos, i_dirs) in self.intersections.iter_mut() {
+            let prune_dirs = i_dirs
+                .visitable_directions
+                .clone()
+                .into_iter()
+                .filter(|dir| {
+                    if let Some(leads_to_dir) = *i_pos + dir.steps_in_dir(1) {
+                        !could_access_goal.contains(&leads_to_dir)
+                    } else {
+                        true
+                    }
+                });
+
+            for prune_dir in prune_dirs {
+                debug!(target:"strat/dfs", "Pruning {i_pos:?} in dir {prune_dir:?} (Cannot access goal)");
+                i_dirs.visitable_directions.remove(&prune_dir);
+                let intersection_path = IntersectionPath {
+                    at_intersection: *i_pos,
+                    in_direction: prune_dir,
+                };
+                self.explored.insert(intersection_path.clone());
+                if let Some(ref mut display) = display {
+                    if let Some(mut w) = display.wall_mut(*i_pos, prune_dir) {
+                        w.apply_style(Style::new().on_magenta());
+                    }
+                }
             }
 
             if i_dirs.visitable_directions.is_empty() {

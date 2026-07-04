@@ -42,6 +42,7 @@ use crate::{
 #[derive(Debug, Clone, Deserialize, PartialEq, Serialize)]
 pub struct DepthFirstConfig {
     pub path_ranking: PathRanking,
+    pub prune_dead_ends: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -113,7 +114,7 @@ impl<const N: usize> Strategy<N> for DepthFirst<N> {
         };
         info!(target: "strat/dfs", "TRY EXPAND DFS");
 
-        let Some(mut successor) = df.with_current_world(world, *goal) else {
+        let Some(mut successor) = df.with_current_world(world, *goal, self.config.prune_dead_ends) else {
             info!(target: "strat/dfs", "--> Not enough information");
             return StrategyComputationResult::NotEnoughInformation;
         };

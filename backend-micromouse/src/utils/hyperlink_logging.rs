@@ -611,10 +611,10 @@ pub fn init_tree_logger() {
                 //         && !meta.target().contains("display")
                 //         && !meta.target().contains("op")
                 // })),
-                // .with_filter(FilterFn::new(|meta| {
+                .with_filter(FilterFn::new(|meta| {
                     // meta.target().eq("strat") || meta.target().contains("dfs")
-                    // meta.target().contains("webs")
-                // })),
+                    meta.target().contains("dfs")
+                })),
         )
     };
 
@@ -692,8 +692,8 @@ pub fn init_tree_logger() {
         tracing_reg.with(
             warn_fmt_layer
                 // .with_filter(FilterFn::new(|m| {
-                    // m.target().contains("webs")
-                    // m.target().eq("strat") || m.target().contains("dfs")
+                // m.target().contains("webs")
+                // m.target().eq("strat") || m.target().contains("dfs")
                 // }))
                 .with_filter(EnvFilter::new("debug")),
         )
