@@ -25,6 +25,10 @@ impl Path {
         Path { nodes: vec![start] }
     }
 
+    pub fn last(&self) -> &MouseTransform {
+        self.nodes.last().expect("len >= 1")
+    }
+
     pub fn connect_to(&mut self, next_node: MouseTransform) -> bool {
         let last = self
             .nodes
@@ -354,6 +358,28 @@ impl Path {
         }
 
         moves
+    }
+
+    // TODO: Test reduction
+    pub fn reduced(self) -> Self {
+        let mut current_transf = self.nodes.first().expect("Len >= 1").clone();
+        let mut new_nodes = vec![current_transf];
+        for node in self.nodes.into_iter().skip(1) {
+            if current_transf.dir != node.dir {
+                if *new_nodes.last().expect("Len >= 1") != current_transf {
+                    new_nodes.push(current_transf);
+                }
+                new_nodes.push(node);
+                current_transf = node;
+            }
+        }
+
+        if current_transf != *new_nodes.last().expect("Len >= 1") {
+            new_nodes.push(current_transf);
+        }
+
+        todo!("test");
+        Self { nodes: new_nodes }
     }
 }
 
