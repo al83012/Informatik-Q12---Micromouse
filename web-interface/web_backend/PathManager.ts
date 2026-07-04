@@ -168,6 +168,13 @@ export class PathManager {
             start_from: [number, number, string],
         }[][] = [];
 
+        let insertion: {
+            from: [number, number],
+            to: [number, number],
+            change: number,
+            start_from: [number, number, string],
+        }[][] = [];
+
         for (let change of changes) {
             let node = this.path_tree[change[0]];
             let from = node.from;
@@ -175,18 +182,28 @@ export class PathManager {
             let start_node = this.path_tree[node.parent];
             let direction: string = "";
 
+
+            //TODO: make it better, so the from pos is only moved, if the parent or parent of parent(moveNull) exists
             if (to[0] - from[0] > 0) { //dir = e
                 direction = "e";
-                from[0] += 1;
+                if (unfolded.length !== 0) {
+                    from[0] += 1;
+                }
             } else if (to[0] - from[0] < 0) { //dir = w
                 direction = "w";
-                from[0] -= 1;
+                if (unfolded.length !== 0) {
+                    from[0] -= 1;
+                }
             } else if (to[1] - from[1] > 0) { //dir = s
                 direction = "s";
-                from[1] += 1;
+                if (unfolded.length !== 0) {
+                    from[1] += 1;
+                }
             } else if (to[1] - from[1] < 0) { //dir = n
                 direction = "n";
-                from[1] -= 1;
+                if (unfolded.length !== 0) {
+                    from[1] -= 1;
+                }
             }
 
             let change_type = change[1];
@@ -211,14 +228,16 @@ export class PathManager {
             }[] = [];
 
             for (let ar of unfolded) {
-                for (let c of ar) {
+                label_c_for: for (let c of ar) {
                     if ((c.start_from[2] === part.start_from[2] || c.start_from[2] === this.flipDirection(part.start_from[2])) &&
                         (this.rangedOverlap(c.from[0], c.to[0], part.from[0], part.to[0])
                         || this.rangedOverlap(c.from[1], c.to[1], part.from[1], part.to[1]))
                     ) {
+                        if (c.from[0] === -99 && c.from[1] === -99 && c.to[0] === -99 && c.to[1] === -99) {continue label_c_for;}
                         let direction: number = (this.rangedOverlap(c.from[0], c.to[0], part.from[0], part.to[0])) ? 0 : 1;
                         let positive: boolean = (c.to[direction] - c.from[direction] > 0);
-                        let bidirectional: boolean = (c.start_from[2] === part.start_from[2]);
+                        let part_positive: boolean = (part.to[direction] - part.from[direction] > 0);
+                        let bidirectional: boolean = (c.start_from[2] !== part.start_from[2]);
 
                         //RUles for deletion:
                         // 1. Delete the one with lower priority
@@ -230,6 +249,9 @@ export class PathManager {
                         //priorities: "keep" over "add" over "remove"
                         if (c.change === part.change) { //prio is the same (Rule 4)
                             //remove from the from_part
+                            if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
+
+                            }
                         } else if (this.hasHigherPriority(c.change, part.change)) {
                             //c has higher priority
                             if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
@@ -241,28 +263,94 @@ export class PathManager {
                             } else {
                                 //Rule 3 -> delete Overlapping part
                                 if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
-
+                                    if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                                        part.from[direction] = c.from[direction] + (part_positive ? 1 : -1);
+                                    } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                                        part.from[direction] = c.to[direction] + (part_positive ? 1 : -1);
+                                    }
                                 } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
-
+                                    if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                                        part.to[direction] = c.from[direction] + (part_positive ? -1 : 1);
+                                    } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                                        part.to[direction] = c.to[direction] + (part_positive ? -1 : 1);
+                                    }
                                 }
+                                parts.push(part);
                             }
                         } else if (this.hasHigherPriority(part.change, c.change)) {
                             //part has higher priority
+                            if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
+                                //c is fully in part
+                                //Rule 3 -> delete c by marking it
+                                c.from = [-99, -99];
+                                c.to = [-99, -99];
+                                parts.push(part);
+                            } else if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
+                                //Rule 2 -> split part into two parts
+                                insertion.push(this.splitPart(c, part.from[direction], part.to[direction], direction, part_positive, bidirectional));
+                                c.from = [-101, -99]; //mark c for insertion later
+                                c.to = [-99, -99];
+                                parts.push(part);
+                            } else {
+                                //Rule 3 -> delete Overlapping part
+                                if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                                    if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
+                                        c.from[direction] = part.from[direction] + (positive ? 1 : -1);
+                                    } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
+                                        c.from[direction] = part.to[direction] + (positive ? 1 : -1);
+                                    }
+                                } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                                    if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
+                                        c.to[direction] = part.from[direction] + (positive ? -1 : 1);
+                                    } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
+                                        c.to[direction] = part.to[direction] + (positive ? -1 : 1);
+                                    }
+                                }
+                                parts.push(part);
+                            }
                         }
                     }
                 }
             }
 
-            if (change[2] === 1) {
+            if (unfolded.length === 0) {
                 unfolded.push([part]);
-            } else {
-                unfolded[unfolded.length - 1].push(part);
+            }
+
+            unfolded = unfolded.map(ar => {
+                let group: {
+                    from: [number, number],
+                    to: [number, number],
+                    change: number,
+                    start_from: [number, number, string],
+                }[] = [];
+
+                for (let c of ar) {
+                    if (c.from[0] === -101 && c.from[1] === -99 && c.to[0] === -99 && c.to[1] === -99) {
+                        group.push(...insertion.shift());
+                    } else if (!(c.from[0] === -99 && c.from[1] === -99 && c.to[0] === -99 && c.to[1] === -99)) {
+                        group.push(c);
+                    }
+                }
+
+                return group;
+            }).filter(ar => ar.length !== 0);
+
+            if (parts.length !== 0) {
+                if (change[2] === 1) {
+                    unfolded.push(parts);
+                } else {
+                    for (let x = 0; x < parts.length; x++) {
+                        unfolded[unfolded.length - 1].push(parts[x]);
+                    }
+                }
             }
         }
 
+        /*unfolded = unfolded.map(ar => ar.filter(
+            c => !(c.from[0] === c.to[0] && c.from[1] === c.to[1])));*/
 
-
-        return;
+        return unfolded;
     }
 
     private static splitPart(part: {
@@ -341,8 +429,9 @@ export class PathManager {
     }
 
     private static isContained(start1: number, end1: number, start2: number, end2: number): boolean {
-        return (start1 >= start2 && start1 > end2 && start2 >= end1 && end1 >= start2) ||
-            (start1 <= start2 && start1 < end2 && start2 <= end1 && end1 <= start2);
+        /*return (start1 >= start2 && start1 > end2 && start2 >= end1 && end1 >= start2) ||
+            (start1 <= start2 && start1 < end2 && start2 <= end1 && end1 <= start2);*/
+        return this.isBetween(start1, end1, start2) && this.isBetween(start1, end1, end2);
     }
 
 
