@@ -596,7 +596,7 @@ export class AnimGroup extends Animation {
 }
 
 export function generatePathAnimGroup(path_in/*: int[][]*/, tiles, ignore_group, fnc) { //tiles are all arms tied to respective coords
-    const anim_time = 5;
+    const anim_time = 2;
     let complete_group = -1, complete_time = 0;
     for (let doub = 0; doub < 2; doub++) {
         let path = path_in.map(inner => [...inner]);
@@ -618,7 +618,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles, ignore_group,
                 duration += tiles[[part[j], part[j + 1]]].length * anim_time;
             }
             duration /= 3;
-            duration -= 5; //remove the last few child_times
+            duration -= anim_time; //remove the last few child_times
             complete_time += duration;
 
             /*console.log("type:" + type)

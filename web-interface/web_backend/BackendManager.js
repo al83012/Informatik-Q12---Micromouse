@@ -1,5 +1,6 @@
 import { Actions, Action } from "./Actions.js";
 //import { Utils } from "./Utils.ts";
+import { PathManager } from "./PathManager.ts";
 
 export class BackendManager {
     in_button_active = [true, false, false];
@@ -95,7 +96,7 @@ export class BackendManager {
 
     f_handleUpdate(res) {
         // send the newest path updates
-        if (this.in_maze.top_path_node !== -1) {
+        /*if (this.in_maze.top_path_node !== -1) {
             console.log("Sending path updates: " + this.in_maze.path_tree[this.in_maze.top_path_node].changes.length);
             if (this.in_maze.path_tree[this.in_maze.top_path_node].changes.length !== 0) {
                 let changes = this.calculate_path_change(this.in_maze.top_path_node, false);
@@ -103,6 +104,13 @@ export class BackendManager {
                 let updatePathAction = Actions.update_path(changes, this.in_maze.path_tree);
                 //console.log(updatePathAction);
                 this.f_sync.push(updatePathAction);
+            }
+        }*/
+        if (PathManager.hasTopNode()) {
+            if (PathManager.canPlay() && false) {
+                console.log("Sending path updates");
+                let changes = PathManager.unfold(PathManager.getChanges());
+                this.f_sync.push(new Action({action: "update_path", data: {path: {data: changes}, id: changes[0][changes[0].length-1]}}));
             }
         }
 
@@ -159,7 +167,8 @@ export class BackendManager {
                     this.in_maze.paths[id].currently_playing = -1;
                     this.in_maze.paths[id].iterations[it].playing = false;
                 }*/
-                this.in_maze.path_tree[data.id].playing = data.state === "started";
+                //this.in_maze.path_tree[data.id].playing = data.state === "started";
+                PathManager.setPlayingState(data.state);
                 break;
             case "double_path_update":
                 //TODO: read id and iteration from packet and calculate
@@ -189,6 +198,11 @@ export class BackendManager {
         /*console.log("--------------------------------------------------------------------");
         console.log(data, data[0]["MicromouseEvent"]);
         console.log("--------------------------------------------------------------------");*/
+
+        console.log("..........................................................");
+        console.log(JSON.stringify(message));
+        console.log(";;;;;;;;;;;;;");
+
         main: for (let index in message) {
             let data = message[index];
 
@@ -204,11 +218,13 @@ export class BackendManager {
             } else if (data["VisualEvent"] !== undefined) {
                 let event = data["VisualEvent"];
                 if (event["PathVisualEvent"] !== undefined) {
-                    let hash = this.generateHash(JSON.stringify(event["PathVisualEvent"]["associated_node"]));
+                    //let hash = this.generateHash(JSON.stringify(event["PathVisualEvent"]["associated_node"]));
+                    let id = JSON.stringify(event["PathVisualEvent"]["associated_node"]);
 
                     if (typeof event["PathVisualEvent"]["ty"] === "string") {
                         if (event["PathVisualEvent"]["ty"] === "Prune") {
-                            this.delete_children(hash);
+                            PathManager.pruneNode(id);
+                            /*this.delete_children(hash);
                             let parent = this.in_maze.path_tree[this.in_maze.path_tree[hash].parent];
                             try {
                                 parent.changes.push({id: hash, change: -1});
@@ -219,15 +235,16 @@ export class BackendManager {
                                 console.log(TypeError);
                                 console.log(this.in_maze.path_tree);
                             }
-                            this.correct_paths();
+                            this.correct_paths();*/
                             continue main;
                         } else if (event["PathVisualEvent"]["ty"] === "Remove") {
                             //Maybe ignore
-                            this.correct_paths();
+                            //this.correct_paths();
+                            PathManager.removeNode(id);
                             continue main;
                         }
                     } else if (typeof event["PathVisualEvent"]["ty"] === "object") {
-                        if (this.in_maze.top_path_node === -1) {
+                        /*if (this.in_maze.top_path_node === -1) {
                             this.in_maze.path_tree[hash] = {
                                 from: [0, 0],
                                 to: [0, 0],
@@ -238,7 +255,7 @@ export class BackendManager {
                                 is_rotate: true,
                             }
                             this.in_maze.top_path_node = hash;
-                        }
+                        }*/
 
                         let visual_event = event["PathVisualEvent"];
                         if (visual_event["ty"]["Create"] !== undefined) {
@@ -246,9 +263,11 @@ export class BackendManager {
                             let from = [create["path"]["from"]["pos"]["x"], create["path"]["from"]["pos"]["y"]];
                             let to = [create["path"]["to"]["pos"]["x"], create["path"]["to"]["pos"]["y"]];
 
-                            let new_node_hash = this.generateHash(JSON.stringify(create["leads_to_child_node"]));
+                            //let new_node_hash = this.generateHash(JSON.stringify(create["leads_to_child_node"]));
+                            let newId = JSON.stringify(create["leads_to_child_node"]);
+                            PathManager.addNode(from, to, newId, id);
 
-                            this.in_maze.path_tree[new_node_hash] = {
+                            /*this.in_maze.path_tree[new_node_hash] = {
                                 from: from,
                                 to: to,
                                 children: [],
@@ -261,7 +280,7 @@ export class BackendManager {
                             this.in_maze.path_tree[hash].children.push(new_node_hash);
                             this.in_maze.path_tree[hash].changes.push({id: new_node_hash, change: 1});
                             this.correct_paths();
-                            this.update_parent_changes(hash);
+                            this.update_parent_changes(hash);*/
                             continue main;
                         }
                     }
@@ -272,6 +291,7 @@ export class BackendManager {
                 //this.b_sync(Actions.b_error("recv", "incorrect_data", ["type"]));
             }
         }
+        console.log("..........................................................--");
     } //backend
 
     update_parent_changes(hash) {
@@ -337,19 +357,26 @@ export class BackendManager {
         }
 
         if (wall_disc.length !== 0) {
+            console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            console.log(JSON.stringify(wall_disc));
+            console.log("----------------------------------------------------");
             for (let i = 0; i < wall_disc.length; i++) {
                 let disc = wall_disc[i];
+                console.log(JSON.stringify(disc));
                 if (disc["new_status"] === "Visited") {
                     if (!this.b_wall_exists(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"])) {
                         this.b_add_wall(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"]);
                     }
                 } else if (disc["new_status"]["Exists"] !== undefined) {
                     if (disc["new_status"]["Exists"]) {
+                        console.log("++Exists: " + disc["new_status"]["Exists"]);
                         if (!this.b_wall_exists(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"])) {
+                            console.log("++++Added Wall");
                             this.b_add_wall(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"]);
                         }
                     }
                 }
+
             }
         }
     }
@@ -617,10 +644,10 @@ export class BackendManager {
             actions.push(Actions.discover_wall(wall[0], wall[1], wall[2], wall[3]));
         }
 
-        if (this.in_maze.top_path_node !== -1) {
+        /*if (this.in_maze.top_path_node !== -1) {
             let path = this.calculate_path_change(this.in_maze.top_path_node, true);
             actions.push(Actions.complete_path(path, this.in_maze.path_tree));
-        }
+        }*/
 
         for (let i = 0; i < this.in_maze.discovered.length; i++) {
             let x = this.in_maze.discovered[i][0];

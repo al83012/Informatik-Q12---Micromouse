@@ -208,6 +208,7 @@ export class Index {
                     break;
                 case "update_path":
                     //Index.pathUpdateIds += data["id"];
+                    console.log(data["path"]);
                     Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], false));
                     break;
                 case "complete_path":
@@ -236,8 +237,10 @@ export class Index {
                     Index.hide_loading_animation();
                     break;
                 case "discover_wall":
+                    console.log(data);
                     let wall = document.getElementById("sys-wall_wall-" +
                         data["x"] + ":" + data["y"] + "-" + data["x_other"] + ":" + data["y_other"]);
+                    console.log(wall === undefined);
                     Index.animHandler.addImmediate(new AnimCssChange(10, wall, ["off"], "on"));
                     break;
             }
@@ -378,12 +381,14 @@ function discoverTile(x, y, directions, x_other, y_other) {
 
             switch (x_other[i]-x) {
                 case 1:
-                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-e_" + co_crds_i([x+1, y])),
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-w_" + co_crds_i([x+1, y])),
                         ["undiscovered"], "discovered"));
                 break;
 
                 case -1:
-                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-w_" + co_crds_i([x-1, y])),
+                    /*console.log("Other: " + "sys-arm_arm-w_" + co_crds_i([x-1, y]) + " Exists: " +
+                        (document.getElementById("sys-arm_arm-w_" + co_crds_i([x-1, y])) !== null));*/
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-e_" + co_crds_i([x-1, y])),
                         ["undiscovered"], "discovered"));
                 break;
 
