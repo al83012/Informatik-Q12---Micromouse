@@ -175,38 +175,65 @@ export class PathManager {
             start_from: [number, number, string],
         }[][] = [];
 
-        for (let change of changes) {
+        let edit_changes: string[] = [];
+
+        for (let i = 0; i < changes.length; i++) {
+            let change = changes[i];
             let node = this.path_tree[change[0]];
             let from = node.from;
             let to = node.to;
             let start_node = this.path_tree[node.parent];
             let direction: string = "";
+            let change_type = change[1];
+            let move_from_position = 0;
 
 
             //TODO: make it better, so the from pos is only moved, if the parent or parent of parent(moveNull) exists
+            if (node.parent !== "-1") {
+                let parent = node.parent;
+                if (this.path_tree[parent].moveNull && this.path_tree[parent].parent !== "-1") {
+                    parent = this.path_tree[parent].parent;
+                }
+
+                for (let c of changes) {
+                    if (c[0] === parent) {
+                        let type = c[1];
+                        if (this.hasHigherPriority(change_type, type)) {
+                            edit_changes.push(c[0]);
+                        } else {
+                            move_from_position = 1;
+                        }
+
+                        break;
+                    }
+                }
+
+            }
             if (to[0] - from[0] > 0) { //dir = e
                 direction = "e";
-                if (unfolded.length !== 0) {
-                    from[0] += 1;
+                from[0] += move_from_position;
+                if (edit_changes.some(c => c === change[0])) {
+                    to[0] -= 1;
                 }
             } else if (to[0] - from[0] < 0) { //dir = w
                 direction = "w";
-                if (unfolded.length !== 0) {
-                    from[0] -= 1;
+                from[0] -= move_from_position;
+                if (edit_changes.some(c => c === change[0])) {
+                    to[0] += 1;
                 }
             } else if (to[1] - from[1] > 0) { //dir = s
                 direction = "s";
-                if (unfolded.length !== 0) {
-                    from[1] += 1;
+                from[1] += move_from_position;
+                if (edit_changes.some(c => c === change[0])) {
+                    to[1] -= 1;
                 }
             } else if (to[1] - from[1] < 0) { //dir = n
                 direction = "n";
-                if (unfolded.length !== 0) {
-                    from[1] -= 1;
+                from[1] -= move_from_position;
+                if (edit_changes.some(c => c === change[0])) {
+                    to[1] += 1;
                 }
             }
-
-            let change_type = change[1];
 
             let part: {
                 from: [number, number],
@@ -250,7 +277,18 @@ export class PathManager {
                         if (c.change === part.change) { //prio is the same (Rule 4)
                             //remove from the from_part
                             if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
-
+                                c.from = [-99, -99];
+                                c.to = [-99, -99];
+                                parts.push(part);
+                            } else if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
+                                //ignore to skip adding "part"
+                            } else {
+                                if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                                    c.from[direction] = (bidirectional) ? (part.from[direction] + (positive ? 1 : -1)) : (part.to[direction] + (positive ? 1 : -1));
+                                } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                                    c.to[direction] = (bidirectional) ? (part.to[direction] + (positive ? -1 : 1)) : (part.from[direction] + (positive ? -1 : 1));
+                                }
+                                parts.push(part);
                             }
                         } else if (this.hasHigherPriority(c.change, part.change)) {
                             //c has higher priority
