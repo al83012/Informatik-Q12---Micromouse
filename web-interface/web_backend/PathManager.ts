@@ -127,8 +127,22 @@ export class PathManager {
         return (relevant_changes[0].length === 0) ? undefined : relevant_changes;
     }
 
+    private static completeChanges(node_id: string = this.top_node_id) {
+        if (node_id === "-1") return;
+        let node = this.path_tree[node_id];
+
+        for (let child_id of node.children) {
+            if (!(node.changes.some(change => change.id === child_id))) {
+                node.changes.push({id: child_id, change: 0});
+            }
+            this.completeChanges(child_id);
+        }
+    }
+
     static getChanges(): [string, number, number][] {
         let changes: [string, number, number][] = [];
+
+        this.completeChanges();
 
         let relevants = this.getRelevants(this.top_node_id);
 
