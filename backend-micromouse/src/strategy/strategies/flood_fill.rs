@@ -91,9 +91,14 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
 
         // info!(target: "strat/ff", "APPLYING FLOOD FILL ON\n{world}");
         if world.mouse.pos == goal.0 {
+            #[cfg(feature = "internal_strat_logs")]
+            info!(target: "strat/ff", "Mouse is on goal");
             return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
         }
         let flow_field = self.flow_field(world);
+        #[cfg(feature = "internal_strat_logs")]
+        info!(target: "strat/ff", "Generated flow field");
+
         #[cfg(feature = "internal_strat_logs")]
         {
             for x in 0..N {
@@ -159,6 +164,10 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
 
         let start_next_move_from = path.start().clone();
         let Some(next_move) = path.one_towards_destination() else {
+            #[cfg(feature = "internal_strat_logs")]
+            {
+                info!(target: "strat/ff", "Path towards goal is empty --> Finished");
+            }
             return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
         };
 

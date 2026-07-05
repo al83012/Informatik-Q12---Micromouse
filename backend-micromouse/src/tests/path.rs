@@ -196,7 +196,7 @@ pub fn test_path_return() {
             pos: Position { x: 5, y: 2 },
             dir: Direction::PosY,
         }),
-        Ok(vec![MovementType::Move(2),MovementType::Turn(1)])
+        Ok(vec![MovementType::Move(2), MovementType::Turn(1)])
     );
     {
         let map = Map::<10>::new();
@@ -209,4 +209,65 @@ pub fn test_path_return() {
 
         info!(target: "test/path", "{}", map_str);
     }
+}
+
+#[test]
+pub fn test_path_reduction() {
+    let mut path = Path::new(MouseTransform {
+        pos: Position { x: 0, y: 0 },
+        dir: Direction::PosX,
+    });
+
+    path.connect_to(MouseTransform {
+        pos: Position { x: 1, y: 0 },
+        dir: Direction::PosX,
+    });
+    path.connect_to(MouseTransform {
+        pos: Position { x: 2, y: 0 },
+        dir: Direction::PosX,
+    });
+    path.connect_to(MouseTransform {
+        pos: Position { x: 2, y: 0 },
+        dir: Direction::PosY,
+    });
+    path.connect_to(MouseTransform {
+        pos: Position { x: 2, y: 1 },
+        dir: Direction::PosY,
+    });
+    path.connect_to(MouseTransform {
+        pos: Position { x: 2, y: 2 },
+        dir: Direction::PosY,
+    });
+    path.connect_to(MouseTransform {
+        pos: Position { x: 2, y: 2 },
+        dir: Direction::NegX,
+    });
+
+    let reduced = path.reduced();
+
+    assert_eq!(
+        *reduced.nodes(),
+        vec![
+            MouseTransform {
+                pos: Position { x: 0, y: 0 },
+                dir: Direction::PosX,
+            },
+            MouseTransform {
+                pos: Position { x: 2, y: 0 },
+                dir: Direction::PosX,
+            },
+            MouseTransform {
+                pos: Position { x: 2, y: 0 },
+                dir: Direction::PosY,
+            },
+            MouseTransform {
+                pos: Position { x: 2, y: 2 },
+                dir: Direction::PosY,
+            },
+            MouseTransform {
+                pos: Position { x: 2, y: 2 },
+                dir: Direction::NegX,
+            }
+        ]
+    );
 }

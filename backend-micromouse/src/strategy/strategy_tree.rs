@@ -422,15 +422,14 @@ where
                 let mut res = Self {
                     config: tree_config,
                     layers: vec![first_layer],
-                    highest_sent_layer: MarkerLayerId::AtLayer(first_layer_id),
-                    highest_eq_layer: MarkerLayerId::AtLayer(first_layer_id),
+                    highest_sent_layer: MarkerLayerId::NotExistant,
+                    highest_eq_layer: MarkerLayerId::NotExistant,
                     highest_full_layer: MarkerLayerId::AtLayer(first_layer_id),
                     first_layer_absolute_id: AbsoluteLayerId(0),
                     node_count: 0,
                     goal_position,
                     visuals,
                 };
-
                 let first_node_id = res.add_node(
                     StrategyTreeNode::new_orphan(
                         PartialWorldData::from(starting_state),
@@ -439,7 +438,7 @@ where
                     AbsoluteLayerId(0),
                 );
 
-                res.layer_mut(first_layer_id).expect("Checked").is_full = true;
+                // res.layer_mut(first_layer_id).expect("Checked").is_full = true;
 
                 res.expand_fully().map_err(TreeCreationError::from)?;
                 res.update_equal_layers();
