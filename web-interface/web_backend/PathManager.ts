@@ -35,6 +35,10 @@ export class PathManager {
             this.top_node_id = parent;
         }
 
+        if (this.path_tree[id] !== undefined) {
+            return;
+        }
+
         this.path_tree[id] = {
             from: from,
             to: to,
@@ -56,6 +60,8 @@ export class PathManager {
         const node_index = this.path_tree[parent_id].children.indexOf(id, 0);
         if (node_index > -1) {
             this.path_tree[parent_id].children.splice(node_index, 1);
+        } else {
+            return;
         }
 
 
