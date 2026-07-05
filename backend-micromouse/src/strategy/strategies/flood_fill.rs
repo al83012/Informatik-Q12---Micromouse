@@ -1,6 +1,7 @@
 use std::usize;
 
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::{
     comm::micromouse_message::{
@@ -30,15 +31,15 @@ pub struct FloodFill<const N: usize> {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FloodFillConfig {
-    rotation_cost: FFCost,
-    move_cost: FFCost,
+    pub rotation_cost: FFCost,
+    pub move_cost: FFCost,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct FFCost {
-    base_value: usize,
+    pub base_value: usize,
     /// Between 0.0 and 1.0 --> 0.0 being no reduction and 1.0 being scaling by sqrt(streak)
-    streak_reduction_factor: f32,
+    pub streak_reduction_factor: f32,
 }
 
 impl<const N: usize> FromConfig<N> for FloodFill<N> {
@@ -48,7 +49,9 @@ impl<const N: usize> FromConfig<N> for FloodFill<N> {
         config: &Self::Config,
         starting_state: &crate::map::world_data::WorldData<N>,
     ) -> Self {
-        todo!()
+        Self {
+            config: config.clone(),
+        }
     }
 }
 
@@ -81,13 +84,78 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
         world: &crate::map::world_data::PartialWorldData<N>,
         goal: &crate::strategy::strategy::GoalPosition,
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
-        let mut flow_field = self.flow_field(world);
+        use crate::utils::map_display::MapDisplay;
+
+        #[cfg(feature = "internal_strat_logs")]
+        let mut map_display = MapDisplay::from(&world.map);
+
+        // info!(target: "strat/ff", "APPLYING FLOOD FILL ON\n{world}");
+        if world.mouse.pos == goal.0 {
+            return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
+        }
+        let flow_field = self.flow_field(world);
+        #[cfg(feature = "internal_strat_logs")]
+        {
+            for x in 0..N {
+                for y in 0..N {
+                    use crate::{
+                        transform::position::Position, utils::map_display::MapDisplayWrite,
+                    };
+
+                    let pos = Position {
+                        x: x as u32,
+                        y: y as u32,
+                    };
+
+                    let flow_dir = match flow_field
+                        .value(pos)
+                        .expect("Should exist")
+                        .enter_in_direction
+                    {
+                        Direction::PosX => '>',
+                        Direction::PosY => 'V',
+                        Direction::NegX => '<',
+                        Direction::NegY => 'A',
+                    };
+
+                    map_display
+                        .cell_mut(pos)
+                        .expect("Should exist")
+                        .center()
+                        .set_char(flow_dir);
+                }
+            }
+        }
 
         let mut path = match self.path_on_flow_field(flow_field, *goal) {
             Ok(o) => o,
             Err(e) => return StrategyComputationResult::Computed(Err(e)),
         };
+
+        #[cfg(feature = "internal_strat_logs")]
+        {
+            use crate::utils::{map_display::MapDisplayWrite, path::PathReference};
+
+            let mut path_ref = PathReference::new(&path, &mut map_display);
+            path_ref.set_char('*');
+        }
+
         let required_openings = path.required_openings();
+
+        #[cfg(feature = "internal_strat_logs")]
+        {
+            for opening in required_openings.iter() {
+                use console::Style;
+
+                use crate::utils::map_display::MapDisplayWrite;
+
+                let Some(mut w) = map_display.wall_mut(opening.pos, opening.dir) else {
+                    continue;
+                };
+
+                w.apply_style(Style::new().on_magenta());
+            }
+        }
 
         let start_next_move_from = path.start().clone();
         let Some(next_move) = path.one_towards_destination() else {
@@ -121,39 +189,54 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
         let pos_y_range = min_y..=max_y;
 
         let required_openings_checkable_from_path =
-            required_openings.into_iter().filter_map(|opening| {
+            required_openings.into_iter().filter(|opening| {
                 let rotation_from_move_dir = move_dir.shortest_rotate_to(&opening.dir);
-                if pos_x_range.contains(&opening.pos.x)
+                pos_x_range.contains(&opening.pos.x)
                     && pos_y_range.contains(&opening.pos.y)
                     && rotation_from_move_dir.abs() <= 1
-                {
-                    let dir = match rotation_from_move_dir {
-                        -1 => RelativeDirection::Right,
-                        0 => RelativeDirection::Forward,
-                        1 => RelativeDirection::Left,
-                        _ => unreachable!("Checked"),
-                    };
-                    let interrupt = MeasurementInterrupt {
-                        direction: dir,
-                        at_step: InterruptStep::At(
-                            start_next_move_from
-                                .pos
-                                .distance_straight_line(opening.pos)
-                                .expect("On straight line"),
-                        ),
-                        action: InterruptAction::StopIfBlocked,
-                    };
-                    Some(interrupt)
-                } else {
-                    None
-                }
             });
+
+        #[cfg(feature = "internal_strat_logs")]
+        {
+            for opening in required_openings_checkable_from_path.clone() {
+                use console::Style;
+
+                use crate::utils::map_display::MapDisplayWrite;
+
+                let Some(mut w) = map_display.wall_mut(opening.pos, opening.dir) else {
+                    continue;
+                };
+
+                w.apply_style(Style::new().on_red());
+            }
+
+            info!(target: "strat/ff", "Flood Fill: {map_display}");
+        }
+        let opening_interrupts = required_openings_checkable_from_path.map(|o| {
+            let rotation_from_move_dir = move_dir.shortest_rotate_to(&o.dir);
+            let dir = match rotation_from_move_dir {
+                -1 => RelativeDirection::Right,
+                0 => RelativeDirection::Forward,
+                1 => RelativeDirection::Left,
+                _ => unreachable!("Checked"),
+            };
+            MeasurementInterrupt {
+                direction: dir,
+                at_step: InterruptStep::At(
+                    start_next_move_from
+                        .pos
+                        .distance_straight_line(o.pos)
+                        .expect("On straight line"),
+                ),
+                action: InterruptAction::StopIfBlocked,
+            }
+        });
 
         StrategyComputationResult::Computed(Ok(ComputedActions(NonEmpty::one(ComputedAction {
             next_strategy_state: Some(self.clone()),
             after_command: Command {
                 ty: next_move,
-                interrupts: required_openings_checkable_from_path.collect(),
+                interrupts: opening_interrupts.collect(),
             },
         }))))
     }
@@ -191,6 +274,10 @@ impl<const N: usize> FloodFill<N> {
                 let Some(neighbor_pos) = next_propagate + pos_offset else {
                     continue;
                 };
+
+                if neighbor_pos.x as usize >= N || neighbor_pos.y as usize >= N {
+                    continue;
+                }
 
                 let neighbor = flow_field.value_mut(neighbor_pos).expect("Has to exist");
 

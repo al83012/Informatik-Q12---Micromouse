@@ -102,8 +102,7 @@ impl DepthFirstBase {
         successor.prune_zero_steps(world_data, goal);
 
         let mut map_display = MapDisplay::from(&world_data.map);
-        let mut path_ref = PathReference::new(successor.path_from_start.clone(), &mut map_display);
-
+        let mut path_ref = PathReference::new(&successor.path_from_start, &mut map_display);
         path_ref.set_char('*');
         for explored in successor.explored.iter() {
             let Some(mut x) = map_display.wall_mut(explored.at_intersection, explored.in_direction)

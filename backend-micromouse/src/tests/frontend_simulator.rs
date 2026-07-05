@@ -26,6 +26,7 @@ use crate::{
         dyn_strategy_tree::{DynStrategyConfig, StrategyChangeCommand},
         strategies::{
             depth_first::DepthFirstConfig,
+            flood_fill::{FFCost, FloodFillConfig},
             follow_wall::{FollowWallConfig, WallDirection},
             utils::depth_first_base::PathRanking,
         },
@@ -187,14 +188,23 @@ impl FrontendSimulator {
             // DynStrategyConfig::DepthFirst(DepthFirstConfig {
             //     forward_first: true,
             // }),
-            DynStrategyConfig::DepthFirst(DepthFirstConfig {
-                path_ranking: PathRanking::TowardsGoal,
-                prune_dead_ends: true,
-            }),
-            // DynStrategyConfig::FollowWall(FollowWallConfig {
-            //     follow_wall: WallDirection::Right,
-            //     measure_all: false,
-            // }),
+            DynStrategyConfig::FloodFill(FloodFillConfig {
+                move_cost: FFCost {
+                    base_value: 10,
+                    streak_reduction_factor: 0.5,
+                },
+                rotation_cost: FFCost {
+                    base_value: 15,
+                    streak_reduction_factor: 0.0,
+                },
+            }), // DynStrategyConfig::DepthFirst(DepthFirstConfig {
+                //     path_ranking: PathRanking::TowardsGoal,
+                //     prune_dead_ends: true,
+                // }),
+                // DynStrategyConfig::FollowWall(FollowWallConfig {
+                //     follow_wall: WallDirection::Right,
+                //     measure_all: false,
+                // }),
         ][current_strat_id];
 
         let next_pos = [Position { x: 0, y: 0 }, Position { x: 8, y: 8 }][current_strat_id];

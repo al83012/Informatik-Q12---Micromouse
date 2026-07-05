@@ -613,7 +613,7 @@ pub fn init_tree_logger() {
                 // })),
                 .with_filter(FilterFn::new(|meta| {
                     // meta.target().eq("strat") || meta.target().contains("dfs")
-                    meta.target().contains("dfs")
+                    meta.target().contains("ff") || meta.target().eq("strat")
                 })),
         )
     };

@@ -74,7 +74,7 @@ pub fn test_path_return() {
         let mut map_display = MapDisplay::from(&map);
         info!(target: "test/path", "{path:?}");
 
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 
@@ -94,7 +94,7 @@ pub fn test_path_return() {
     {
         let map = Map::<10>::new();
         let mut map_display = MapDisplay::from(&map);
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 
@@ -117,7 +117,7 @@ pub fn test_path_return() {
     {
         let map = Map::<10>::new();
         let mut map_display = MapDisplay::from(&map);
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 
@@ -146,7 +146,7 @@ pub fn test_path_return() {
     {
         let map = Map::<10>::new();
         let mut map_display = MapDisplay::from(&map);
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 
@@ -165,7 +165,7 @@ pub fn test_path_return() {
     {
         let map = Map::<10>::new();
         let mut map_display = MapDisplay::from(&map);
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 
@@ -183,7 +183,7 @@ pub fn test_path_return() {
     {
         let map = Map::<10>::new();
         let mut map_display = MapDisplay::from(&map);
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 
@@ -201,7 +201,7 @@ pub fn test_path_return() {
     {
         let map = Map::<10>::new();
         let mut map_display = MapDisplay::from(&map);
-        let mut path_ref = PathReference::new(path.clone(), &mut map_display);
+        let mut path_ref = PathReference::new(&path, &mut map_display);
 
         path_ref.set_char('*');
 

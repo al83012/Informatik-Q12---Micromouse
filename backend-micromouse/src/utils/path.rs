@@ -377,7 +377,7 @@ impl Path {
             new_nodes.push(current_transf);
         }
 
-        todo!("test");
+        // todo!("test");
         Self { nodes: new_nodes }
     }
 
@@ -416,7 +416,7 @@ pub enum PathTraversalError {
 
 pub struct PathReference<'a> {
     map: &'a mut MapDisplay,
-    path: Path,
+    path: &'a Path,
 }
 
 impl<'a> MapDisplayWrite for PathReference<'a> {
@@ -503,7 +503,7 @@ impl<'a> MapDisplayWrite for PathReference<'a> {
 }
 
 impl<'a> PathReference<'a> {
-    pub fn new(path: Path, map: &'a mut MapDisplay) -> Self {
+    pub fn new(path: &'a Path, map: &'a mut MapDisplay) -> Self {
         Self { map, path }
     }
 }
