@@ -213,6 +213,7 @@ pub fn test_path_return() {
 
 #[test]
 pub fn test_path_reduction() {
+    init_logging();
     let mut path = Path::new(MouseTransform {
         pos: Position { x: 0, y: 0 },
         dir: Direction::PosX,

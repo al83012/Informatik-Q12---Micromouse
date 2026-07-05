@@ -2,7 +2,7 @@ use console::Style;
 use tracing::{debug, error};
 
 use crate::{
-    comm::micromouse_message::MovementType,
+    comm::micromouse_message::{MovementType, TransformedMovement},
     transform::{
         direction::{Direction, DirectionNormalizedVector},
         position::{MouseTransform, Position},
@@ -361,23 +361,47 @@ impl Path {
 
     // TODO: Test reduction
     pub fn reduced(self) -> Self {
-        let mut current_transf = self.nodes.first().expect("Len >= 1").clone();
-        let mut new_nodes = vec![current_transf];
-        for node in self.nodes.into_iter().skip(1) {
-            if current_transf.dir != node.dir {
-                if *new_nodes.last().expect("Len >= 1") != current_transf {
-                    new_nodes.push(current_transf);
+        let mut new_nodes = vec![*self.nodes.first().expect("Len >= 1")];
+        let mut current_move = MovementType::Turn(0);
+
+        for node_window in self.nodes().windows(2) {
+            let from_node = node_window[0];
+            let to_node = node_window[1];
+
+            debug!(target: "path", "{from_node:?}..{to_node:?}");
+
+            let movement = if from_node.pos == to_node.pos {
+                MovementType::Turn(from_node.dir.shortest_rotate_to(&to_node.dir))
+            } else {
+                MovementType::Move(
+                    from_node
+                        .pos
+                        .distance_straight_line(to_node.pos)
+                        .expect("In straight line") as u8,
+                )
+            };
+
+            match (&mut current_move, movement) {
+                (MovementType::Turn(acc), MovementType::Turn(add)) => *acc += add,
+                (MovementType::Move(acc), MovementType::Move(add)) => *acc += add,
+                (prev_acc, new) => {
+                    debug!(target: "path", "--> {prev_acc:?} +/= {new:?}");
+                    let from_cell = new_nodes.last().expect("Len >= 1");
+                    let transf = TransformedMovement::new(*prev_acc, *from_cell);
+                    let new_step = transf.at_step(transf.max_step_count()).expect("Checked");
+                    if new_step != *from_cell {
+                        debug!(target: "path", "Step did something");
+                        new_nodes.push(new_step);
+                    }
+                    current_move = new;
                 }
-                new_nodes.push(node);
-                current_transf = node;
             }
         }
-
-        if current_transf != *new_nodes.last().expect("Len >= 1") {
-            new_nodes.push(current_transf);
+        if current_move.max_step_count() > 0 {
+            let from_cell = new_nodes.last().expect("Len >= 1");
+            let transf = TransformedMovement::new(current_move, *from_cell);
+            new_nodes.push(transf.at_step(transf.max_step_count()).expect("Checked"));
         }
-
-        // todo!("test");
         Self { nodes: new_nodes }
     }
 

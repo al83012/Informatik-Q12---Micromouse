@@ -1,14 +1,14 @@
 use std::usize;
 
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
     comm::micromouse_message::{
         Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
         TransformedMovement,
     },
-    map::world_data::WorldData,
+    map::{map::WallDiscoveryStatus, world_data::WorldData},
     strategy::{
         strategies::utils::{self, value_map::ValueMap},
         strategy::{
@@ -99,6 +99,19 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
         #[cfg(feature = "internal_strat_logs")]
         info!(target: "strat/ff", "Generated flow field");
 
+        let mut path = match self.path_on_flow_field(&flow_field, *goal) {
+            Ok(o) => o,
+            Err(e) => return StrategyComputationResult::Computed(Err(e)),
+        };
+
+        #[cfg(feature = "internal_strat_logs")]
+        {
+            use crate::utils::{map_display::MapDisplayWrite, path::PathReference};
+
+            let mut path_ref = PathReference::new(&path, &mut map_display);
+            path_ref.set_char('*');
+        }
+
         #[cfg(feature = "internal_strat_logs")]
         {
             for x in 0..N {
@@ -131,20 +144,6 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
                 }
             }
         }
-
-        let mut path = match self.path_on_flow_field(flow_field, *goal) {
-            Ok(o) => o,
-            Err(e) => return StrategyComputationResult::Computed(Err(e)),
-        };
-
-        #[cfg(feature = "internal_strat_logs")]
-        {
-            use crate::utils::{map_display::MapDisplayWrite, path::PathReference};
-
-            let mut path_ref = PathReference::new(&path, &mut map_display);
-            path_ref.set_char('*');
-        }
-
         let required_openings = path.required_openings();
 
         #[cfg(feature = "internal_strat_logs")]
@@ -219,7 +218,7 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
                 w.apply_style(Style::new().on_red());
             }
 
-            info!(target: "strat/ff", "Flood Fill: {map_display}");
+            info!(target: "strat/ff", "Flood Fill: \n{map_display}");
         }
         let opening_interrupts = required_openings_checkable_from_path.map(|o| {
             let rotation_from_move_dir = move_dir.shortest_rotate_to(&o.dir);
@@ -272,6 +271,7 @@ impl<const N: usize> FloodFill<N> {
                 .expect("Has to exist")
                 .clone();
 
+            debug!(target: "strat/ff", "Propagating {next_propagate:?} (cost = {})", cell.total_cost);
             let neighbor_dirs = vec![
                 Direction::PosX,
                 Direction::PosY,
@@ -290,8 +290,14 @@ impl<const N: usize> FloodFill<N> {
 
                 let neighbor = flow_field.value_mut(neighbor_pos).expect("Has to exist");
 
-                let cost = self.cost_to_neighbor(&cell, dir);
+                let cost = self.cost_to_neighbor(&cell, dir) + cell.total_cost;
                 if cost < neighbor.total_cost {
+                    let wall = world.map.wall(&next_propagate, &dir);
+                    if wall == Some(&WallDiscoveryStatus::Exists(true)) || wall.is_none() {
+                        debug!(target: "strat/ff", " --> Neighbor {neighbor_pos} inaccessible");
+                        continue;
+                    }
+                    debug!(target: "strat/ff", " --> to: {neighbor_pos} (cost = {})", cost);
                     propagate.push(neighbor_pos);
                     neighbor.total_cost = cost;
                     neighbor.fwd_streak = if dir == cell.enter_in_direction {
@@ -327,7 +333,7 @@ impl<const N: usize> FloodFill<N> {
 
     pub fn path_on_flow_field(
         &self,
-        flow_field: FlowField<N>,
+        flow_field: &FlowField<N>,
         goal: GoalPosition,
     ) -> Result<Path, StrategyEndState> {
         let goal = goal.0;
@@ -338,9 +344,12 @@ impl<const N: usize> FloodFill<N> {
             dir: goal_cell.enter_in_direction.rotated(2),
         });
 
+        debug!(target: "strat/ff", "Path on flow-field starting from {goal}");
+
         let mut current_cell = goal;
 
         loop {
+            debug!(target: "strat/ff", "Going from {current_cell}");
             let current_cell_flow =
                 flow_field
                     .value(current_cell)
@@ -348,10 +357,13 @@ impl<const N: usize> FloodFill<N> {
                         "Goal is walled off from current position".to_string(),
                     ))?;
             if current_cell_flow.total_cost == 0 {
+                debug!(target: "strat/ff", "Cost = 0 --> Found start");
                 break;
             }
 
             let entered_from_dir = current_cell_flow.enter_in_direction.rotated(2);
+
+            debug!(target: "strat/ff", "Exit in dir {entered_from_dir}");
 
             let entered_from_cell = (current_cell + entered_from_dir.steps_in_dir(1)).ok_or(
                 StrategyEndState::NoPossibleAction(
@@ -385,6 +397,6 @@ impl FFCost {
     pub fn value(&self, action_len: usize) -> usize {
         let reduction_factor = self.streak_reduction_factor.clamp(0.0, 1.0);
         let val = action_len as f32;
-        val.powf(1.0 - 0.5 * reduction_factor).ceil() as usize
+        val.powf(1.0 - 0.5 * reduction_factor).round() as usize * self.base_value
     }
 }
