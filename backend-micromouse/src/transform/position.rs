@@ -18,6 +18,7 @@ pub struct PositionOffset {
     pub d_y: i32,
 }
 
+
 impl From<DirectionNormalizedVector> for PositionOffset {
     fn from(value: DirectionNormalizedVector) -> Self {
         Self {
@@ -163,3 +164,4 @@ impl std::ops::Sub<Position> for Position {
         }
     }
 }
+

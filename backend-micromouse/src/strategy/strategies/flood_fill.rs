@@ -3,14 +3,24 @@ use std::usize;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    comm::micromouse_message::{
+        Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
+        TransformedMovement,
+    },
     map::world_data::WorldData,
     strategy::{
         strategies::utils::{self, value_map::ValueMap},
-        strategy::{FromConfig, GoalPosition, Strategy, StrategyEndState, WithGraftingFilter},
+        strategy::{
+            ComputedAction, ComputedActions, FromConfig, GoalPosition, Strategy,
+            StrategyComputationResult, StrategyEndState, WithGraftingFilter,
+        },
         strategy_tree::GraftingFilter,
     },
-    transform::{direction::Direction, position::MouseTransform},
-    utils::path::Path,
+    transform::{
+        direction::{Direction, RelativeDirection},
+        position::MouseTransform,
+    },
+    utils::{nonempty::NonEmpty, path::Path},
 };
 
 #[derive(Clone, Debug)]
@@ -73,7 +83,79 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
     ) -> crate::strategy::strategy::StrategyComputationResult<N, Self> {
         let mut flow_field = self.flow_field(world);
 
-        todo!()
+        let mut path = match self.path_on_flow_field(flow_field, *goal) {
+            Ok(o) => o,
+            Err(e) => return StrategyComputationResult::Computed(Err(e)),
+        };
+        let required_openings = path.required_openings();
+
+        let start_next_move_from = path.start().clone();
+        let Some(next_move) = path.one_towards_destination() else {
+            return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
+        };
+
+        if let MovementType::Turn(_) = &next_move {
+            return StrategyComputationResult::Computed(Ok(ComputedActions(NonEmpty::one(
+                ComputedAction {
+                    next_strategy_state: Some(self.clone()),
+                    after_command: Command {
+                        ty: next_move,
+                        interrupts: vec![],
+                    },
+                },
+            ))));
+        }
+
+        let move_dir = start_next_move_from.dir;
+        let mut transformed_move = TransformedMovement::new(next_move, start_next_move_from);
+        let end_next_move_at = transformed_move
+            .at_step(transformed_move.max_step_count())
+            .expect("In range");
+
+        let max_x = start_next_move_from.pos.x.max(end_next_move_at.pos.x);
+        let min_x = start_next_move_from.pos.x.min(end_next_move_at.pos.x);
+        let max_y = start_next_move_from.pos.y.max(end_next_move_at.pos.y);
+        let min_y = start_next_move_from.pos.y.min(end_next_move_at.pos.y);
+
+        let pos_x_range = min_x..=max_x;
+        let pos_y_range = min_y..=max_y;
+
+        let required_openings_checkable_from_path =
+            required_openings.into_iter().filter_map(|opening| {
+                let rotation_from_move_dir = move_dir.shortest_rotate_to(&opening.dir);
+                if pos_x_range.contains(&opening.pos.x)
+                    && pos_y_range.contains(&opening.pos.y)
+                    && rotation_from_move_dir.abs() <= 1
+                {
+                    let dir = match rotation_from_move_dir {
+                        -1 => RelativeDirection::Right,
+                        0 => RelativeDirection::Forward,
+                        1 => RelativeDirection::Left,
+                        _ => unreachable!("Checked"),
+                    };
+                    let interrupt = MeasurementInterrupt {
+                        direction: dir,
+                        at_step: InterruptStep::At(
+                            start_next_move_from
+                                .pos
+                                .distance_straight_line(opening.pos)
+                                .expect("On straight line"),
+                        ),
+                        action: InterruptAction::StopIfBlocked,
+                    };
+                    Some(interrupt)
+                } else {
+                    None
+                }
+            });
+
+        StrategyComputationResult::Computed(Ok(ComputedActions(NonEmpty::one(ComputedAction {
+            next_strategy_state: Some(self.clone()),
+            after_command: Command {
+                ty: next_move,
+                interrupts: required_openings_checkable_from_path.collect(),
+            },
+        }))))
     }
 }
 
@@ -175,16 +257,23 @@ impl<const N: usize> FloodFill<N> {
 
             let entered_from_dir = current_cell_flow.enter_in_direction.rotated(2);
 
-            let entered_from_cell =
-                (current_cell + entered_from_dir.steps_in_dir(1)).ok_or(StrategyEndState::NoPossibleAction(
+            let entered_from_cell = (current_cell + entered_from_dir.steps_in_dir(1)).ok_or(
+                StrategyEndState::NoPossibleAction(
                     "Goal is walled off from current position; Path leads to wall".to_string(),
-                ))?;
+                ),
+            )?;
 
             let last = path.last();
             if last.dir != entered_from_dir {
-                path.connect_to(MouseTransform { pos: current_cell, dir: entered_from_dir });
+                path.connect_to(MouseTransform {
+                    pos: current_cell,
+                    dir: entered_from_dir,
+                });
             }
-            path.connect_to(MouseTransform{pos: entered_from_cell, dir: entered_from_dir});
+            path.connect_to(MouseTransform {
+                pos: entered_from_cell,
+                dir: entered_from_dir,
+            });
             current_cell = entered_from_cell;
         }
 

@@ -25,6 +25,10 @@ impl Path {
         Path { nodes: vec![start] }
     }
 
+    pub fn start(&self) -> &MouseTransform {
+        self.nodes.first().expect("Len >= 1")
+    }
+
     pub fn last(&self) -> &MouseTransform {
         self.nodes.last().expect("len >= 1")
     }
@@ -332,32 +336,27 @@ impl Path {
         }
     }
 
-    pub fn one_towards_destination(&mut self) -> Vec<MovementType> {
+    pub fn one_towards_destination(&mut self) -> Option<MovementType> {
         if self.nodes.len() <= 1 {
-            return vec![];
+            return None;
         }
 
         let first = self.nodes.remove(0);
         let second = self.nodes.first().expect("Checked");
 
-        let mut moves = vec![];
         if first.dir == second.dir {
             // Move
-            moves.push(MovementType::Move(
+            Some(MovementType::Move(
                 first
                     .pos
                     .distance_straight_line(second.pos)
                     .expect("Should be in a line") as u8,
-            ));
+            ))
         } else {
             // Rotation
             let rotate = first.dir.shortest_rotate_to(&second.dir);
-            if rotate != 0 {
-                moves.push(MovementType::Turn(rotate))
-            }
+            Some(MovementType::Turn(rotate))
         }
-
-        moves
     }
 
     // TODO: Test reduction
@@ -380,6 +379,32 @@ impl Path {
 
         todo!("test");
         Self { nodes: new_nodes }
+    }
+
+    pub fn required_openings(&self) -> Vec<MouseTransform> {
+        let mut openings = vec![];
+        for adjacent in self.nodes.windows(2) {
+            let from = adjacent[0];
+            let to = adjacent[1];
+
+            if from.pos != to.pos && from.dir == to.dir {
+                let dir = from.dir;
+                let dist = from
+                    .pos
+                    .distance_straight_line(to.pos)
+                    .expect("Checked in straight line");
+                openings.append(
+                    &mut ((0..dist).filter_map(|d| {
+                        (from.pos + dir.steps_in_dir(d as u8)).map(|from_cell| MouseTransform {
+                            pos: from_cell,
+                            dir,
+                        })
+                    }))
+                    .collect(),
+                );
+            }
+        }
+        openings
     }
 }
 
