@@ -1,14 +1,17 @@
 use std::usize;
 
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::{
     comm::micromouse_message::{
         Command, InterruptAction, InterruptStep, MeasurementInterrupt, MovementType,
         TransformedMovement,
     },
-    map::{map::WallDiscoveryStatus, world_data::WorldData},
+    map::{
+        map::{CellDiscoveryStatus, WallDiscoveryStatus},
+        world_data::WorldData,
+    },
     strategy::{
         strategies::utils::{self, value_map::ValueMap},
         strategy::{
@@ -33,6 +36,7 @@ pub struct FloodFill<const N: usize> {
 pub struct FloodFillConfig {
     pub rotation_cost: FFCost,
     pub move_cost: FFCost,
+    pub exploration_incentive: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -110,6 +114,10 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
 
             let mut path_ref = PathReference::new(&path, &mut map_display);
             path_ref.set_char('*');
+
+            for node in path.nodes().iter() {
+                debug!(target: "strat/ff", "PN: {node:?}");
+            }
         }
 
         #[cfg(feature = "internal_strat_logs")]
@@ -165,12 +173,16 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
         let Some(next_move) = path.one_towards_destination() else {
             #[cfg(feature = "internal_strat_logs")]
             {
-                info!(target: "strat/ff", "Path towards goal is empty --> Finished");
+                info!(target: "strat/ff", "\nFlood Fill: \n{map_display}\n");
             }
             return StrategyComputationResult::Computed(Err(StrategyEndState::ReachedGoal));
         };
 
         if let MovementType::Turn(_) = &next_move {
+            #[cfg(feature = "internal_strat_logs")]
+            {
+                info!(target: "strat/ff", "\nFlood Fill: \n{map_display}\n");
+            }
             return StrategyComputationResult::Computed(Ok(ComputedActions(NonEmpty::one(
                 ComputedAction {
                     next_strategy_state: Some(self.clone()),
@@ -218,7 +230,7 @@ impl<const N: usize> Strategy<N> for FloodFill<N> {
                 w.apply_style(Style::new().on_red());
             }
 
-            info!(target: "strat/ff", "Flood Fill: \n{map_display}");
+            info!(target: "strat/ff", "\nFlood Fill: \n{map_display}\n");
         }
         let opening_interrupts = required_openings_checkable_from_path.map(|o| {
             let rotation_from_move_dir = move_dir.shortest_rotate_to(&o.dir);
@@ -271,7 +283,7 @@ impl<const N: usize> FloodFill<N> {
                 .expect("Has to exist")
                 .clone();
 
-            debug!(target: "strat/ff", "Propagating {next_propagate:?} (cost = {})", cell.total_cost);
+            trace!(target: "strat/ff", "Propagating {next_propagate:?} (cost = {})", cell.total_cost);
             let neighbor_dirs = vec![
                 Direction::PosX,
                 Direction::PosY,
@@ -290,14 +302,22 @@ impl<const N: usize> FloodFill<N> {
 
                 let neighbor = flow_field.value_mut(neighbor_pos).expect("Has to exist");
 
-                let cost = self.cost_to_neighbor(&cell, dir) + cell.total_cost;
+                let double_visit_cost = if world.map.cell(&neighbor_pos).cloned()
+                    == Some(CellDiscoveryStatus::Visited)
+                {
+                    self.config.exploration_incentive
+                } else {
+                    0
+                };
+
+                let cost = self.cost_to_neighbor(&cell, dir) + double_visit_cost + cell.total_cost;
                 if cost < neighbor.total_cost {
                     let wall = world.map.wall(&next_propagate, &dir);
                     if wall == Some(&WallDiscoveryStatus::Exists(true)) || wall.is_none() {
-                        debug!(target: "strat/ff", " --> Neighbor {neighbor_pos} inaccessible");
+                        trace!(target: "strat/ff", " --> Neighbor {neighbor_pos} inaccessible");
                         continue;
                     }
-                    debug!(target: "strat/ff", " --> to: {neighbor_pos} (cost = {})", cost);
+                    trace!(target: "strat/ff", " --> to: {neighbor_pos} (cost = {})", cost);
                     propagate.push(neighbor_pos);
                     neighbor.total_cost = cost;
                     neighbor.fwd_streak = if dir == cell.enter_in_direction {
@@ -358,6 +378,13 @@ impl<const N: usize> FloodFill<N> {
                     ))?;
             if current_cell_flow.total_cost == 0 {
                 debug!(target: "strat/ff", "Cost = 0 --> Found start");
+                let starting_dir = current_cell_flow.enter_in_direction;
+                if path.last().dir != starting_dir.rotated(2) {
+                    path.connect_to(MouseTransform {
+                        pos: current_cell,
+                        dir: starting_dir.rotated(2),
+                    });
+                }
                 break;
             }
 

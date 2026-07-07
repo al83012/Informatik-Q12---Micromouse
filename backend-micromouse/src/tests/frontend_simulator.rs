@@ -177,10 +177,10 @@ impl FrontendSimulator {
         let current_strat_id = self.current_strat_id % 2;
 
         let next: &DynStrategyConfig<10> = &[
-            DynStrategyConfig::DepthFirst(DepthFirstConfig {
-                path_ranking: PathRanking::Undefined,
-                prune_dead_ends: false,
-            }),
+            // DynStrategyConfig::DepthFirst(DepthFirstConfig {
+            //     path_ranking: PathRanking::Undefined,
+            //     prune_dead_ends: false,
+            // }),
             // DynStrategyConfig::FollowWall(FollowWallConfig {
             //     follow_wall: WallDirection::Right,
             //     measure_all: true,
@@ -191,12 +191,24 @@ impl FrontendSimulator {
             DynStrategyConfig::FloodFill(FloodFillConfig {
                 move_cost: FFCost {
                     base_value: 10,
+                    streak_reduction_factor: 1.0,
+                },
+                rotation_cost: FFCost {
+                    base_value: 15,
+                    streak_reduction_factor: 1.0,
+                },
+                exploration_incentive: 7,
+            }),
+            DynStrategyConfig::FloodFill(FloodFillConfig {
+                move_cost: FFCost {
+                    base_value: 10,
                     streak_reduction_factor: 0.5,
                 },
                 rotation_cost: FFCost {
                     base_value: 15,
                     streak_reduction_factor: 0.0,
                 },
+                exploration_incentive: 0
             }), // DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 //     path_ranking: PathRanking::TowardsGoal,
                 //     prune_dead_ends: true,
@@ -209,14 +221,14 @@ impl FrontendSimulator {
 
         let next_pos = [Position { x: 0, y: 0 }, Position { x: 8, y: 8 }][current_strat_id];
 
-        self.current_strat_id = current_strat_id + 1;
 
         let strat_change = StrategyChangeCommand {
             set_strategy: Some(next.clone()),
-            reset_map: true,
+            reset_map: !self.current_strat_id.is_multiple_of(2),
             set_goal: Some(GoalPosition(next_pos)),
         };
 
+        self.current_strat_id = current_strat_id + 1;
         serde_json::ser::to_string_pretty(&FrontendResponse::StrategyChange(strat_change))
             .expect("Should be pareseable")
     }
