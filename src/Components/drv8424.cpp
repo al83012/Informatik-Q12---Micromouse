@@ -56,7 +56,7 @@ void DRV8424::readEncoder1() {
         direction1 = false;
     }
     
-    log_i("Interrupt: ENC_A1 changed. Encoder Count 1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
+   // log_i("Interrupt: ENC_A1 changed. Encoder Count 1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
 }
 
 void DRV8424::readEncoder2() {
@@ -71,7 +71,7 @@ void DRV8424::readEncoder2() {
         direction2 = false;
     }
 
-    log_i("Interrupt: ENC_A2 changed. Encoder Count 2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
+ //   log_i("Interrupt: ENC_A2 changed. Encoder Count 2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
 
 }
 

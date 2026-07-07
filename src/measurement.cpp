@@ -139,6 +139,7 @@ void Measurement::IR::Emitters::enableLED(int channel) {
 }
 
 void Measurement::IR::Emitters::disableLED(int channel) {
+    log_i("# Trying to disable IR_LED on channel %d", channel);
 
     //No print statements or logic for turning off to save time
 
@@ -199,8 +200,8 @@ int Measurement::IR::getNoise(int channel) {
 }
 
 void Measurement::IR::debugPrintRawDistance(int channel) {
-    log_d("# Noise of channel %d : %d", channel, Noises[channel]);
-    log_d("# Raw value of channel %d : %d", channel, FinalDistances_Unconverted[channel]);
+    log_i("# Noise of channel %d : %d", channel, Noises[channel]);
+    log_i("# Raw value of channel %d : %d", channel, FinalDistances_Unconverted[channel]);
 
 } 
 
