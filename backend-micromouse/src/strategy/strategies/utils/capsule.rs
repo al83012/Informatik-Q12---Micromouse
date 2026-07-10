@@ -1,4 +1,4 @@
-use crate::{map::map::{PartialMap, WallDiscoveryStatus}, transform::{direction::Direction, position::Position}};
+use crate::{map::map::{Map, PartialMap, WallDiscoveryStatus}, transform::{direction::Direction, position::Position}};
 
 
 
@@ -6,7 +6,9 @@ use crate::{map::map::{PartialMap, WallDiscoveryStatus}, transform::{direction::
 
 /// This turns a partial map into one, where all the boundaries between the discovered and
 /// undiscovered areas are blocked off with walls
-pub fn as_capsule_map<const N: usize>(mut map: PartialMap<N>) -> PartialMap<N> {
+pub fn as_capsule_map<const N: usize>(mut map: impl AsRef<Map<N>>) -> Map<N> {
+
+    let mut map = map.as_ref().clone();
 
     for x in 0..N {
         for y in 0..N {
