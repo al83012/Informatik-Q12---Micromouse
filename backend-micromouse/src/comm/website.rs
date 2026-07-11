@@ -13,6 +13,10 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, instrument, Instrument};
 use tungstenite::{Message, Utf8Bytes};
 
+#[cfg(feature = "")]
+use crate::utils::record_manager::RecordWriter;
+#[cfg(feature = "record_frontend_messages")]
+use crate::utils::records::RecordWriter;
 use crate::{
     comm::{
         micromouse_manager::{MicromouseEvent, MicromouseManagerError},
@@ -82,6 +86,8 @@ pub struct FrontendConnectionManagerInternal<const N: usize> {
     cancellation_token: CancellationToken,
     websocket: WsChannel,
     send_batch: Vec<FrontendMessage>,
+    #[cfg(feature = "record_frontend_messages")]
+    record_writer: RecordWriter,
 }
 
 pub struct FrontendManager<const N: usize> {
@@ -121,6 +127,8 @@ impl<const N: usize> FrontendManager<N> {
             websocket: new_ws,
             read_queue: read_sender,
             send_batch: vec![],
+            #[cfg(feature = "record_frontend_messages")]
+            record_writer: RecordWriter::new().expect("Cannot create record writer"),
         };
         info!(target: "comm/webs", "Created Internal Frontend Connection Handler");
 
@@ -244,9 +252,14 @@ impl<const N: usize> FrontendConnectionManagerInternal<N> {
     pub async fn send_batch(&mut self) {
         let mut empty = vec![];
         std::mem::swap(&mut empty, &mut self.send_batch);
-        self.websocket
-            .send(BatchedFrontendMessage(empty).into())
-            .await;
+        let batched_message = BatchedFrontendMessage(empty).into();
+        #[cfg(feature = "record_frontend_messages")]
+        {
+            self.record_writer
+                .write(&batched_message)
+                .expect("Failed to write record");
+        }
+        self.websocket.send(batched_message.into()).await;
         self.first_element_send_time = None;
     }
     #[instrument(

@@ -13,7 +13,7 @@ use crate::{
     tests::TEST_MAP_SIZE,
     transform::direction::RelativeDirection,
     utils::{
-        hyperlink_logging::init_tree_logger,
+        hyperlink_logging::init_loggers,
         logging::{init_logging, run_test},
     },
 };
@@ -22,7 +22,7 @@ use crate::{
 #[test]
 #[instrument(name = "follow_r_test_short")]
 pub fn follow_r_and_conn() {
-    init_tree_logger();
+    init_loggers();
     info!(target: "comm/msg_log", "****************************************************************************************");
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {

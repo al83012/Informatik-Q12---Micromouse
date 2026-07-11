@@ -3,13 +3,13 @@ use tracing::info;
 use crate::{
     comm::micromouse_message::CommandId,
     strategy::strategy_tree::AbsoluteNodeId,
-    utils::hyperlink_logging::{init_tree_logger, enter_process, LinkFileName},
+    utils::hyperlink_logging::{init_loggers, enter_process, LinkFileName},
 };
 
 #[test]
 #[ignore]
 fn test_spans_simple_tree() {
-    init_tree_logger();
+    init_loggers();
 
     let _s = enter_process("outer");
 
