@@ -25,6 +25,7 @@ use crate::{
     strategy::{
         dyn_strategy_tree::{DynStrategyConfig, StrategyChangeCommand},
         strategies::{
+            dbg_known_path::DbgKnownPathConfig,
             depth_first::DepthFirstConfig,
             flood_fill::{FFCost, FloodFillConfig},
             follow_wall::{FollowWallConfig, WallDirection},
@@ -188,17 +189,27 @@ impl FrontendSimulator {
             // DynStrategyConfig::DepthFirst(DepthFirstConfig {
             //     forward_first: true,
             // }),
-            DynStrategyConfig::FloodFill(FloodFillConfig {
+            DynStrategyConfig::DbgKnownPath(DbgKnownPathConfig {
                 move_cost: FFCost {
                     base_value: 10,
-                    streak_reduction_factor: 1.0,
+                    streak_reduction_factor: 0.5,
                 },
                 rotation_cost: FFCost {
                     base_value: 15,
-                    streak_reduction_factor: 1.0,
+                    streak_reduction_factor: 0.0,
                 },
-                exploration_incentive: 7,
             }),
+            // DynStrategyConfig::FloodFill(FloodFillConfig {
+            //     move_cost: FFCost {
+            //         base_value: 10,
+            //         streak_reduction_factor: 1.0,
+            //     },
+            //     rotation_cost: FFCost {
+            //         base_value: 15,
+            //         streak_reduction_factor: 1.0,
+            //     },
+            //     exploration_incentive: 7,
+            // }),
             DynStrategyConfig::FloodFill(FloodFillConfig {
                 move_cost: FFCost {
                     base_value: 10,
@@ -208,7 +219,7 @@ impl FrontendSimulator {
                     base_value: 15,
                     streak_reduction_factor: 0.0,
                 },
-                exploration_incentive: 0
+                exploration_incentive: 0,
             }), // DynStrategyConfig::DepthFirst(DepthFirstConfig {
                 //     path_ranking: PathRanking::TowardsGoal,
                 //     prune_dead_ends: true,
@@ -220,7 +231,6 @@ impl FrontendSimulator {
         ][current_strat_id];
 
         let next_pos = [Position { x: 0, y: 0 }, Position { x: 8, y: 8 }][current_strat_id];
-
 
         let strat_change = StrategyChangeCommand {
             set_strategy: Some(next.clone()),

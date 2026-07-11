@@ -141,27 +141,6 @@ fn test_parse_frontend_msg() {
         })
     );
 
-    // Example with no config-values
-    // assert_eq!(
-    //     FM::<N>::parse_msg(
-    //         r#"
-    // {
-    //     "StrategyChange" : {
-    //         "reset_map": true,
-    //         "set_strategy": {
-    //             "DbgKnownPath": null
-    //         }
-    //     }
-    // }
-    // "#
-    //     )
-    //     .unwrap(),
-    //     FrontendResponse::StrategyChange(StrategyChangeCommand {
-    //         reset_map: true,
-    //         set_strategy: Some(DynStrategyConfig::DbgKnownPath(DbgKnownPathConfig)),
-    //         set_goal: None
-    //     })
-    // );
 
     // Example with no config-values
     assert_eq!(
