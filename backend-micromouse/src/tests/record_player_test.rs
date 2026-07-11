@@ -1,27 +1,21 @@
 use std::time::Duration;
 
-use tracing::{error, info, span, Instrument};
+use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers};
+use futures_util::StreamExt;
+use tracing::{error, Instrument};
 
 use crate::{
-    process::Process,
-    tests::{
-        frontend_simulator::{self, FrontendSimulator},
-        micromouse_simulator::{self, MicromouseSimulator},
-    },
+    tests::frontend_simulator::{self, FrontendSimulator},
     utils::{
         hyperlink_logging::{init_loggers, process_span},
-        logging::init_logging,
+        records::RecordPlayer,
     },
 };
 
 #[test]
 #[ignore]
-pub fn process_test_no_m_sim() {
-    const N: usize = super::TEST_MAP_SIZE;
-    let world = super::test_map(0.5);
+fn record_player_test() {
     init_loggers();
-    // let _g = init_logging();
-    info!(target: "tests", "Fully shorted process test");
     let rt = tokio::runtime::Runtime::new().unwrap();
 
     // let m_handle = rt.spawn(
@@ -38,10 +32,12 @@ pub fn process_test_no_m_sim() {
         }
         .instrument(process_span("frontend_sim")),
     );
-    let p_handle = rt.spawn(
+    let r_handle = rt.spawn(
         async {
-            let process: Process<N> = Process::new().await.expect("Process creation failed");
-            process.run().await
+            let mut record_player = RecordPlayer::new()
+                .await
+                .expect("There has to be a record for this test to run");
+            record_player.run().await;
         }
         .instrument(process_span("process")),
     );
@@ -49,8 +45,9 @@ pub fn process_test_no_m_sim() {
     rt.block_on(async {
         tokio::select! {
             // _ = m_handle => {error!(target: "tests", "Micromouse Simulator failed")}
-            _ = f_handle => {error!(target: "tests", "Frontend Simulator failed")}
-            _ = p_handle => {error!(target: "tests", "Process failed")}
+            _ = f_handle => {println!("Frontend failed"); error!(target: "tests", "Frontend Simulator failed")}
+            _ = r_handle => {println!("Player failed");error!(target: "tests", "RecordPlayer failed")}
         }
     });
+    println!("Finished");
 }

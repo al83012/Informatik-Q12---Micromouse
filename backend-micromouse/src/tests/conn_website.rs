@@ -2,13 +2,13 @@ use tracing::info;
 
 use crate::{
     comm::website::{FrontendConnectionConfig, FrontendManager, FrontendMessage},
-    utils::{hyperlink_logging::init_tree_logger, logging::init_logging},
+    utils::{hyperlink_logging::init_loggers, logging::init_logging},
 };
 
 #[test]
 #[ignore]
 fn test_simple_conn() {
-    init_tree_logger();
+    init_loggers();
     let rt = tokio::runtime::Runtime::new().unwrap();
     info!(target: "test/webs", "Attempting simple connection");
     rt.block_on(async {

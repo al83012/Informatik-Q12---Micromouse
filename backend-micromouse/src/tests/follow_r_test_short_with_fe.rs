@@ -22,7 +22,7 @@ use crate::{
     },
     transform::direction::RelativeDirection,
     utils::{
-        hyperlink_logging::{enter_process, init_tree_logger},
+        hyperlink_logging::{enter_process, init_loggers},
     },
 };
 
@@ -30,7 +30,7 @@ use crate::{
 #[test]
 pub fn follow_r() {
     let world = super::test_map(0.5);
-    init_tree_logger();
+    init_loggers();
     let _s = enter_process("test");
     info!(target: "tests/map", "TEST WORLD:\n{world}");
     let mut micromouse_simulator = MicromouseSimulator::new(world, Duration::ZERO);

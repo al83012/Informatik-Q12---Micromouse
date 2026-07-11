@@ -12,7 +12,7 @@ use crate::{
         micromouse_simulator::{self, MicromouseSimulator},
     },
     utils::{
-        hyperlink_logging::{init_tree_logger, process_span},
+        hyperlink_logging::{init_loggers, process_span},
         logging::init_logging,
     },
 };
@@ -22,7 +22,7 @@ use crate::{
 pub fn process_test_short() {
     const N: usize = super::TEST_MAP_SIZE;
     let world = super::test_map(0.5);
-    init_tree_logger();
+    init_loggers();
     // let _g = init_logging();
     info!(target: "tests", "Fully shorted process test");
     let rt = tokio::runtime::Runtime::new().unwrap();
