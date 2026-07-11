@@ -23,11 +23,11 @@ mod process_test_no_m_sim;
 pub mod process_test_short;
 mod random_move;
 mod record_player_test;
+mod run_record_player;
 mod serialize_test;
 mod spans;
 mod test_map_discoveries;
 mod visual_tests;
-mod run_record_player;
 
 pub const TEST_MAP_SIZE: usize = 12;
 
