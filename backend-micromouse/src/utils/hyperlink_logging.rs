@@ -2,9 +2,9 @@ use std::{
     collections::HashMap,
     fmt::Display,
     fs::{File, OpenOptions},
-    io::Write,
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::Instant,
 };
 
@@ -113,7 +113,7 @@ struct LogSpan {
 }
 
 pub struct RoutingLayer {
-    files: Mutex<HashMap<PathBuf, File>>,
+    files: Mutex<HashMap<PathBuf, Arc<Mutex<BufWriter<File>>>>>,
     run_root: PathBuf,
     start_time: Instant,
 }
@@ -128,7 +128,7 @@ impl RoutingLayer {
         }
     }
 
-    fn get_file(&self, path: &Path) -> File {
+    fn get_file(&self, path: &Path) -> Arc<Mutex<BufWriter<File>>> {
         let mut files = self.files.lock().unwrap();
         if !files.contains_key(path) {
             if let Some(parent) = path.parent() {
@@ -142,9 +142,13 @@ impl RoutingLayer {
 
             // Write the Header/Styles only once per file
             writeln!(file, "{}", self.get_styles()).ok();
-            files.insert(path.to_path_buf(), file);
+            files.insert(
+                path.to_path_buf(),
+                Arc::from(Mutex::from(BufWriter::new(file))),
+            );
         }
-        files.get(path).unwrap().try_clone().unwrap()
+
+        files.get(path).unwrap().clone()
     }
 
     fn get_styles(&self) -> &str {
@@ -293,7 +297,8 @@ where
         });
 
         {
-            let mut file = self.get_file(&current_file);
+            let file = self.get_file(&current_file);
+            let mut file = file.lock().expect("Poisoned Mutex");
             let rel_up = diff_paths(&parent_file, &current_dir).unwrap();
 
             writeln!(file, "<section class='span-container'>").ok();
@@ -325,6 +330,7 @@ where
                 let link_dir = self.run_root.join(&link.category);
                 let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
                 let mut link_file = self.get_file(&link_path);
+                let mut link_file = link_file.lock().expect("Poisoned Mutex");
 
                 let rel_back = diff_paths(&current_file, &link_dir).unwrap();
                 // writeln!(link_file, "<section class = 'span-container'>").ok();
@@ -351,6 +357,7 @@ where
         // 2. Link from the parent file
         {
             let mut file = self.get_file(&parent_file);
+            let mut file = file.lock().expect("Poisoned Mutex");
             let rel_down = diff_paths(&current_file, &parent_dir).unwrap();
             let all_empty = visitor.links.is_empty() && visitor.fields.is_empty();
 
@@ -458,6 +465,7 @@ where
 
         {
             let mut main_log_file = self.get_file(&self.run_root.join("out.html"));
+            let mut main_log_file = main_log_file.lock().expect("Poisoned Mutex");
 
             let link_to_file = diff_paths(&current_file, &self.run_root).expect("No link to file");
 
@@ -500,6 +508,7 @@ where
         // }
         let mut file = self.get_file(&current_file);
 
+        let mut file = file.lock().expect("Poisoned Mutex");
         let all_empty = visitor.links.is_empty() && visitor.fields.is_empty();
 
         if !all_empty {
@@ -519,6 +528,7 @@ where
             let link_dir = self.run_root.join(&link.category);
             let link_path = link_dir.join(&link.name).with_extension(BASE_EXTENSION);
             let mut link_file = self.get_file(&link_path);
+            let mut link_file = link_file.lock().expect("Poisoned Mutex");
 
             let rel_back = diff_paths(&current_file, &link_dir).unwrap();
             writeln!(
@@ -560,6 +570,7 @@ where
         if let Some(span) = ctx.span(&id) {
             if let Some(span_data) = span.extensions().get::<LogSpan>() {
                 let mut file = self.get_file(&span_data.dir.join(BASE_FILE));
+                let mut file = file.lock().expect("Poisoned Mutex");
                 writeln!(file, "</section> ").ok();
             }
         }
@@ -632,8 +643,9 @@ pub fn init_tree_logger() {
             .join("warnings")
             .with_extension("html");
         fs::create_dir_all(e_log_folder_path.clone()).expect("Error while creating log folder");
-        let mut e_log_file =
-            File::create(e_log_file_path).expect("Creating error log file caused an error");
+        let mut e_log_file = BufWriter::new(
+            File::create(e_log_file_path).expect("Creating error log file caused an error"),
+        );
 
         e_log_file
             .write_all(
@@ -663,8 +675,9 @@ pub fn init_tree_logger() {
 
         let e_log_dbg_path = e_log_folder_path.join("dbg_out").with_extension("html");
         fs::create_dir_all(e_log_folder_path).expect("Error while creating log folder");
-        let mut e_dbg_out_file =
-            File::create(e_log_dbg_path).expect("Creating error log file caused an error");
+        let mut e_dbg_out_file = BufWriter::new(
+            File::create(e_log_dbg_path).expect("Creating error log file caused an error"),
+        );
 
         e_dbg_out_file
             .write_all(
