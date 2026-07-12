@@ -65,6 +65,7 @@ impl<T> Deref for NonEmpty<T> {
 }
 
 
+
 // impl<T> Serialize for NonEmpty<T> 
 // where T: Serialize
 // {

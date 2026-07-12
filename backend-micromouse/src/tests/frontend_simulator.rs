@@ -16,13 +16,11 @@ use crate::{
             MeasurementOccurrence, MicromouseResponse, TransformedMovement,
         },
         website::{BatchedFrontendMessage, FrontendMessage, FrontendResponse},
-    },
-    map::{
+    }, map::{
         map::Map,
         measurement::{self, MeasurementValue},
         world_data::{self, WorldData},
-    },
-    strategy::{
+    }, strategy::{
         dyn_strategy_tree::{DynStrategyConfig, StrategyChangeCommand},
         strategies::{
             dbg_known_path::DbgKnownPathConfig,
@@ -34,15 +32,15 @@ use crate::{
         strategy::GoalPosition,
         strategy_tree::AbsolutePathId,
         visuals::{PathSegment, TreeVisualEvent},
-    },
-    transform::position::{MouseTransform, Position},
-    utils::hyperlink_logging::{enter_process, process_span, LinkFileName},
+    }, transform::position::{MouseTransform, Position}, utils::{frontend_display::FrontendDisplay, hyperlink_logging::{LinkFileName, enter_process, process_span}},
 };
+
+const SIZE: usize = super::TEST_MAP_SIZE;
 
 pub struct FrontendSimulator {
     current_strat_id: usize,
-    paths: HashMap<AbsolutePathId, PathSegment>,
     routine_strategy_change_interval: Duration,
+    display: FrontendDisplay<SIZE>,
 }
 
 impl FrontendSimulator {
@@ -50,8 +48,8 @@ impl FrontendSimulator {
     pub fn new(strategy_change_interval: Duration) -> Self {
         Self {
             current_strat_id: 1,
-            paths: HashMap::new(),
             routine_strategy_change_interval: strategy_change_interval,
+            display: FrontendDisplay::new(),
         }
     }
     #[instrument(skip(self), name = "run")]
@@ -111,6 +109,11 @@ impl FrontendSimulator {
                 warn!(target: "tests/sim/webs", "Non-parseable msg {frontend_msg_batch:#?}");
                 continue;
             };
+
+
+            self.display.update(&frontend_msg_batch);
+            info!(target: "test/sim/webs/display", "Frontend Display: \n{}", self.display);
+
 
             info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg_batch:#?}");
 
