@@ -187,7 +187,8 @@ impl<const N: usize> Display for FrontendDisplay<N> {
 
         let mut cell_ref = map_display
             .cell_mut(self.world.mouse.pos)
-            .expect("Cell should exist").center();
+            .expect("Cell should exist");
+        let mut cell_ref = cell_ref.center();
         cell_ref.set_char(dir_char);
         cell_ref.apply_style(Style::new().on_red());
 
