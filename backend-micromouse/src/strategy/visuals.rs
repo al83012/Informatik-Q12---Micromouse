@@ -34,8 +34,8 @@ pub enum CmdVisualEventType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PathVisualEvent {
-    associated_node: AbsoluteNodeId,
-    ty: PathVisualEventType,
+    pub associated_node: AbsoluteNodeId,
+    pub ty: PathVisualEventType,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,8 +50,8 @@ pub enum PathVisualEventType {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PathSegment {
-    from: MouseTransform,
-    to: MouseTransform,
+    pub from: MouseTransform,
+    pub to: MouseTransform,
 }
 
 pub struct FrontendVisuals {

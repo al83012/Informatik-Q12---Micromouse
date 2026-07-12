@@ -158,7 +158,7 @@ pub struct SentTreeLayer<const N: usize> {
 }
 
 // Always counting up
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize, Eq, Hash)]
 pub struct AbsoluteLayerId(pub usize);
 
 // The lowest layer of a tree has id 0
@@ -1731,10 +1731,10 @@ pub enum PruneError {
     SourceDoesNotHaveThisChild(AbsolutePathId),
 }
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct AbsoluteNodeId {
-    layer_id: AbsoluteLayerId,
-    node_id: RelativeNodeId,
+    pub layer_id: AbsoluteLayerId,
+    pub node_id: RelativeNodeId,
 }
 
 impl AbsoluteNodeId {

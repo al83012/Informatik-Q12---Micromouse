@@ -613,8 +613,9 @@ pub fn init_loggers() {
             warn_fmt_layer
                 .with_filter(EnvFilter::new("debug"))
                 .with_filter(FilterFn::new(|meta| {
-                    meta.target().contains("webs") || meta.target().eq("rec")
+                    // meta.target().contains("webs") || meta.target().eq("rec")
                     // meta.target().contains("dkp") || meta.target().eq("strat")
+                    meta.target().eq("test/sim/webs/display")
                 })),
         )
     };

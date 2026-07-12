@@ -6,3 +6,4 @@ pub mod stats;
 pub mod file_writer;
 pub mod hyperlink_logging;
 pub mod records;
+pub mod frontend_display;
