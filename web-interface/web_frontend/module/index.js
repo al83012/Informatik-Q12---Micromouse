@@ -208,11 +208,13 @@ export class Index {
                     break;
                 case "update_path":
                     //Index.pathUpdateIds += data["id"];
-                    console.log(data["path"]);
-                    Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], false));
+                    /*console.log(data["path"]);
+                    Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], false));*/
+                    console.log(data["changes"]);
+                    Index.animHandler.addImmediate(displayPathChangeCompact(data["changes"], data["id"]));
                     break;
                 case "complete_path":
-                    Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], true));
+                    //Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], true));
                     break;
                 case "discover_tile":
                     console.log(data);
@@ -521,6 +523,251 @@ function init_maze() {
     Index.animHandler.add(animation);
     Index.animHandler.add(animation_second);*/
 }
+
+function flipDirection(direction) {
+    if (direction === "n") {
+        return "s";
+    } else if (direction === "s") {
+        return "n";
+    } else if (direction === "e") {
+        return "w";
+    } else if (direction === "w") {
+        return "e";
+    }
+}
+
+function displayPathChangeCompact(changes, id, ignore_group = false) {
+    Index.send({action: "path_update", id: id, state: "started"});
+
+    //unfold changes to coords path (int[][])
+    let unfolded_coords_path = [];
+    for (let g = 0; g < changes.length; g++) {
+        for (let i = 0; i < changes[g].length; i++) {
+            let part = [];
+            let change = changes[g][i];
+
+            if (change.to[0] - change.from[0] > 0) {
+                for (let j = 0; j <= change.to[0] - change.from[0]; j++) {
+                    part.push(change.from[0] + j);
+                    part.push(change.from[1]);
+                }
+            } else if (change.to[0] - change.from[0] < 0) {
+                for (let j = 0; j >= change.to[0] - change.from[0]; j--) {
+                    part.push(change.from[0] + j);
+                    part.push(change.from[1]);
+                }
+            } else if (change.to[1] - change.from[1] > 0) {
+                for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
+                    part.push(change.from[0]);
+                    part.push(change.from[1] + j);
+                }
+            } else if (change.to[1] - change.from[1] < 0) {
+                for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
+                    part.push(change.from[0]);
+                    part.push(change.from[1] + j);
+                }
+            }
+
+            part.push(change.change);
+            part.push((i === 0) ? 1 : 0);
+            unfolded_coords_path.push(part);
+        }
+    }
+
+    console.log("Unfolded Path: ");
+    console.log(unfolded_coords_path);
+
+    //generate tiles
+    //tiles: tiles[[x,y]] = HTMLElements[] ?
+    let tiles = [];
+    for (let g = 0; g < changes.length; g++) {
+        for (let i = 0; i < changes[g].length; i++) {
+            let change = changes[g][i];
+
+            if (change.to[0] - change.from[0] > 0) {
+                for (let j = 0; j <= change.to[0] - change.from[0]; j++) {
+                    tiles[[change.from[0] + j, change.from[1]]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                    ];
+
+                    if (j === 0) {
+                        if (!(change.from[0] === change.start_from[0] && change.from[1] === change.start_from[1])) {
+                            let from_direction;
+                            if (change.from[0] - change.start_from[0] < 0) {
+                                from_direction = "w"; //NegX -> opposite side for the connection arm
+                            } else if (change.from[0] - change.start_from[0] > 0) {
+                                from_direction = "e";
+                            } else if (change.from[1] - change.start_from[1] < 0) {
+                                from_direction = "s"; //NegY -> opposite side for the connection arm
+                            } else {
+                                from_direction = "n";
+                            }
+                            tiles[[change.from[0], change.from[1]]].push(
+                                document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                            );
+
+                            tiles[[change.from[0], change.from[1]]].push(
+                                document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                            );
+                        }
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[0] - change.from[0]) {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    } else {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    }
+                }
+            } else if (change.to[0] - change.from[0] < 0) {
+                for (let j = 0; j >= change.to[0] - change.from[0]; j--) {
+                    tiles[[change.from[0] + j, change.from[1]]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                    ];
+
+                    if (j === 0) {
+                        let from_direction;
+                        if (change.from[0] - change.start_from[0] < 0) {
+                            from_direction = "w"; //NegX -> opposite side for the connection arm
+                        } else if (change.from[0] - change.start_from[0] > 0) {
+                            from_direction = "e";
+                        } else if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "s"; //NegY -> opposite side for the connection arm
+                        } else {
+                            from_direction = "n";
+                        }
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                        );
+
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[0] - change.from[0]) {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    } else {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    }
+                }
+            } else if (change.to[1] - change.from[1] > 0) {
+                for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
+                    tiles[[change.from[0], change.from[1] + j]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                    ];
+
+                    if (j === 0) {
+                        let from_direction;
+                        if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "w"; //NegX -> opposite side for the connection arm
+                        } else if (change.from[0] - change.start_from[0] > 0) {
+                            from_direction = "e";
+                        } else if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "s"; //NegY -> opposite side for the connection arm
+                        } else {
+                            from_direction = "n";
+                        }
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                        );
+
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[1] - change.from[1]) {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    } else {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    }
+                }
+            } else if (change.to[1] - change.from[1] < 0) {
+                for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
+                    tiles[[change.from[0], change.from[1] + j]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                    ];
+
+                    if (j === 0) {
+                        let from_direction;
+                        if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "w"; //NegX -> opposite side for the connection arm
+                        } else if (change.from[0] - change.start_from[0] > 0) {
+                            from_direction = "e";
+                        } else if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "s"; //NegY -> opposite side for the connection arm
+                        } else {
+                            from_direction = "n";
+                        }
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                        );
+
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[1] - change.from[1]) {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    } else {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    console.log("Tiles: ");
+    console.log(tiles);
+
+    if (unfolded_coords_path[0].length === 2 && unfolded_coords_path.length === 1) { //an empty path
+        Index.send({action: "path_update", id: id, state: "finished"});
+    }
+
+    return generatePathAnimGroup(unfolded_coords_path, tiles, ignore_group, ()=>{Index.send({action: "path_update", id: id, state: "finished"});});
+}
+
 
 function displayPathChange(path_data, id, ignore_group) {
     /*if (Index.pathUpdateIds.some(e => e === id)) {

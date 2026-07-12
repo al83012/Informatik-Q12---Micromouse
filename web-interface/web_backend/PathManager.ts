@@ -1,3 +1,5 @@
+import {record} from './recorder.cjs';
+
 export class PathManager {
     static path_tree: {
         [key: string]: {
@@ -18,10 +20,19 @@ export class PathManager {
     static is_playing: boolean = false;
 
     static setPlayingState(state: string) {
+        record({state: state}, "Call -> SetPlayingState");
         this.is_playing = state === "started";
+        record({}, "Finished -> SetPlayingState");
     }
 
     static addNode(from: [number, number], to: [number, number], id: string, parent: string) {
+        record({
+            from: from,
+            to: to,
+            id: id,
+            parent: parent,
+        }, "Call -> AddNode");
+
         if (this.top_node_id === "-1") {
             this.path_tree[parent] = {
                 from: [0, 0],
@@ -53,6 +64,14 @@ export class PathManager {
         this.path_tree[parent].changes.push({id: id, change: 1});
 
         this.updateParentChanges(parent);
+
+        record({
+            from: from,
+            to: to,
+            id: id,
+            parent: parent,
+            path_tree: this.path_tree,
+        }, "Finished -> AddNode");
     }
 
     static pruneNode(id: string) {
@@ -85,6 +104,7 @@ export class PathManager {
     }
 
     private static updateParentChanges(node_id: string) {
+        record({node_id: node_id}, "Call -> updateParentChanges");
         let parent_id = this.path_tree[node_id].parent;
         if (parent_id === "-1") return;
         let parent = this.path_tree[parent_id];
@@ -92,6 +112,7 @@ export class PathManager {
             parent.changes.push({id: node_id, change: 0});
         }
         this.updateParentChanges(parent_id);
+        record({}, "Finished -> updateParentChanges");
     }
 
     static removeNode(id: string) {
@@ -99,20 +120,28 @@ export class PathManager {
     }
 
     private static getRelevants(node_id: string): { id: string; change: number }[][] {
-        if (this.path_tree[node_id].changes.length === 0) return undefined;
+        record({node_id: node_id, PathTree: this.path_tree}, "Call -> getRelevants");
+
+        if (this.path_tree[node_id].changes.length === 0) {
+            record({}, "Finished -> getRelevants by returning null");
+            return undefined;
+        }
 
         let relevant_changes: { id: string; change: number }[][] = [[]];
         let relevant_nodes: string[] = [];
 
         for (let change of this.path_tree[node_id].changes) {
-            relevant_changes[0].push(change);
             relevant_nodes.push(change.id);
+            if (this.path_tree[change.id].moveNull) {continue;}
+
+            relevant_changes[0].push(change);
         }
         this.path_tree[node_id].changes = [];
 
         for (let rel_node_id of relevant_nodes) {
             let rel_changes = this.getRelevants(rel_node_id);
-            if (rel_changes === undefined) continue;
+            record({IsRelChangesUndefined: rel_changes === undefined}, "Middle -> getRelevants");
+            if (rel_changes === undefined) {continue;}
             for (let i = 0; i < rel_changes.length; i++) {
                 if (relevant_changes.length > i + 1) {
                     rel_changes[i].forEach(change => relevant_changes[i + 1].push(change));
@@ -130,10 +159,12 @@ export class PathManager {
             return new_group;
         });
 
-        return (relevant_changes[0].length === 0) ? undefined : relevant_changes;
+        record({Return: (relevant_changes[0].length === 0 && relevant_changes.length === 1) ? undefined : relevant_changes}, "Finished -> getRelevants");
+        return (relevant_changes[0].length === 0 && relevant_changes.length === 1) ? undefined : relevant_changes;
     }
 
     private static completeChanges(node_id: string = this.top_node_id) {
+        record({node_id: node_id}, "Call -> completeChanges");
         if (node_id === "-1") return;
         let node = this.path_tree[node_id];
 
@@ -143,12 +174,16 @@ export class PathManager {
             }
             this.completeChanges(child_id);
         }
+
+        record({}, "Finished -> completeChanges");
     }
 
     static getChanges(): [string, number, number][] {
+        record({PathTree: this.path_tree}, "Call -> getChanges");
+
         let changes: [string, number, number][] = [];
 
-        this.completeChanges();
+        this.completeChanges(this.top_node_id);
 
         let relevants = this.getRelevants(this.top_node_id);
 
@@ -172,7 +207,196 @@ export class PathManager {
 
         console.log("CHANGES.....................................");
         console.log(changes);
+        record({changes: changes}, "Finished -> getChanges");
         return changes;
+    }
+
+    private static calculateOverlap(
+    c: {
+        from: [number, number]
+        to: [number, number]
+        change: number
+        start_from: [number, number, string]
+    }, part: {
+        from: [number, number]
+        to: [number, number]
+        change: number
+        start_from: [number, number, string]
+    }, _parts: {
+        from: [number, number]
+        to: [number, number]
+        change: number
+        start_from: [number, number, string]
+    }[], _insertion: {
+        from: [number, number]
+        to: [number, number]
+        change: number
+        start_from: [number, number, string]
+    }[][]) {
+        let direction: number = (this.rangedOverlap(c.from[0], c.to[0], part.from[0], part.to[0])) ? 0 : 1;
+        let positive: boolean = (c.to[direction] - c.from[direction] > 0);
+        let part_positive: boolean = (part.to[direction] - part.from[direction] > 0);
+        let bidirectional: boolean = (c.start_from[2] !== part.start_from[2]);
+
+        let parts: {
+            from: [number, number]
+            to: [number, number]
+            change: number
+            start_from: [number, number, string]
+        }[] = [];
+
+        let insertion: {
+            from: [number, number]
+            to: [number, number]
+            change: number
+            start_from: [number, number, string]
+        }[][] = [];
+
+        //RUles for deletion:
+        // 1. Delete the one with lower priority
+        // 2. If the one with higher prio is fully contained (isContained())
+        //    -> split the lower prio into two halfes (two parts)
+        // 3. remove from the lower prio part everything overlapping with the higher prio part
+        // 4. if the prio is the same -> start cutting from the "from" and if fully contained -> just delete
+
+        //priorities: "keep" over "add" over "remove"
+        if (c.change === part.change) { //prio is the same (Rule 4)
+            //remove from the from_part
+            if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
+                c.from = [-99, -99];
+                c.to = [-99, -99];
+                parts.push(part);
+            } else if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
+                //ignore to skip adding "part"
+            } else {
+                if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                    c.from[direction] = (bidirectional) ? (part.from[direction] + (positive ? 1 : -1)) : (part.to[direction] + (positive ? 1 : -1));
+                } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                    c.to[direction] = (bidirectional) ? (part.to[direction] + (positive ? -1 : 1)) : (part.from[direction] + (positive ? -1 : 1));
+                }
+                parts.push(part);
+            }
+        } else if (this.hasHigherPriority(c.change, part.change)) {
+            //c has higher priority
+            if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
+                //part is fully in c
+                //Rule 3 -> delete part by not adding it to "parts"
+            } else if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
+                //Rule 2 -> split part into two parts
+                parts = this.splitPart(part, c.from[direction], c.to[direction], direction, positive, bidirectional);
+                if (part.from[direction] === c.from[direction]) {
+                    parts.shift();
+                } else if (part.to[direction] === c.to[direction]) {
+                    parts.pop();
+                }
+            } else {
+                //Rule 3 -> delete Overlapping part
+                if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
+                    if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                        part.from[direction] = c.from[direction] + (part_positive ? 1 : -1);
+                    } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                        part.from[direction] = c.to[direction] + (part_positive ? 1 : -1);
+                    }
+                } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
+                    if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                        part.to[direction] = c.from[direction] + (part_positive ? -1 : 1);
+                    } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                        part.to[direction] = c.to[direction] + (part_positive ? -1 : 1);
+                    }
+                }
+                parts.push(part);
+            }
+        } else if (this.hasHigherPriority(part.change, c.change)) {
+            //part has higher priority
+            if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
+                //c is fully in part
+                //Rule 3 -> delete c by marking it
+                c.from = [-99, -99];
+                c.to = [-99, -99];
+                parts.push(part);
+            } else if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
+                //Rule 2 -> split part into two parts
+                let insert = this.splitPart(c, part.from[direction], part.to[direction], direction, part_positive, bidirectional);
+                if (part.from[direction] === c.from[direction]) {
+                    insert.shift();
+                } else if (part.to[direction] === c.to[direction]) {
+                    insert.pop();
+                }
+                insertion.push(insert);
+                c.from = [-101, -99]; //mark c for insertion later
+                c.to = [-99, -99];
+                parts.push(part);
+            } else {
+                //Rule 3 -> delete Overlapping part
+                if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
+                    if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
+                        c.from[direction] = part.from[direction] + (positive ? 1 : -1);
+                    } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
+                        c.from[direction] = part.to[direction] + (positive ? 1 : -1);
+                    }
+                } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
+                    if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
+                        c.to[direction] = part.from[direction] + (positive ? -1 : 1);
+                    } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
+                        c.to[direction] = part.to[direction] + (positive ? -1 : 1);
+                    }
+                }
+                parts.push(part);
+            }
+        }
+
+        return {parts: parts, insertion: insertion};
+    }
+
+    static convertCompact(changes: [string, number, number][]): {
+        from: [number, number],
+        to: [number, number],
+        change: number,
+        start_from: [number, number, string], //x, y, direction (n,s,e,w)
+    }[][] {
+
+        let field: number[][][] = [];
+        for (let x = 0; x < 16; x++) {
+            field.push([]);
+            for (let y = 0; y < 16; y++) {
+                field[x].push([0, -1]);
+            }
+        }
+        
+        for (let change of changes) {
+            let node = this.path_tree[change[0]];
+            let from = node.from;
+            let to = node.to;
+            let start_node = this.path_tree[node.parent];
+            let direction: string = "";
+            let change_type = change[1];
+            
+            if (to[0] - from[0] > 0) {
+                for (let j = 0; j <= to[0] - from[0]; j++) {
+                    if (this.hasHigherPriority(change_type, field[from[0]+j][from[1]][0])) {
+                        field[from[0] + j][from[1]] = [change_type, 1];
+                    }
+                }
+            } else if (to[0] - from[0] < 0) {
+                for (let j = 0; j >= to[0] - from[0]; j--) {
+                    if (this.hasHigherPriority(change_type, field[from[0]+j][from[1]][0])) {
+                        field[from[0] + j][from[1]] = [change_type, 3];
+                    }
+                }
+            } else if (to[1] - from[1] > 0) {
+                for (let j = 0; j <= to[1] - from[1]; j++) {
+                    if (this.hasHigherPriority(change_type, field[from[0]][from[1]+j][0])) {
+                        field[from[0]][from[1]+j] = [change_type, 0];
+                    }
+                }
+            } else if (to[1] - from[1] < 0) {
+                for (let j = 0; j >= to[1] - from[1]; j--) {
+
+                }
+            }
+        }
+
+        return undefined;
     }
 
     static unfoldCompact(changes: [string, number, number][]): {
@@ -181,6 +405,7 @@ export class PathManager {
         change: number,
         start_from: [number, number, string], //x, y, direction (n,s,e,w)
     }[][] {
+        record({changes: changes}, "Call -> unfoldCompact");
         let unfolded: {
             from: [number, number],
             to: [number, number],
@@ -198,6 +423,8 @@ export class PathManager {
         let edit_changes: string[] = [];
 
         for (let i = 0; i < changes.length; i++) {
+            record({Iteration: i, Change: changes[i], Changes: changes, Unfolded: unfolded}, "Iteration -> unfoldCompact");
+
             let change = changes[i];
             let node = this.path_tree[change[0]];
             let from = node.from;
@@ -274,107 +501,123 @@ export class PathManager {
                 start_from: [number, number, string],
             }[] = [];
 
+            let has_overlap = false;
             for (let ar of unfolded) {
                 label_c_for: for (let c of ar) {
                     if ((c.start_from[2] === part.start_from[2] || c.start_from[2] === this.flipDirection(part.start_from[2])) &&
-                        (this.rangedOverlap(c.from[0], c.to[0], part.from[0], part.to[0])
-                        || this.rangedOverlap(c.from[1], c.to[1], part.from[1], part.to[1]))
+                        ((this.rangedOverlap(c.from[0], c.to[0], part.from[0], part.to[0])  && !(c.from[0] === c.to[0] || part.from[0] === part.to[0]))
+                        || (this.rangedOverlap(c.from[1], c.to[1], part.from[1], part.to[1])  && !(c.from[1] === c.to[1] || part.from[1] === part.to[1])))
                     ) {
+                        has_overlap = true;
                         if (c.from[0] === -99 && c.from[1] === -99 && c.to[0] === -99 && c.to[1] === -99) {continue label_c_for;}
-                        let direction: number = (this.rangedOverlap(c.from[0], c.to[0], part.from[0], part.to[0])) ? 0 : 1;
-                        let positive: boolean = (c.to[direction] - c.from[direction] > 0);
-                        let part_positive: boolean = (part.to[direction] - part.from[direction] > 0);
-                        let bidirectional: boolean = (c.start_from[2] !== part.start_from[2]);
-
-                        //RUles for deletion:
-                        // 1. Delete the one with lower priority
-                        // 2. If the one with higher prio is fully contained (isContained())
-                        //    -> split the lower prio into two halfes (two parts)
-                        // 3. remove from the lower prio part everything overlapping with the higher prio part
-                        // 4. if the prio is the same -> start cutting from the "from" and if fully contained -> just delete
-
-                        //priorities: "keep" over "add" over "remove"
-                        if (c.change === part.change) { //prio is the same (Rule 4)
-                            //remove from the from_part
-                            if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
-                                c.from = [-99, -99];
-                                c.to = [-99, -99];
-                                parts.push(part);
-                            } else if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
-                                //ignore to skip adding "part"
-                            } else {
-                                if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
-                                    c.from[direction] = (bidirectional) ? (part.from[direction] + (positive ? 1 : -1)) : (part.to[direction] + (positive ? 1 : -1));
-                                } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
-                                    c.to[direction] = (bidirectional) ? (part.to[direction] + (positive ? -1 : 1)) : (part.from[direction] + (positive ? -1 : 1));
-                                }
-                                parts.push(part);
-                            }
-                        } else if (this.hasHigherPriority(c.change, part.change)) {
-                            //c has higher priority
-                            if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
-                                //part is fully in c
-                                //Rule 3 -> delete part by not adding it to "parts"
-                            } else if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
-                                //Rule 2 -> split part into two parts
-                                parts = this.splitPart(part, c.from[direction], c.to[direction], direction, positive, bidirectional);
-                            } else {
-                                //Rule 3 -> delete Overlapping part
-                                if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
-                                    if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
-                                        part.from[direction] = c.from[direction] + (part_positive ? 1 : -1);
-                                    } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
-                                        part.from[direction] = c.to[direction] + (part_positive ? 1 : -1);
-                                    }
-                                } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
-                                    if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
-                                        part.to[direction] = c.from[direction] + (part_positive ? -1 : 1);
-                                    } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
-                                        part.to[direction] = c.to[direction] + (part_positive ? -1 : 1);
-                                    }
-                                }
-                                parts.push(part);
-                            }
-                        } else if (this.hasHigherPriority(part.change, c.change)) {
-                            //part has higher priority
-                            if (this.isContained(part.from[direction], part.to[direction], c.from[direction], c.to[direction])) {
-                                //c is fully in part
-                                //Rule 3 -> delete c by marking it
-                                c.from = [-99, -99];
-                                c.to = [-99, -99];
-                                parts.push(part);
-                            } else if (this.isContained(c.from[direction], c.to[direction], part.from[direction], part.to[direction])) {
-                                //Rule 2 -> split part into two parts
-                                insertion.push(this.splitPart(c, part.from[direction], part.to[direction], direction, part_positive, bidirectional));
-                                c.from = [-101, -99]; //mark c for insertion later
-                                c.to = [-99, -99];
-                                parts.push(part);
-                            } else {
-                                //Rule 3 -> delete Overlapping part
-                                if (this.isBetween(part.from[direction], part.to[direction], c.from[direction])) {
-                                    if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
-                                        c.from[direction] = part.from[direction] + (positive ? 1 : -1);
-                                    } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
-                                        c.from[direction] = part.to[direction] + (positive ? 1 : -1);
-                                    }
-                                } else if (this.isBetween(part.from[direction], part.to[direction], c.to[direction])) {
-                                    if (this.isBetween(c.from[direction], c.to[direction], part.from[direction])) {
-                                        c.to[direction] = part.from[direction] + (positive ? -1 : 1);
-                                    } else if (this.isBetween(c.from[direction], c.to[direction], part.to[direction])) {
-                                        c.to[direction] = part.to[direction] + (positive ? -1 : 1);
-                                    }
-                                }
-                                parts.push(part);
-                            }
-                        }
+                        let calculated_overlap = this.calculateOverlap(c, part, parts, insertion);
+                        parts.push(...calculated_overlap.parts);
+                        insertion.push(...calculated_overlap.insertion);
+                    } else if (part.from[0] === part.to[0] && part.from[1] === part.to[1]) {
+                        has_overlap = true;
                     }
                 }
             }
 
             if (unfolded.length === 0) {
                 unfolded.push([part]);
+            } else if (!has_overlap) {
+                parts.push(part);
+            } else {
+                //test parts for every possible overlap it could
+                // have with unfolded or others in parts
+                let changes = true;
+                label_while_changes: while (changes) {
+                    changes = false;
+                    for (let ip = 0; ip < parts.length; ip++) {
+                        let p = parts[ip];
+
+
+                        for (let ic = ip + 1; ic < parts.length; ic++) {
+                            let c = parts[ic];
+
+                            if (c === p) {
+                                changes = true;
+                                parts.splice(ic, 1);
+                                continue label_while_changes;
+                            }
+
+                            if ((c.start_from[2] === p.start_from[2] || c.start_from[2] === this.flipDirection(p.start_from[2])) &&
+                                (this.rangedOverlap(c.from[0], c.to[0], p.from[0], p.to[0]) && !(c.from[0] === c.to[0] || p.from[0] === p.to[0]))
+                                || this.rangedOverlap(c.from[1], c.to[1], p.from[1], p.to[1]) && !(c.from[1] === c.to[1] || p.from[1] === p.to[1])) {
+                                changes = true;
+
+                                let calculated_overlap = this.calculateOverlap(c, p, [], []);
+                                let _parts = calculated_overlap.parts;
+                                let _insertion = calculated_overlap.insertion;
+
+                                //ic is always greater than ip, so we can safely remove the part from the array.
+
+                                if (c.from[0] === -99) {
+                                    parts.splice(ic, 1);
+                                } else if (c.from[0] === -101) {
+                                    parts.splice(ic, 1);
+                                    parts.push(...(_insertion[0]));
+                                }
+
+                                parts.splice(ip, 1);
+                                if (_parts.length > 0) {
+                                    parts.push(..._parts);
+                                }
+
+                                continue label_while_changes;
+                            }
+                        }
+
+                        for (let ar of unfolded) {
+                            for (let ic = 0; ic < ar.length; ic++) {
+                                let c = ar[ic];
+
+                                if ((c.start_from[2] === p.start_from[2] || c.start_from[2] === this.flipDirection(p.start_from[2])) &&
+                                    (this.rangedOverlap(c.from[0], c.to[0], p.from[0], p.to[0]) && !(c.from[0] === c.to[0] || p.from[0] === p.to[0]))
+                                    || this.rangedOverlap(c.from[1], c.to[1], p.from[1], p.to[1]) && !(c.from[1] === c.to[1] || p.from[1] === p.to[1])) {
+                                    changes = true;
+                                    let _parts: {
+                                        from: [number, number],
+                                        to: [number, number],
+                                        change: number,
+                                        start_from: [number, number, string]
+                                    }[] = [];
+
+                                    let _insertion: {
+                                        from: [number, number],
+                                        to: [number, number],
+                                        change: number,
+                                        start_from: [number, number, string]
+                                    }[][] = [];
+
+                                    let calculated_overlap = this.calculateOverlap(c, p, _parts, _insertion);
+                                    _parts = calculated_overlap.parts;
+                                    _insertion = calculated_overlap.insertion;
+
+                                    if (c.from[0] === -99 /*&& c.from[1] === -99 && c.to[0] === -99 && c.to[1] === -99*/) {
+                                        ar.splice(ic, 1);
+                                    } else if (c.from[0] === -101) {
+                                        ar.splice(ic, 1);
+                                        ar.push(...(_insertion[0]));
+                                    }
+
+                                    parts.splice(ip, 1);
+                                    if (_parts.length > 0) {
+                                        parts.push(..._parts);
+                                    }
+
+                                    continue label_while_changes;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
+            record({Iteration: i, Change: changes[i], Changes: changes, Unfolded: unfolded}, "Iteration Middle -> unfoldCompact");
+
+            //add insertions or delete c
             unfolded = unfolded.map(ar => {
                 let group: {
                     from: [number, number],
@@ -394,13 +637,14 @@ export class PathManager {
                 return group;
             }).filter(ar => ar.length !== 0);
 
+            record({Iteration: i, Change: changes[i], Changes: changes, Unfolded: unfolded}, "Iteration Middle after Filter -> unfoldCompact");
+
+            //add parts
             if (parts.length !== 0) {
                 if (change[2] === 1) {
                     unfolded.push(parts);
                 } else {
-                    for (let x = 0; x < parts.length; x++) {
-                        unfolded[unfolded.length - 1].push(parts[x]);
-                    }
+                    unfolded[unfolded.length - 1].push(...parts);
                 }
             }
         }
@@ -408,6 +652,7 @@ export class PathManager {
         /*unfolded = unfolded.map(ar => ar.filter(
             c => !(c.from[0] === c.to[0] && c.from[1] === c.to[1])));*/
 
+        record({Unfolded: unfolded}, "Finished -> unfoldCompact");
         return unfolded;
     }
 

@@ -1,6 +1,7 @@
 import { Actions, Action } from "./Actions.js";
 //import { Utils } from "./Utils.ts";
 import { PathManager } from "./PathManager.ts";
+import { record } from "./recorder.cjs";
 
 export class BackendManager {
     in_button_active = [true, false, false];
@@ -107,10 +108,22 @@ export class BackendManager {
             }
         }*/
         if (PathManager.hasTopNode()) {
-            if (PathManager.canPlay() && false) {
+            if (PathManager.canPlay()) {
                 console.log("Sending path updates");
-                let changes = PathManager.unfold(PathManager.getChanges());
-                this.f_sync.push(new Action({action: "update_path", data: {path: {data: changes}, id: changes[0][changes[0].length-1]}}));
+                record({}, "Call -> f_handleUpdate: Sending path updates");
+                let changes = PathManager.unfoldCompact(PathManager.getChanges());
+                //this.f_sync.push(new Action({action: "update_path", data: {path: {data: changes}, id: changes[0][changes[0].length-1]}}));
+                console.log("Unfolded Changes:");
+                console.log(changes);
+                record({changes: changes}, "Middle -> f_handleUpdate: Unfolded Changes");
+                this.f_sync.push(new Action({
+                    action: "update_path",
+                    data: {
+                        changes: changes,
+                        id: PathManager.top_node_id
+                    }
+                }));
+                record({}, "Finished -> f_handleUpdate: Sending path updates");
             }
         }
 
@@ -168,6 +181,7 @@ export class BackendManager {
                     this.in_maze.paths[id].iterations[it].playing = false;
                 }*/
                 //this.in_maze.path_tree[data.id].playing = data.state === "started";
+                console.log("Update Playing State: " + data.state);
                 PathManager.setPlayingState(data.state);
                 break;
             case "double_path_update":
@@ -199,9 +213,11 @@ export class BackendManager {
         console.log(data, data[0]["MicromouseEvent"]);
         console.log("--------------------------------------------------------------------");*/
 
-        console.log("..........................................................");
+        /*console.log("..........................................................");
         console.log(JSON.stringify(message));
-        console.log(";;;;;;;;;;;;;");
+        console.log(";;;;;;;;;;;;;");*/
+
+        record({Message: message}, "Call -> b_handlePost");
 
         main: for (let index in message) {
             let data = message[index];
@@ -216,7 +232,9 @@ export class BackendManager {
                     continue main;
                 }
             } else if (data["VisualEvent"] !== undefined) {
+                console.log("--VisualEvent");
                 let event = data["VisualEvent"];
+                console.log(JSON.stringify(event));
                 if (event["PathVisualEvent"] !== undefined) {
                     //let hash = this.generateHash(JSON.stringify(event["PathVisualEvent"]["associated_node"]));
                     let id = JSON.stringify(event["PathVisualEvent"]["associated_node"]);
@@ -291,7 +309,8 @@ export class BackendManager {
                 //this.b_sync(Actions.b_error("recv", "incorrect_data", ["type"]));
             }
         }
-        console.log("..........................................................--");
+        record({}, "Finished -> b_handlePost");
+        //console.log("..........................................................--");
     } //backend
 
     update_parent_changes(hash) {
@@ -357,21 +376,21 @@ export class BackendManager {
         }
 
         if (wall_disc.length !== 0) {
-            console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++");
+            /*console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++");
             console.log(JSON.stringify(wall_disc));
-            console.log("----------------------------------------------------");
+            console.log("----------------------------------------------------");*/
             for (let i = 0; i < wall_disc.length; i++) {
                 let disc = wall_disc[i];
-                console.log(JSON.stringify(disc));
+                //console.log(JSON.stringify(disc));
                 if (disc["new_status"] === "Visited") {
                     if (!this.b_wall_exists(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"])) {
                         this.b_add_wall(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"]);
                     }
                 } else if (disc["new_status"]["Exists"] !== undefined) {
                     if (disc["new_status"]["Exists"]) {
-                        console.log("++Exists: " + disc["new_status"]["Exists"]);
+                        //console.log("++Exists: " + disc["new_status"]["Exists"]);
                         if (!this.b_wall_exists(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"])) {
-                            console.log("++++Added Wall");
+                            //console.log("++++Added Wall");
                             this.b_add_wall(disc["from_cell"]["x"], disc["from_cell"]["y"], disc["in_direction"]);
                         }
                     }

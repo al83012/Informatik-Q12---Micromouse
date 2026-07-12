@@ -363,9 +363,9 @@ export class Actions {
         return {
             StrategyChange: {
                 set_strategy: {
-                    FollowWall: {
-                        follow_wall: "Right",
-                        measure_all: false
+                    DepthFirst: {
+                        path_ranking: "TowardsGoal",
+                        prune_dead_ends: true,
                     }
                 },
                 reset_map: true

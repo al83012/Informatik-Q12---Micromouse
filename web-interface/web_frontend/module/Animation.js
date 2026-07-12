@@ -20,10 +20,18 @@ export class Animation {
     duration;
     finished = false;
 
-    constructor(duration, object) {
-        this.duration = duration;
-        this.remaining_duration = duration;
-        this.object = object;
+    constructor(duration, object, ignore=false) {
+        if (ignore) return;
+
+        if (object !== null) {
+            this.duration = duration;
+            this.remaining_duration = duration;
+            this.object = object;
+            this.has_animation = object?.has_animation ?? false;
+        } else {
+            console.log("[ERROR] -> Animation: object is null");
+            throw new Error("Animation: object is null");
+        }
     }
 
     execute() {};
@@ -298,11 +306,23 @@ export class AnimBorderColor extends Animation {
 
 export class AnimCssChange extends Animation {
     constructor(duration, object, items, replacement) {
-        super(duration, object);
-        this.log_name = object.className;
-        //console.log(this.log_name);
-        this.items = items;
-        this.replacement = replacement;
+        if (object !== null) {
+            super(duration, object);
+            if (this.has_animation) {
+                console.log("Possible collision with existing AnimCssChange: " + (object?.css_change_anim_repl ?? "no-anim"));
+            } else {
+                object.has_animation = true;
+                object.css_change_anim_repl = replacement;
+            }
+
+            this.log_name = object.className;
+            //console.log(this.log_name);
+            this.items = items;
+            this.replacement = replacement;
+        } else {
+            super(duration, null);
+            this.has_animation = true;
+        }
     }
 
     execute() {
@@ -311,14 +331,15 @@ export class AnimCssChange extends Animation {
         }
 
         try {
-            if (this.duration === this.remaining_duration) {
-                for (let i = 0; i < this.items.length; i++) {
-                    if (this.object.className.includes(" " + this.items[i])) {
-                        this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
-                        break;
+            if (this.object !== null) {
+                if (this.duration === this.remaining_duration) {
+                    for (let i = 0; i < this.items.length; i++) {
+                        if (this.object.className.includes(" " + this.items[i])) {
+                            this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
+                            break;
+                        }
                     }
                 }
-
             }
         } catch (e) {
             console.log("Error in AnimCssChange of tile: " + this.log_name);
@@ -518,7 +539,7 @@ export class AnimGroup extends Animation {
     rem_animations = [];
 
     constructor(delay, action) {
-        super(-1, null); //ignore
+        super(-1, null, true); //ignore
         this.delay = delay;
         this.current_delay = delay;
         if (action !== undefined) {
@@ -615,6 +636,11 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles, ignore_group,
 
             let duration = 0; //add 5 to the end to make it seamless
             for (let j = 0; j < part.length; j += 2) {
+                console.log("tiles: ");
+                console.log(tiles);
+                console.log("J: " + j);
+                console.log("length: " + tiles[[part[j], part[j + 1]]].length);
+                console.log("coords: " + part[j] + ", " + part[j + 1]);
                 duration += tiles[[part[j], part[j + 1]]].length * anim_time;
             }
             duration /= 3;
