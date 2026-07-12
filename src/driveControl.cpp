@@ -1,6 +1,9 @@
 #include "driveControl.h"
 #include "Arduino.h"
 #include "Components/drv8424.h"
+#include "colors.h"
+
+using namespace COLORS;
 
 namespace DRIVECONTROL {
      float kp = 0.6;
@@ -49,12 +52,21 @@ namespace DRIVECONTROL {
         kd = kD;
     }
 
+
+    void resetEncoders() {
+        log_d("# (DRIVECONTROL) Resetting encoders...");
+        noInterrupts(); 
+        DRV8424::encoderCount1 = 0;
+        DRV8424::encoderCount2 = 0;
+        interrupts(); 
+        log_d("# (DRIVECONTROL) Encoders reset: encoderCount1=%ld, encoderCount2=%ld", DRV8424::encoderCount1, DRV8424::encoderCount2);
+    }
+
     void forward(float distanceCm, float baseSpeedPercentage) {
-        log_i("# (DRIVECONTROL) Moving forward: Distance = %f cm, Base Speed = %f%%", distanceCm, baseSpeedPercentage);
+        log_i("# (DRIVECONTROL) Moving forward: Distance =" CYAN "%f cm, Base Speed =" MAGENTA "%f%%", distanceCm, baseSpeedPercentage);
         long targetTicks = DRV8424::calculateTargetTicks(distanceCm);
         
-        DRV8424::encoderCount1 = 0; // Motor 1 = Links
-        DRV8424::encoderCount2 = 0; // Motor 2 = Rechts
+        resetEncoders();
         resetPID();
 
 
@@ -90,8 +102,9 @@ namespace DRIVECONTROL {
         DRV8424::setSpeedPercentage2(0);
 }
 
+
 void backward(float distanceCm, float baseSpeedPercentage) {
-    log_i("# (DRIVECONTROL) Moving backward: Distance = %f cm, Base Speed = %f%%", distanceCm, baseSpeedPercentage);
+    log_i("# (DRIVECONTROL) Moving backward: Distance =" CYAN "%f cm, Base Speed =" MAGENTA "%f%%", distanceCm, baseSpeedPercentage);
     long targetTicks = DRV8424::calculateTargetTicks(distanceCm);
     
     DRV8424::encoderCount1 = 0;

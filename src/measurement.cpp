@@ -8,7 +8,9 @@
 #include "Components/tmp464.h"
 #include "Components/tpl0102.h"
 #include "Components/vl53l4cd.h"
+#include "colors.h"
 
+using namespace COLORS;
 void Measurement::Sensors::e_sensor(SensorNames SensorName, std::string errorMessage) {
     std::string message = std::string(Measurement::Sensors::to_string(SensorName)) + " " + errorMessage;
 
@@ -98,7 +100,7 @@ void Measurement::Sensors::sendSensorData(SensorData data, float value) {
 }
 
 void Measurement::IR::Emitters::initIR_LEDs() {
-    log_i("# Setting IR_LED_PINS to OUTPUT...");
+    log_d("# Setting IR_LED_PINS to OUTPUT...");
 
     for (int i = 0; i < 4; i++)
     {
@@ -109,7 +111,7 @@ void Measurement::IR::Emitters::initIR_LEDs() {
 }
 
 void Measurement::IR::Receivers::initPhotoSensors() {
-    log_i("# Setting PD_PINS to INPUT...");
+    log_d("# Setting PD_PINS to INPUT...");
 
     for (int i = 0; i < 4; i++)
     {
@@ -118,10 +120,10 @@ void Measurement::IR::Receivers::initPhotoSensors() {
 }
 
 int Measurement::IR::Receivers::readAmbientNoise(int channel) {
-    log_i("# Trying to read ambient noise on channel %d", channel);
+    log_d("# Trying to read ambient noise on channel %d", channel);
 
     if(channel >= 4 || channel < 0) {
-        log_e("# Invalid channel for reading ambient noise!");
+        log_e(RED "# Invalid channel for reading ambient noise!");
         return 0;
     }
     int noise = analogRead(Measurement::IR::RECEIVERS[channel]);
@@ -129,9 +131,9 @@ int Measurement::IR::Receivers::readAmbientNoise(int channel) {
 }
 
 void Measurement::IR::Emitters::enableLED(int channel) {
-    log_i("# Trying to enable IR_LED on channel %d", channel);
+    log_d("# Trying to enable IR_LED on channel %d", channel);
     if(channel > 4 || channel < 0) {
-    log_e("# Invalid channel for pulsing IR_LED!");
+    log_e(RED "# Invalid channel for pulsing IR_LED!");
     return;
     } else {
     digitalWrite(EMITTERS[channel], HIGH);
@@ -139,7 +141,7 @@ void Measurement::IR::Emitters::enableLED(int channel) {
 }
 
 void Measurement::IR::Emitters::disableLED(int channel) {
-    log_i("# Trying to disable IR_LED on channel %d", channel);
+    log_d("# Trying to disable IR_LED on channel %d", channel);
 
     //No print statements or logic for turning off to save time
 
@@ -153,9 +155,9 @@ int Measurement::IR::Receivers::readDistance(int channel) {
 
 void Measurement::IR::refreshDistance(int channel) {
 
-    log_i("# Trying to refresh distance on channel %d", channel);
+    log_d("# Trying to refresh distance on channel %d", channel);
     if(channel > 4 || channel < 0) {
-        log_e("# Invalid channel for refreshing distance");
+        log_e(RED "# Invalid channel for refreshing distance");
     }
 
     refreshNoise(channel);
@@ -173,10 +175,10 @@ void Measurement::IR::refreshDistance(int channel) {
 }
 
 void Measurement::IR::refreshNoise(int channel) {
-     log_i("# Refreshing noise on channel %d", channel);
+     log_d("# Refreshing noise on channel %d", channel);
 
     if(channel > 4 || channel < 0) {
-        log_e("# Invalid channel for refreshing ambient noise!");
+        log_e(RED "# Invalid channel for refreshing ambient noise!");
         return;
     } else {
         Noises[channel] = Measurement::IR::Receivers::readAmbientNoise(channel);
@@ -200,24 +202,151 @@ int Measurement::IR::getNoise(int channel) {
 }
 
 void Measurement::IR::debugPrintRawDistance(int channel) {
-    log_i("# Noise of channel %d : %d", channel, Noises[channel]);
-    log_i("# Raw value of channel %d : %d", channel, FinalDistances_Unconverted[channel]);
+    log_i("# Noise of channel" CYAN "%d : %d", channel, Noises[channel]);
+    log_i("# Raw value of channel" MAGENTA "%d : %d", channel, FinalDistances_Unconverted[channel]);
 
 } 
 
 void Measurement::IR::init() {
-    log_i("# Initializing IR-Sensor-System");
+    log_d("# Initializing IR-Sensor-System");
     Measurement::IR::Emitters::initIR_LEDs();
     Measurement::IR::Receivers::initPhotoSensors();
 }
 
 void Measurement::Sensors::reportTemperature() {
 
-    log_i("# Reporting temperature...");
+    log_d("# Reporting temperature...");
     Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_LOCAL, TMP464::readLocalTemperature());
     Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_REMOTE_1, TMP464::readRemoteTemperature(0x01));
     Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_REMOTE_2, TMP464::readRemoteTemperature(0x02));
     Measurement::Sensors::sendSensorData(Measurement::Sensors::SensorData::TMP_TEMP_REMOTE_3, TMP464::readRemoteTemperature(0x03));
 
     
+}
+
+void Measurement::IR::calibration::calibrateWallThresholdLeft() {
+    log_d("# Calibrating wall threshold for left side...");
+    refreshDistance(Measurement::IR::CHANNEL_LEFT);
+    int leftDistance = Measurement::IR::getDistance(Measurement::IR::CHANNEL_LEFT);
+    log_d("# Left distance:" CYAN " %d", leftDistance);
+    Measurement::IR::calibration::wallThresholdLeft = leftDistance; 
+}
+
+void Measurement::IR::calibration::calibrateWallThresholdRight() {
+    log_d("# Calibrating wall threshold for right side...");
+    refreshDistance(Measurement::IR::CHANNEL_RIGHT);
+    int rightDistance = Measurement::IR::getDistance(Measurement::IR::CHANNEL_RIGHT);
+    log_d("# Right distance:" CYAN " %d", rightDistance);
+    Measurement::IR::calibration::wallThresholdRight = rightDistance; 
+}
+
+void Measurement::IR::calibration::calibrateWallThresholdFront() {
+    log_d("# Calibrating wall threshold for front side...");
+    refreshDistance(Measurement::IR::CHANNEL_FRONT1);
+    refreshDistance(Measurement::IR::CHANNEL_FRONT2);
+
+    int frontDistance1 = Measurement::IR::getDistance(Measurement::IR::CHANNEL_FRONT1);
+    int frontDistance2 = Measurement::IR::getDistance(Measurement::IR::CHANNEL_FRONT2);
+    int averageDistance = (frontDistance1 + frontDistance2) / 2;
+    log_d("# Front distance:" CYAN " %d", averageDistance);
+    Measurement::IR::calibration::wallThresholdFront = averageDistance; 
+}
+
+void Measurement::IR::calibration::initCalibration(int calibrationSteps) {
+    wallThresholdLeft = 0;
+    wallThresholdRight = 0;
+    wallThresholdFront = 0;
+    absoluteWallThreshold = 0;
+    log_d("# Initialized wall thresholds to 0");
+    log_i(RED "# CALIBRATION INITIALIZED: Please ensure that the robot is placed in a safe environment for calibration. The robot will measure distances to walls and set thresholds accordingly.");
+    log_i(RED "# Calibration will start in 10 seconds...");
+    delay(10000);
+    log_i(GREEN "# Calibration started...");
+    int totalLeft = 0;
+    int totalRight = 0;
+    int totalFront = 0;
+
+    for(int i = 0; i < calibrationSteps; i++) {
+        log_i(RED "# Calibration step" GREEN "%d of %d", i+1, calibrationSteps);
+        
+        calibrateWallThresholdLeft();
+        totalLeft += Measurement::IR::calibration::wallThresholdLeft;
+        delay(500);
+        calibrateWallThresholdRight();
+        totalRight += Measurement::IR::calibration::wallThresholdRight;
+        delay(500);
+        calibrateWallThresholdFront();
+        totalFront += Measurement::IR::calibration::wallThresholdFront;
+        delay(500);
+    }
+    Measurement::IR::calibration::wallThresholdLeft = totalLeft / calibrationSteps;
+    Measurement::IR::calibration::wallThresholdRight = totalRight / calibrationSteps;
+    Measurement::IR::calibration::wallThresholdFront = totalFront / calibrationSteps;
+
+    log_i(GREEN "# Calibration completed. Wall thresholds set:");
+
+    log_i(RED "# Left Wall Threshold: " CYAN "%d", Measurement::IR::calibration::wallThresholdLeft);
+    log_i(BLUE "# Right Wall Threshold: " CYAN "%d", Measurement::IR::calibration::wallThresholdRight);
+    log_i(MAGENTA "# Front Wall Threshold: " CYAN "%d", Measurement::IR ::calibration::wallThresholdFront);
+}
+
+
+bool Measurement::IR::WallDetection::RefreshWallLeft() {
+    Measurement::IR::refreshDistance(Measurement::IR::CHANNEL_LEFT);
+    int leftDistance = Measurement::IR::getDistance(Measurement::IR::CHANNEL_LEFT);
+
+    if(leftDistance < Measurement::IR::calibration::wallThresholdLeft+(Measurement::IR::calibration::wallThresholdLeft * Measurement::IR::WallDetection::tolerancePercent / 100)) {
+        isWallLeft = true;
+    } else {
+        isWallLeft = false;
+    }
+
+
+    return isWallLeft;
+}
+
+bool Measurement::IR::WallDetection::RefreshWallRight() {
+    Measurement::IR::refreshDistance(Measurement::IR::CHANNEL_RIGHT);
+    int rightDistance = Measurement::IR::getDistance(Measurement::IR::CHANNEL_RIGHT);
+
+    if(rightDistance < Measurement::IR::calibration::wallThresholdRight+(Measurement::IR::calibration::wallThresholdRight * Measurement::IR::WallDetection::tolerancePercent / 100)) {
+        isWallRight = true;
+    } else {
+        isWallRight = false;
+    }
+
+    return isWallRight;
+}
+
+bool Measurement::IR::WallDetection::RefreshWallFront() {
+    Measurement::IR::refreshDistance(Measurement::IR::CHANNEL_FRONT1);
+    Measurement::IR::refreshDistance(Measurement::IR::CHANNEL_FRONT2);
+
+    int frontDistance1 = Measurement::IR::getDistance(Measurement::IR::CHANNEL_FRONT1);
+    int frontDistance2 = Measurement::IR::getDistance(Measurement::IR::CHANNEL_FRONT2);
+
+    int averageFrontDistance = (frontDistance1 + frontDistance2) / 2;
+
+    if(averageFrontDistance < Measurement::IR::calibration::wallThresholdFront+(Measurement::IR::calibration::wallThresholdFront * Measurement::IR::WallDetection::tolerancePercent / 100)) {
+        isWallFront = true;
+    } else {
+        isWallFront = false;
+    }
+
+    return isWallFront;
+}
+
+void Measurement::IR::WallDetection::RefreshAllWalls() {
+    RefreshWallLeft();
+    RefreshWallRight();
+    RefreshWallFront();
+}
+
+
+void Measurement::IR::WallDetection::debugPrintWallDetectionStatus() {
+    RefreshAllWalls();
+    log_i("# Wall Detection Status:");
+    log_i("# Left Wall: " CYAN "%s", isWallLeft ? GREEN "Y" : RED "N");
+    log_i("# Right Wall: " CYAN "%s", isWallRight ? GREEN "Y" : RED "N");
+    log_i("# Front Wall: " CYAN "%s", isWallFront ? GREEN "Y" : RED "N");
 }

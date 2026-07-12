@@ -15,6 +15,10 @@
 #include "measurement.h"
 #include "driveControl.h"
 #include "i2ctool.h"
+#include "colors.h"
+
+using namespace COLORS;
+
 
 void setup() {
 delay(1000);
@@ -22,14 +26,13 @@ log_i("# Initializing Setup");
 Esp32::initESP32();
 // Network::setup();
 
- log_i("# Setup done!");
  I2CTOOL::I2CScanner();
 
  TPL0102::DbgPrintVoltages();
  TMP464::DbgPrintTemperatures(); 
 
 
- log_i("# Setup done!");
+ log_i(GREEN "# Setup done!");
    // DRIVECONTROL::forward(30, 15);
  DRV8424::setDutyCycle1(40);
  DRV8424::setDutyCycle2(40);
@@ -46,7 +49,10 @@ void loop() {
 
 
 
-/* Measurement::IR::refreshDistance(1);
+/* 
+DEBUG: TEST IR-SENSORS
+
+Measurement::IR::refreshDistance(1);
 Measurement::IR::debugPrintRawDistance(1);
 
 Measurement::IR::refreshDistance(0);
@@ -58,4 +64,21 @@ Measurement::IR::debugPrintRawDistance(2);
 Measurement::IR::refreshDistance(3);
 Measurement::IR::debugPrintRawDistance(3);
 */
+
+
+
+/*
+DEBUG: THRESHOLD CALIBRATION
+Measurement::IR::calibration::initCalibration(5);
+
+
+DEBUG: TEST WALL DETECTION
+Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
+*/
+
+
+
+
+
+
 }

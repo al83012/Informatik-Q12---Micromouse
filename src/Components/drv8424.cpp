@@ -4,6 +4,8 @@
 #include "Arduino.h"
 #include "Wire.h"
 #include "Components/tcal6408.h"
+#include "colors.h"
+using namespace COLORS;
 
 namespace DRV8424 {
     volatile long encoderCount1 = 0;
@@ -32,8 +34,8 @@ void DRV8424::init(int frequency) {
 
     TCAL6408::setDriverAwake(true);
 
-    attachInterrupt(digitalPinToInterrupt(ENC_A1), DRV8424::readEncoder1, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ENC_A2), DRV8424::readEncoder2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ENC_A1), DRV8424::readEncoder1, RISING);
+    attachInterrupt(digitalPinToInterrupt(ENC_A2), DRV8424::readEncoder2, RISING);
 
     setFrequency(frequency);
   
@@ -45,10 +47,9 @@ bool DRV8424::assureSafeCurrent() {
 }
 
 void DRV8424::readEncoder1() {
-    bool encA1 = digitalRead(ENC_A1);
     bool encB1 = digitalRead(ENC_B1);
 
-    if(encA1 != encB1) {
+    if(encB1 == HIGH) {
         encoderCount1++;
         direction1 = true;
     } else {
@@ -56,29 +57,28 @@ void DRV8424::readEncoder1() {
         direction1 = false;
     }
     
-   // log_i("Interrupt: ENC_A1 changed. Encoder Count 1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
+   // log_d("Interrupt: ENC_A1 changed. Encoder Count 1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
 }
 
 void DRV8424::readEncoder2() {
-    bool encA2 = digitalRead(ENC_A2);
     bool encB2 = digitalRead(ENC_B2);
 
-    if(encA2 != encB2) {
-        encoderCount2--;
+    if(encB2 == HIGH) {
+        encoderCount2++;
         direction2 = true;
     } else {
-        encoderCount2++;
+        encoderCount2--;
         direction2 = false;
     }
 
- //   log_i("Interrupt: ENC_A2 changed. Encoder Count 2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
+ //   log_d("Interrupt: ENC_A2 changed. Encoder Count 2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
 
 }
 
 void DRV8424::debugPrintEncoderCounts() {
     log_i("---------DRV8424 ENCODER COUNTS (DRV8424)---------");
-    log_i("# ENC_1: %ld, Direction: %s", encoderCount1, direction1 ? "Forward" : "Reverse");
-    log_i("# ENC_2: %ld, Direction: %s", encoderCount2, direction2 ? "Forward" : "Reverse");
+    log_i("# ENC_1:" RED "%ld, Direction: " MAGENTA "%s", encoderCount1, direction1 ? "Forward" : "Reverse");
+    log_i("# ENC_2: " RED "%ld, Direction: " MAGENTA "%s", encoderCount2, direction2 ? "Forward" : "Reverse");
     log_i("---------------------------------------");
 }
 

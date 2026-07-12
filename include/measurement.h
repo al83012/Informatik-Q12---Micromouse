@@ -12,6 +12,11 @@ namespace Measurement {
         constexpr int EMITTERS[4] = {IRLED_0, IRLED_1, IRLED_2, IRLED_3};
         constexpr int RECEIVERS[4] = {PD_0, PD_1, PD_2, PD_3};
 
+        constexpr int CHANNEL_RIGHT = 2;
+        constexpr int CHANNEL_LEFT = 1;
+        constexpr int CHANNEL_FRONT1 = 0;
+        constexpr int CHANNEL_FRONT2 = 3;
+
        inline int FinalDistances_Unconverted[4];
        inline int RawDistances_Unconverted[4];
        inline int Noises[4];
@@ -44,6 +49,40 @@ namespace Measurement {
             int readAmbientNoise(int channel);
             
         }
+
+        namespace calibration {
+            inline int wallThresholdLeft;
+            inline int wallThresholdRight;
+            inline int wallThresholdFront;
+
+            inline int absoluteWallThreshold;
+
+            void calibrateWallThresholdLeft();
+            void calibrateWallThresholdRight();
+            void calibrateWallThresholdFront();
+
+            void initCalibration(int calibrationSteps);
+
+        }
+
+        namespace WallDetection {
+            constexpr int tolerancePercent = 10;
+
+
+           inline bool isWallLeft;
+            inline bool isWallRight;
+            inline bool isWallFront;
+
+            bool RefreshWallLeft();
+            bool RefreshWallRight();
+            bool RefreshWallFront();
+
+            void RefreshAllWalls();
+
+            void debugPrintWallDetectionStatus();
+
+        }
+
 
     } 
     

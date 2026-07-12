@@ -2,7 +2,9 @@
 #include "Arduino.h"
 #include "Components/esp32.h"
 #include "i2ctool.h"
+#include "colors.h"
 
+using namespace COLORS;
 // Temperature Sensor
 using namespace TMP464;
 using namespace I2CTOOL;
@@ -49,7 +51,7 @@ float TMP464::convertToCelsius(uint16_t rawValue) {
 
 void TMP464::setLocalThermLimit(uint16_t limit) {
     if(limit > 256) {
-    log_e("# Invalid temperature limit (LocalTempLimit - TMP464)!");
+    log_e(RED "# Invalid temperature limit (LocalTempLimit - TMP464)!");
     uint16_t formatted_limit = limit << 8;
     } else {
     I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_LOCAL_THERM_LIMIT, limit);
@@ -58,7 +60,7 @@ void TMP464::setLocalThermLimit(uint16_t limit) {
 
 void TMP464::setLocalTherm2Limit(uint16_t limit) {
     if(limit > 256) {
-    log_e("# Invalid temperature limit2 (LocalTempLimit2 - TMP464)!");
+    log_e(RED "# Invalid temperature limit2 (LocalTempLimit2 - TMP464)!");
     uint16_t formatted_limit = limit << 8;
     } else {
     I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_LOCAL_THERM2_LIMIT, limit);
@@ -68,7 +70,7 @@ void TMP464::setLocalTherm2Limit(uint16_t limit) {
 void TMP464::setRemoteThermLimit(uint8_t channel, uint16_t limit) {
     log_d("# (TMP464) Trying to set RemoteTemp Limit %d", limit , "for channel %d", channel);
     if(limit > 256) {
-    log_e("# Invalid temperature limit (RemoteTemp - TMP464)!");
+    log_e(RED "# Invalid temperature limit (RemoteTemp - TMP464)!");
     uint16_t formatted_limit = limit << 8;
     } else {
     
@@ -81,7 +83,7 @@ void TMP464::setRemoteThermLimit(uint8_t channel, uint16_t limit) {
     } else if(channel == 4) {
         I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_4_THERM_LIMIT, limit);
     } else {
-        log_e("# (TMP464) Error while trying to set remote temperature: Invalid channel!");
+        log_e(RED "# (TMP464) Error while trying to set remote temperature: Invalid channel!");
     }
 
     }
@@ -91,7 +93,7 @@ void TMP464::setRemoteThermLimit(uint8_t channel, uint16_t limit) {
 void TMP464::setRemoteTherm2Limit(uint8_t channel, uint16_t limit) {
     log_d("# (TMP464) Trying to set RemoteTemp Limit %d", limit , "for channel %d", channel);
     if(limit > 256) {
-    log_e("# Invalid temperature limit (RemoteTemp - TMP464)!");
+    log_e(RED "# Invalid temperature limit (RemoteTemp - TMP464)!");
     uint16_t formatted_limit = limit << 8;
     } else {
     
@@ -104,7 +106,7 @@ void TMP464::setRemoteTherm2Limit(uint8_t channel, uint16_t limit) {
     } else if(channel == 4) {
         I2C1Write(ComponentVars::I2C_ADDRESS, ComponentVars::REG_REMOTE_4_THERM2_LIMIT, limit);
     } else {
-        log_e("# (TMP464) Error while trying to set remote temperature: Invalid channel!");
+        log_e(RED "# (TMP464) Error while trying to set remote temperature: Invalid channel!");
     }
 
     }
@@ -137,9 +139,9 @@ void TMP464::setShutdownMode(bool enableShutDown) {
     I2C1Read(ComponentVars::I2C_ADDRESS, ComponentVars::REG_CONFIG, current_reg);
     if(enableShutDown) {
         current_reg |= (1 << 5);
-        log_d("# Succesfuly enabled shutdown mode! (TMP464) ");
+        log_d(GREEN "# Succesfuly enabled shutdown mode! (TMP464) ");
     } else {
-        log_d("# Succesfuly disabled shutdown mode! (TMP464) ");
+        log_d(GREEN "# Succesfuly disabled shutdown mode! (TMP464) ");
         current_reg &= ~(1 << 5);
     }
 
@@ -149,11 +151,11 @@ void TMP464::setShutdownMode(bool enableShutDown) {
 
 void TMP464::DbgPrintTemperatures() {
     log_i("---------TEMPERATURES (TMP464)---------");
-    log_i("# LOCAL: %f", readLocalTemperature());
-    log_i("# REMOTE_1: %f", readRemoteTemperature(0x01));
-    log_i("# REMOTE_2: %f", readRemoteTemperature(0x02));
-    log_i("# REMOTE_3: %f", readRemoteTemperature(0x03));
-   // log_i("# REMOTE_4: %f", readRemoteTemperature(0x04)); Not connected
+    log_i("# LOCAL: " GREEN "%f", readLocalTemperature());
+    log_i("# REMOTE_1:" RED "%f", readRemoteTemperature(0x01));
+    log_i("# REMOTE_2: " RED "%f", readRemoteTemperature(0x02));
+    log_i("# REMOTE_3: " RED "%f", readRemoteTemperature(0x03));
+   // log_i("# REMOTE_4: " RED "%f", readRemoteTemperature(0x04)); Not connected
     log_i("---------------------------------------");
 
 
