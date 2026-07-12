@@ -64,10 +64,10 @@ void DRV8424::readEncoder2() {
     bool encB2 = digitalRead(ENC_B2);
 
     if(encA2 != encB2) {
-        encoderCount2++;
+        encoderCount2--;
         direction2 = true;
     } else {
-        encoderCount2--;
+        encoderCount2++;
         direction2 = false;
     }
 
@@ -154,6 +154,8 @@ void DRV8424::driveDistance(float distanceCm, float speedPercentage) {
     }
 
     while (motor1_active || motor2_active) {
+
+        
         
         //Motor 1
         if (motor1_active) {

@@ -36,7 +36,7 @@ void Esp32::initSubComponents() {
     //BQ76905::init();
     TMP464::init();
     //IIS2MDC::init();
-    TPL0102::init(3.4, 1, 0.1); 
+    TPL0102::init(3.4, 0.7, 0.1); 
     //Fan::init();
     LSM6DSR::init();   
     
