@@ -964,7 +964,7 @@ body {
 
 .sys-mouse_wrapper {
     position: absolute;
-    z-index: -1;/*29;*/ /*higher then the arm system*/ /*-1 only for debug*/
+    z-index: /*-1;*/29; /*higher then the arm system*/ /*-1 only for debug*/
     pointer-events: none;
     width: 544px;
     height: 544px;

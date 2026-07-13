@@ -1,4 +1,5 @@
 import {record} from './recorder.cjs';
+import { getFilteredChanges } from './getFilteredChanges.cjs';
 
 export class PathManager {
     static path_tree: {
@@ -18,6 +19,7 @@ export class PathManager {
 
     static top_node_id: string = "-1";
     static is_playing: boolean = false;
+    static has_changes: boolean = false;
 
     static setPlayingState(state: string) {
         record({state: state}, "Call -> SetPlayingState");
@@ -63,7 +65,9 @@ export class PathManager {
         this.path_tree[parent].children.push(id);
         this.path_tree[parent].changes.push({id: id, change: 1});
 
-        this.updateParentChanges(parent);
+        //this.updateParentChanges(parent);
+
+        this.has_changes = true;
 
         record({
             from: from,
@@ -74,18 +78,28 @@ export class PathManager {
         }, "Finished -> AddNode");
     }
 
-    static pruneNode(id: string) {
-        let parent_id = this.path_tree[id].parent;
-        const node_index = this.path_tree[parent_id].children.indexOf(id, 0);
-        if (node_index > -1) {
-            this.path_tree[parent_id].children.splice(node_index, 1);
-        } else {
-            return;
+    static pruneNode(id: string, no_parent: boolean = false) {
+        if (!no_parent) {
+            let parent_id = this.path_tree[id].parent;
+            const node_index = this.path_tree[parent_id].children.indexOf(id, 0);
+            if (node_index > -1) {
+                this.path_tree[parent_id].children.splice(node_index, 1);
+            } else {
+                return;
+            }
         }
+
+        let child_list = this.path_tree[id].children.slice();
+        delete this.path_tree[id];
+        for (let i = 0; i < child_list.length; i++) {
+            this.pruneNode(child_list[i], true);
+        }
+
+        this.has_changes = true;
 
 
         //remove the "create" change if present and then cancel the removal
-        if (this.path_tree[parent_id].changes.some(change => change.id === id && change.change === 1)) {
+        /*if (this.path_tree[parent_id].changes.some(change => change.id === id && change.change === 1)) {
             for (let i = 0; i < this.path_tree[parent_id].changes.length; i++) {
                 if (this.path_tree[parent_id].changes[i].id === id && this.path_tree[parent_id].changes[i].change === 1) {
                     this.path_tree[parent_id].changes.splice(i, 1);
@@ -100,7 +114,7 @@ export class PathManager {
         //prune all children
         for (let child_id of this.path_tree[id].children) {
             this.pruneNode(child_id);
-        }
+        }*/
     }
 
     private static updateParentChanges(node_id: string) {
@@ -205,8 +219,8 @@ export class PathManager {
             }
         }
 
-        console.log("CHANGES.....................................");
-        console.log(changes);
+        //console.log("CHANGES.....................................");
+        //console.log(changes);
         record({changes: changes}, "Finished -> getChanges");
         return changes;
     }
@@ -348,55 +362,220 @@ export class PathManager {
         return {parts: parts, insertion: insertion};
     }
 
-    static convertCompact(changes: [string, number, number][]): {
+
+
+
+    static convert_directionStr_to_FieldIndex(direction: string): number {
+        if (direction === "PosX") return 0;
+        if (direction === "PosY") return 1;
+        if (direction === "NegX") return 2;
+        return 3;
+    }
+
+    static convertCompact(): {
+        from: [number, number],
+        to: [number, number],
+        direction: string
+    }[] {
+
+        this.has_changes = false;
+
+        //           PosX     PosY     NegX     NegY
+        let field: [boolean, boolean, boolean, boolean][][] = [];
+        for (let x = 0; x < 16; x++) {
+            field.push([]);
+            for (let y = 0; y < 16; y++) {
+                field[x].push([false, false, false, false]);
+            }
+        }
+
+        const allNodes = [this.top_node_id];
+        (function traverse(nodeId, tree) {
+            const node = tree[nodeId];
+            if (!node) return;
+            if (Array.isArray(node.children)) node.children.forEach(c => allNodes.push(c));
+            if (Array.isArray(node.children)) node.children.forEach(c => traverse(c, tree));
+        })(this.top_node_id, this.path_tree);
+
+        for (let id of allNodes) {
+            let node = this.path_tree[id];
+
+            if (node.moveNull) continue;
+
+            if (node.to[1] - node.from[1] < 0) {
+                for (let j = 0; j >= node.to[1] - node.from[1]; j--) {
+                    field[node.from[0]][node.from[1] + j][3] = true;
+                }
+            } else if (node.to[1] - node.from[1] > 0) {
+                for (let j = 0; j <= node.to[1] - node.from[1]; j++) {
+                    field[node.from[0]][node.from[1] + j][1] = true;
+                }
+            } else if (node.to[0] - node.from[0] > 0) {
+                for (let j = 0; j <= node.to[0] - node.from[0]; j++) {
+                    field[node.from[0] + j][node.from[1]][0] = true;
+                }
+            } else {
+                for (let j = 0; j >= node.to[0] - node.from[0]; j--) {
+                    field[node.from[0] + j][node.from[1]][2] = true;
+                }
+            }
+        }
+
+        //console.log(field);
+
+        let x = 0;
+        let y = 0;
+        let direction: string;
+
+        let splits: [number, number, string][] = [[0,0, (field[0][0][0] ? "PosX" : (field[0][0][1] ? "PosY" : "-1"))]];
+
+        let paths: {
+            from: [number, number],
+            to: [number, number],
+            direction: string,
+        }[] = [];
+
+        while(splits.length > 0) {              //field.some(x => x.some(y => y.some(v => v)))) { //are there any true left
+            let split = splits.shift();
+            x = split[0];
+            y = split[1];
+            direction = split[2];
+
+            if (!field[x][y][this.convert_directionStr_to_FieldIndex(direction)]) continue;
+
+            let path: {
+                from: [number, number],
+                to: [number, number],
+                direction: string,
+            } = {
+                from: [x, y],
+                to: [x, y],
+                direction: direction
+            };
+
+            if (direction === "-1") {
+                break;
+            } else if (direction === "PosX") {
+                for (let j = 0; j <= 15-x; j++) {
+                    if (field[x+j][y][0]) {
+                        path.to[0] = x+j;
+                        field[x+j][y][0] = false;
+                    } else {
+                        break;
+                    }
+
+                    if (y < 15) {
+                        if (field[x + j][y][1]) {
+                            splits.push([x + j, y + 1, "PosY"]);
+                        }
+                    }
+                    if (y > 0) {
+                        if (field[x + j][y][3]) {
+                            splits.push([x + j, y - 1, "NegY"]);
+                        }
+                    }
+                }
+            } else if (direction === "NegX") {
+                for (let j = 0; j <= x; j++) {
+                    if (field[x-j][y][2]) {
+                        path.to[0] = x-j;
+                        field[x-j][y][2] = false;
+                    } else {
+                        break;
+                    }
+
+                    if (y < 15) {
+                        if (field[x - j][y][1]) {
+                            splits.push([x - j, y + 1, "PosY"]);
+                        }
+                    }
+                    if (y > 0) {
+                        if (field[x + j][y][3]) {
+                            splits.push([x - j, y - 1, "NegY"]);
+                        }
+                    }
+                }
+            } else if (direction === "PosY") {
+                for (let j = 0; j <= 15-y; j++) {
+                    if (field[x][y+j][1]) {
+                        path.to[1] = y+j;
+                        field[x][y+j][1] = false;
+                    } else {
+                        break;
+                    }
+
+                    if (x < 15) {
+                        if (field[x][y + j][0]) {
+                            splits.push([x + 1, y + j, "PosX"]);
+                        }
+                    }
+                    if (x > 0) {
+                        if (field[x][y + j][2]) {
+                            splits.push([x - 1, y + j, "NegX"]);
+                        }
+                    }
+                }
+            } else if (direction === "NegY") {
+                for (let j = 0; j <= y; j++) {
+                    if (field[x][y-j][3]) {
+                        path.to[0] = y-j;
+                        field[x][y-j][3] = false;
+                    } else {
+                        break;
+                    }
+
+                    if (x < 15) {
+                        if (field[x][y - j][0]) {
+                            splits.push([x + 1, y - j, "PosX"]);
+                        }
+                    }
+                    if (x > 0) {
+                        if (field[x][y - j][2]) {
+                            splits.push([x - 1, y - j, "NegX"]);
+                        }
+                    }
+                }
+            }
+
+            paths.push(path);
+        }
+
+        return paths;
+    }
+
+    static unfoldCompactTest(): {
         from: [number, number],
         to: [number, number],
         change: number,
         start_from: [number, number, string], //x, y, direction (n,s,e,w)
     }[][] {
+        let unfold = [];
 
-        let field: number[][][] = [];
-        for (let x = 0; x < 16; x++) {
-            field.push([]);
-            for (let y = 0; y < 16; y++) {
-                field[x].push([0, -1]);
-            }
-        }
-        
+        let changes = getFilteredChanges(this.top_node_id, this.path_tree);
+
         for (let change of changes) {
-            let node = this.path_tree[change[0]];
-            let from = node.from;
-            let to = node.to;
-            let start_node = this.path_tree[node.parent];
-            let direction: string = "";
-            let change_type = change[1];
-            
-            if (to[0] - from[0] > 0) {
-                for (let j = 0; j <= to[0] - from[0]; j++) {
-                    if (this.hasHigherPriority(change_type, field[from[0]+j][from[1]][0])) {
-                        field[from[0] + j][from[1]] = [change_type, 1];
-                    }
-                }
-            } else if (to[0] - from[0] < 0) {
-                for (let j = 0; j >= to[0] - from[0]; j--) {
-                    if (this.hasHigherPriority(change_type, field[from[0]+j][from[1]][0])) {
-                        field[from[0] + j][from[1]] = [change_type, 3];
-                    }
-                }
-            } else if (to[1] - from[1] > 0) {
-                for (let j = 0; j <= to[1] - from[1]; j++) {
-                    if (this.hasHigherPriority(change_type, field[from[0]][from[1]+j][0])) {
-                        field[from[0]][from[1]+j] = [change_type, 0];
-                    }
-                }
-            } else if (to[1] - from[1] < 0) {
-                for (let j = 0; j >= to[1] - from[1]; j--) {
-
-                }
+            let parent = this.path_tree[change.id].parent;
+            let p_node = this.path_tree[parent];
+            let direction;
+            if (change.to[0] - change.from[0] > 0) {
+                direction = "e";
+            } else if (change.to[0] - change.from[0] < 0) {
+                direction = "w";
+            } else if (change.to[1] - change.from[1] > 0) {
+                direction = "s";
+            } else {
+                direction = "n";
             }
+
+            unfold.push([{
+                from: change.from,
+                to: change.to,
+                change: change.change,
+                start_from: [p_node.to[0], p_node.to[1], direction]
+            }]);
         }
 
-        return undefined;
+        return unfold
     }
 
     static unfoldCompact(changes: [string, number, number][]): {
@@ -798,7 +977,7 @@ export class PathManager {
     }
 
     static canPlay(): boolean {
-        return this.hasChanges() && !this.is_playing;
+        return /*this.hasChanges()*/ this.has_changes && !this.is_playing;
     }
 }
 

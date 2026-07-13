@@ -177,14 +177,14 @@ PathManager.path_tree = {
 
 console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
 
-console.log("++++++++++++++++++++++++++++++++++++++++++5 0,3- & 4,8+ & 9,10-");
+console.log("++++++++++++++++++++++++++++++++++++++++++5 0,3- & 4,8+ & 9,10- || since new simple path converter -> it needs to start from 0,0");
 PathManager.path_tree = {
     "top_node": {
         from: [0,0],
         to: [0,0],
         playing: false,
         parent: "-1",
-        children: [],
+        children: ["second_node"],
         changes: [
             {
                 id: "first_node",
@@ -215,7 +215,8 @@ PathManager.path_tree = {
         moveNull: false
     }
 }
-console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+//console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+console.log(PathManager.convertCompact());
 
 
 
@@ -226,7 +227,7 @@ PathManager.path_tree = {
         to: [0,0],
         playing: false,
         parent: "-1",
-        children: [],
+        children: ["first_node", "second_node"],
         changes: [
             {
                 id: "first_node",
@@ -257,7 +258,8 @@ PathManager.path_tree = {
         moveNull: false
     }
 }
-console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+//console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+console.log(PathManager.convertCompact());
 
 
 
@@ -269,7 +271,7 @@ PathManager.path_tree = {
         to: [0,0],
         playing: false,
         parent: "-1",
-        children: [],
+        children: ["first_node", "second_node"],
         changes: [
             {
                 id: "first_node",
@@ -300,7 +302,8 @@ PathManager.path_tree = {
         moveNull: false
     }
 }
-console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+//console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+console.log(PathManager.convertCompact());
 
 
 
@@ -311,7 +314,7 @@ PathManager.path_tree = {
         to: [0,0],
         playing: false,
         parent: "-1",
-        children: [],
+        children: ["first_node", "second_node", "third_node"],
         changes: [
             {
                 id: "first_node",
@@ -355,7 +358,10 @@ PathManager.path_tree = {
         moveNull: false
     }
 }
-console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+//console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+console.log(PathManager.convertCompact());
+
+
 
 console.log("++++++++++++++++++++++++++++++++++++++++++9 0,5+ & 6,10+");
 PathManager.path_tree = {
@@ -364,7 +370,7 @@ PathManager.path_tree = {
         to: [0,0],
         playing: false,
         parent: "-1",
-        children: [],
+        children: ["first_node", "second_node"],
         changes: [
             {
                 id: "first_node",
@@ -408,7 +414,8 @@ PathManager.path_tree = {
         moveNull: false
     }
 }
-console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+//console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+console.log(PathManager.convertCompact());
 
 
 
@@ -457,7 +464,7 @@ PathManager.path_tree = {
         parent: "third_node",
         children: [],
         changes: [],
-        moveNull: false
+        moveNull: true
     },
     "layer_2_node_2": {
         from: [0,0],
@@ -466,7 +473,7 @@ PathManager.path_tree = {
         parent: "third_node",
         children: [],
         changes: [],
-        moveNull: false
+        moveNull: true
     },
     "layer_2_node_3": {
         from: [0,0],
@@ -475,11 +482,11 @@ PathManager.path_tree = {
         parent: "third_node",
         children: ["layer_3_node_1"],
         changes: [],
-        moveNull: false
+        moveNull: true
     },
     "layer_3_node_1": {
         from: [0,0],
-        to: [1,0],
+        to: [0,1],
         playing: false,
         parent: "layer_2_node_3",
         children: [],
@@ -488,7 +495,9 @@ PathManager.path_tree = {
     }
 }
 
-console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
+console.log(PathManager.convertCompact());
+
+//console.log(JSON.stringify(PathManager.unfoldCompact(PathManager.getChanges())));
 
 
 //save("log-" + Date.now() + ".json")

@@ -111,7 +111,7 @@ export class BackendManager {
             if (PathManager.canPlay()) {
                 console.log("Sending path updates");
                 record({}, "Call -> f_handleUpdate: Sending path updates");
-                let changes = PathManager.unfoldCompact(PathManager.getChanges());
+                let changes = PathManager.convertCompact();//PathManager.unfoldCompact(PathManager.getChanges());
                 //this.f_sync.push(new Action({action: "update_path", data: {path: {data: changes}, id: changes[0][changes[0].length-1]}}));
                 console.log("Unfolded Changes:");
                 console.log(changes);

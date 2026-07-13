@@ -77,7 +77,7 @@ async function loop_worker(manager) {
 
 
 class Options {
-    static recon = false;
+    static recon = true;
     static input = true;
 }
 /**Comment is deprecated -> moved to ".md"

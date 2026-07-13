@@ -211,7 +211,8 @@ export class Index {
                     /*console.log(data["path"]);
                     Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], false));*/
                     console.log(data["changes"]);
-                    Index.animHandler.addImmediate(displayPathChangeCompact(data["changes"], data["id"]));
+                    //Index.animHandler.addImmediate(displayPathChangeCompact(data["changes"], data["id"]));
+                    Index.animHandler.addImmediate(displaySimplePathChangeCompact(data["changes"]));
                     break;
                 case "complete_path":
                     //Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], true));
@@ -536,6 +537,257 @@ function flipDirection(direction) {
     }
 }
 
+function displaySimplePathChangeCompact(path) {
+
+    let unfolded_coords_path = [];
+    let tiles = [];
+
+    for (let g = 0; g < path.length; g++) {
+        let part = path[g];
+
+        if (part.direction === "PosX") {
+            for (let j = 0; j <= part.to[0] - part.from[0]; j++) {
+                unfolded_coords_path.push(part.from[0] + j);
+                unfolded_coords_path.push(part.from[1]);
+
+                tiles[[part.from[0] + j, part.from[1]]] = [
+                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                ]
+
+                if (j === part.to[0] - part.from[0]) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] > 0 && j === 0) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j - 1, part.from[1]]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] > 0) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j - 1, part.from[1]]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                }
+            }
+        } else if (part.direction === "NegX") {
+            for (let j = 0; j >= part.to[0] - part.from[0]; j--) {
+                unfolded_coords_path.push(part.from[0] + j);
+                unfolded_coords_path.push(part.from[1]);
+
+                tiles[[part.from[0] + j, part.from[1]]] = [
+                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                ]
+
+                if (j === part.to[0] - part.from[0]) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] < 15 && j === 0) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j + 1, part.from[1]]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] < 15) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j + 1, part.from[1]]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                }
+            }
+        } else if (part.direction === "PosY") {
+            for (let j = 0; j <= part.to[1] - part.from[1]; j++) {
+                unfolded_coords_path.push(part.from[0]);
+                unfolded_coords_path.push(part.from[1] + j);
+
+                tiles[[part.from[0], part.from[1] + j]] = [
+                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                ]
+
+                if (j === part.to[1] - part.from[1]) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] > 0 && j === 0) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j - 1]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] > 0) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j - 1]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                }
+            }
+        } else if (part.direction === "NegY") {
+            for (let j = 0; j >= part.to[1] - part.from[1]; j--) {
+                unfolded_coords_path.push(part.from[0]);
+                unfolded_coords_path.push(part.from[1] + j);
+
+                tiles[[part.from[0], part.from[1] + j]] = [
+                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                ]
+
+                if (j === part.to[1] - part.from[1]) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] < 15 && j === 0) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j + 1]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] < 15) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j + 1]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                }
+            }
+        }
+    }
+    console.log(unfolded_coords_path);
+
+
+    unfolded_coords_path.push(1);
+    unfolded_coords_path.push(1);
+    let pathAnimGroup = generatePathAnimGroup([unfolded_coords_path], tiles, false);
+    unfolded_coords_path.pop();
+    unfolded_coords_path.pop();
+
+    let removeRedGroup = new AnimGroup(0);
+    let removeGroup = new AnimGroup(0);
+    let resetGroup = new AnimGroup(-1);
+    resetGroup.add(removeRedGroup);
+    resetGroup.add(removeGroup);
+
+    let remove_indecies = [];
+    for (let i = 0; i < 16*16; i++) {
+        remove_indecies.push(i);
+    }
+    for (let i = 0; i < unfolded_coords_path.length; i+=2) {
+        remove_indecies = remove_indecies.filter(value => value !== co_crds_i([unfolded_coords_path[i], unfolded_coords_path[i+1]]));
+
+        let index = co_crds_i([unfolded_coords_path[i], unfolded_coords_path[i+1]]);
+        let coords = convert_index_to_coords(index);
+
+        let allTiles = [
+            document.getElementById("sys-arm_node_" + index),
+            document.getElementById("sys-arm_arm-w_" + index),
+            document.getElementById("sys-arm_arm-e_" + index),
+            document.getElementById("sys-arm_arm-n_" + index),
+            document.getElementById("sys-arm_arm-s_" + index),
+        ];
+
+        allTiles.filter(value => value !== null).filter(value => !tiles[coords].some(t => t === value))
+            .forEach(value => {
+                removeRedGroup.add(new AnimCssChange(5, value, ["on", "highlighted"], "remove"));
+                removeGroup.add(new AnimCssChange(5, value, ["remove", "highlighted"], "repl"));
+            });
+    }
+
+    //console.log(remove_indecies);
+    for (let i = 0; i < remove_indecies.length; i++) {
+        let index = remove_indecies[i];
+
+        let coords = convert_index_to_coords(index);
+        //console.log("Deleting: " + coords[0] + ":" + coords[1] + "");
+        removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_node_" + index), ["on", "highlighted"], "remove"));
+        removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_node_" + index), ["remove", "highlighted"], "repl"));
+        if (coords[0] > 0) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-w_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-w_" + index), ["remove", "highlighted"], "repl"));
+        }
+        if (coords[0] < 15) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-e_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-e_" + index), ["remove", "highlighted"], "repl"));
+        }
+        if (coords[1] > 0) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-n_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-n_" + index), ["remove", "highlighted"], "repl"));
+        }
+        if (coords[1] < 15) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-s_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-s_" + index), ["remove", "highlighted"], "repl"));
+        }
+    }
+
+    let completeGroup = new AnimGroup(0);
+    completeGroup.add(pathAnimGroup);
+    completeGroup.add(resetGroup);
+
+    return completeGroup;
+}
+
 function displayPathChangeCompact(changes, id, ignore_group = false) {
     Index.send({action: "path_update", id: id, state: "started"});
 
@@ -579,8 +831,70 @@ function displayPathChangeCompact(changes, id, ignore_group = false) {
 
     //generate tiles
     //tiles: tiles[[x,y]] = HTMLElements[] ?
+    let calculateTiles = function (x, y, direction, pos, from_direction="-1") {
+        let _tiles = [];
+
+        _tiles.push(document.getElementById("sys-arm_node_" + co_crds_i([x, y])));
+
+        if (pos === -1) {
+            let from_x = ((from_direction === "w") ? x - 1 : ((from_direction === "e") ? x + 1 : x));
+            let from_y = ((from_direction === "n") ? y - 1 : ((from_direction === "s") ? y + 1 : y));
+            if (from_x < 0 || from_x > 15 || from_y < 0 || from_y > 15) {return _tiles;}
+
+            _tiles.push(document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([x, y])));
+            _tiles.push(document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([from_x, from_y])));
+        } else if (pos === 0) {
+            _tiles.push(document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([x, y])));
+            _tiles.push(document.getElementById("sys-arm_arm-" + flipDirection(direction) + "_" + co_crds_i([x, y])));
+        } else if (pos === 1) {
+            _tiles.push(document.getElementById("sys-arm_arm-" + flipDirection(direction) + "_" + co_crds_i([x, y])));
+        }
+
+        return _tiles;
+    }
+
     let tiles = [];
+
     for (let g = 0; g < changes.length; g++) {
+        for (let i = 0; i < changes[g].length; i++) {
+            let change = changes[g][i];
+            let direction = change.start_from[2];
+            let from_direction;
+            if (change.from[0] - change.start_from[0] < 0) {
+                from_direction = "w"; //NegX -> opposite side for the connection arm
+            } else if (change.from[0] - change.start_from[0] > 0) {
+                from_direction = "e";
+            } else if (change.from[1] - change.start_from[1] < 0) {
+                from_direction = "s"; //NegY -> opposite side for the connection arm
+            } else {
+                from_direction = "n";
+            }
+
+            if (direction === "n") {
+                for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
+                    tiles[[change.from[0], change.from[1] + j]] = calculateTiles(change.from[0], change.from[1] + j, direction,
+                        (j === 0) ? -1 : ((j === change.to[1] - change.from[1]) ? 1 : 0), from_direction);
+                }
+            } else if (direction === "s") {
+                for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
+                    tiles[[change.from[0], change.from[1] + j]] = calculateTiles(change.from[0], change.from[1] + j, direction,
+                        (j === 0) ? -1 : ((j === change.to[1] - change.from[1]) ? 1 : 0), from_direction);
+                }
+            } else if (direction === "e") {
+                for (let j = 0; j <= change.to[0] - change.from[0]; j++) {
+                    tiles[[change.from[0] + j, change.from[1]]] = calculateTiles(change.from[0] + j, change.from[1], direction,
+                        (j === 0) ? -1 : ((j === change.to[0] - change.from[0]) ? 1 : 0), from_direction);
+                }
+            } else {
+                for (let j = 0; j >= change.to[0] - change.from[0]; j--) {
+                    tiles[[change.from[0] + j, change.from[1]]] = calculateTiles(change.from[0] + j, change.from[1], direction,
+                        (j === 0) ? -1 : ((j === change.to[0] - change.from[0]) ? 1 : 0), from_direction);
+                }
+            }
+        }
+    }
+
+    /*for (let g = 0; g < changes.length; g++) {
         for (let i = 0; i < changes[g].length; i++) {
             let change = changes[g][i];
 
@@ -673,12 +987,12 @@ function displayPathChangeCompact(changes, id, ignore_group = false) {
             } else if (change.to[1] - change.from[1] > 0) {
                 for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
                     tiles[[change.from[0], change.from[1] + j]] = [
-                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0], change.from[1] + j]))
                     ];
 
                     if (j === 0) {
                         let from_direction;
-                        if (change.from[1] - change.start_from[1] < 0) {
+                        if (change.from[0] - change.start_from[0] < 0) {
                             from_direction = "w"; //NegX -> opposite side for the connection arm
                         } else if (change.from[0] - change.start_from[0] > 0) {
                             from_direction = "e";
@@ -692,7 +1006,7 @@ function displayPathChangeCompact(changes, id, ignore_group = false) {
                         );
 
                         tiles[[change.from[0], change.from[1]]].push(
-                            document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1]]))
                         );
 
                         let direction = change.start_from[2];
@@ -715,12 +1029,12 @@ function displayPathChangeCompact(changes, id, ignore_group = false) {
             } else if (change.to[1] - change.from[1] < 0) {
                 for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
                     tiles[[change.from[0], change.from[1] + j]] = [
-                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0], change.from[1] + j]))
                     ];
 
                     if (j === 0) {
                         let from_direction;
-                        if (change.from[1] - change.start_from[1] < 0) {
+                        if (change.from[0] - change.start_from[0] < 0) {
                             from_direction = "w"; //NegX -> opposite side for the connection arm
                         } else if (change.from[0] - change.start_from[0] > 0) {
                             from_direction = "e";
@@ -756,7 +1070,7 @@ function displayPathChangeCompact(changes, id, ignore_group = false) {
                 }
             }
         }
-    }
+    }*/
 
     console.log("Tiles: ");
     console.log(tiles);

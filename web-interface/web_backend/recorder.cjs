@@ -1,8 +1,10 @@
 const fs = require("fs");
 
 const history = [];
+const no_record = true;
 
 function record(vars, label = "") {
+    if (no_record) return;
     const stack = new Error().stack.split("\n")[2];
 
     // Extract filename + line + column from stack trace
@@ -42,6 +44,7 @@ function clone(value) {
 
 
 function save(filename = "execution-trace.json") {
+    if (no_record) return;
     fs.writeFileSync(
         "logs/" + filename,
         JSON.stringify(history, null, 2)
