@@ -77,8 +77,8 @@ void DRV8424::readEncoder2() {
 
 void DRV8424::debugPrintEncoderCounts() {
     log_i("---------DRV8424 ENCODER COUNTS (DRV8424)---------");
-    log_i("# ENC_1:" RED "%ld, Direction: " MAGENTA "%s", encoderCount1, direction1 ? "Forward" : "Reverse");
-    log_i("# ENC_2: " RED "%ld, Direction: " MAGENTA "%s", encoderCount2, direction2 ? "Forward" : "Reverse");
+    log_i("# ENC_1:" CYAN "%ld," RESET "Direction: " MAGENTA "%s" RESET, encoderCount1, direction1 ? "Forward" : "Reverse" );
+    log_i("# ENC_2: " CYAN "%ld," RESET "Direction: " MAGENTA "%s" RESET, encoderCount2, direction2 ? "Forward" : "Reverse" );
     log_i("---------------------------------------");
 }
 

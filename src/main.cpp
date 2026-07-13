@@ -33,9 +33,8 @@ Esp32::initESP32();
 
 
  log_i(GREEN "# Setup done!");
-   // DRIVECONTROL::forward(30, 15);
- DRV8424::setDutyCycle1(40);
- DRV8424::setDutyCycle2(40);
+ //DRIVECONTROL::forward(30, 5);
+
 
 }
 
@@ -67,14 +66,10 @@ Measurement::IR::debugPrintRawDistance(3);
 
 
 
-/*
-DEBUG: THRESHOLD CALIBRATION
-Measurement::IR::calibration::initCalibration(5);
 
-
-DEBUG: TEST WALL DETECTION
+Measurement::IR::calibration::initCalibration(10);
 Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
-*/
+
 
 
 

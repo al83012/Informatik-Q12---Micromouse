@@ -139,9 +139,9 @@ void TMP464::setShutdownMode(bool enableShutDown) {
     I2C1Read(ComponentVars::I2C_ADDRESS, ComponentVars::REG_CONFIG, current_reg);
     if(enableShutDown) {
         current_reg |= (1 << 5);
-        log_d(GREEN "# Succesfuly enabled shutdown mode! (TMP464) ");
+        log_d(GREEN "# Succesfuly enabled shutdown mode! (TMP464) " RESET);
     } else {
-        log_d(GREEN "# Succesfuly disabled shutdown mode! (TMP464) ");
+        log_d(GREEN "# Succesfuly disabled shutdown mode! (TMP464) " RESET);
         current_reg &= ~(1 << 5);
     }
 
@@ -151,11 +151,11 @@ void TMP464::setShutdownMode(bool enableShutDown) {
 
 void TMP464::DbgPrintTemperatures() {
     log_i("---------TEMPERATURES (TMP464)---------");
-    log_i("# LOCAL: " GREEN "%f", readLocalTemperature());
-    log_i("# REMOTE_1:" RED "%f", readRemoteTemperature(0x01));
-    log_i("# REMOTE_2: " RED "%f", readRemoteTemperature(0x02));
-    log_i("# REMOTE_3: " RED "%f", readRemoteTemperature(0x03));
-   // log_i("# REMOTE_4: " RED "%f", readRemoteTemperature(0x04)); Not connected
+    log_i("# LOCAL: " GREEN "%f" RESET, readLocalTemperature() ) ;
+    log_i("# REMOTE_1:" RED "%f" RESET, readRemoteTemperature(0x01) );
+    log_i("# REMOTE_2: " RED "%f" RESET, readRemoteTemperature(0x02) );
+    log_i("# REMOTE_3: " RED "%f" RESET, readRemoteTemperature(0x03) );
+   // log_i("# REMOTE_4: " RED "%f" RESET, readRemoteTemperature(0x04)); Not connected
     log_i("---------------------------------------");
 
 

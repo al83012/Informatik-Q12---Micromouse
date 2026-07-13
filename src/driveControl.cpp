@@ -72,7 +72,7 @@ namespace DRIVECONTROL {
 
         while (true) {
             long currentLeft = DRV8424::encoderCount1;
-            long currentRight = -DRV8424::encoderCount2;
+            long currentRight = DRV8424::encoderCount2;
             
             long averageProgress = (currentLeft + currentRight) / 2;
             if (averageProgress >= targetTicks) {

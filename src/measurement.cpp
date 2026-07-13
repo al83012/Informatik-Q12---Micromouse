@@ -283,11 +283,11 @@ void Measurement::IR::calibration::initCalibration(int calibrationSteps) {
     Measurement::IR::calibration::wallThresholdRight = totalRight / calibrationSteps;
     Measurement::IR::calibration::wallThresholdFront = totalFront / calibrationSteps;
 
-    log_i(GREEN "# Calibration completed. Wall thresholds set:");
+    log_i(GREEN "# Calibration completed. Wall thresholds set:" RESET);
 
-    log_i(RED "# Left Wall Threshold: " CYAN "%d", Measurement::IR::calibration::wallThresholdLeft);
-    log_i(BLUE "# Right Wall Threshold: " CYAN "%d", Measurement::IR::calibration::wallThresholdRight);
-    log_i(MAGENTA "# Front Wall Threshold: " CYAN "%d", Measurement::IR ::calibration::wallThresholdFront);
+    log_i(RED "# Left Wall Threshold: " CYAN "%d" RESET, Measurement::IR::calibration::wallThresholdLeft);
+    log_i(BLUE "# Right Wall Threshold: " CYAN "%d" RESET, Measurement::IR::calibration::wallThresholdRight);
+    log_i(MAGENTA "# Front Wall Threshold: " CYAN "%d" RESET, Measurement::IR ::calibration::wallThresholdFront);
 }
 
 
@@ -346,7 +346,7 @@ void Measurement::IR::WallDetection::RefreshAllWalls() {
 void Measurement::IR::WallDetection::debugPrintWallDetectionStatus() {
     RefreshAllWalls();
     log_i("# Wall Detection Status:");
-    log_i("# Left Wall: " CYAN "%s", isWallLeft ? GREEN "Y" : RED "N");
-    log_i("# Right Wall: " CYAN "%s", isWallRight ? GREEN "Y" : RED "N");
-    log_i("# Front Wall: " CYAN "%s", isWallFront ? GREEN "Y" : RED "N");
+    log_i("# Left Wall: " CYAN "%s" RESET, isWallLeft ? GREEN "Y" : RED "N");
+    log_i("# Right Wall: " CYAN "%s" RESET, isWallRight ? GREEN "Y" : RED "N");
+    log_i("# Front Wall: " CYAN "%s" RESET, isWallFront ? GREEN "Y" : RED "N");
 }

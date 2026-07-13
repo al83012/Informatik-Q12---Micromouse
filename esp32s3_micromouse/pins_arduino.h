@@ -142,9 +142,9 @@ static const uint8_t DRV_BIN2 = 10;
 // Interrupt
 static const uint8_t ENC_A1 = 3;
 // Interrupt
-static const uint8_t ENC_A2 = 46;
+static const uint8_t ENC_A2 = 8;
 // Interrupt
-static const uint8_t ENC_B1 = 8;
+static const uint8_t ENC_B1 = 46;
 // Interrupt
 static const uint8_t ENC_B2 = 9;
 
