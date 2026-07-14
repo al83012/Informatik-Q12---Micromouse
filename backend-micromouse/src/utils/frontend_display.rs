@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use console::Style;
+use tracing::info;
 
 use crate::{
     comm::{
@@ -23,12 +24,14 @@ use crate::{
     },
 };
 
+#[derive(Debug)]
 pub struct FrontendDisplay<const N: usize> {
     pub root: AbsoluteNodeId,
     pub nodes: HashMap<AbsoluteNodeId, FrontendDisplayNode>,
     pub world: WorldData<N>,
 }
 
+#[derive(Debug)]
 pub struct FrontendDisplayNode {
     pub children: HashMap<AbsoluteNodeId, Path>,
     pub parent: Option<AbsoluteNodeId>,
@@ -72,6 +75,9 @@ impl<const N: usize> FrontendDisplay<N> {
         let node_id = visual_event.associated_node;
 
         let ty = &visual_event.ty;
+        info!(target: "test/sim/webs/display", "Event: from L{}N{} --> {ty:?}", node_id.layer_id.0, node_id.node_id.0);
+
+        // info!(target: "test/sim/webs/display", "Current nodes: {:#?}", self.nodes);
 
         match ty {
             PathVisualEventType::Remove => {
@@ -95,11 +101,11 @@ impl<const N: usize> FrontendDisplay<N> {
                 new_path.connect_to(path.to);
                 self.nodes
                     .insert(*leads_to_child_node, FrontendDisplayNode::new(node_id));
-                self.nodes
-                    .get_mut(&node_id)
-                    .expect("Parent must exist")
-                    .children
-                    .insert(*leads_to_child_node, new_path);
+                let parent = self.nodes.entry(node_id).or_insert(FrontendDisplayNode {
+                    children: HashMap::new(),
+                    parent: None,
+                });
+                parent.children.insert(*leads_to_child_node, new_path);
             }
             PathVisualEventType::Prune => {
                 let node = self.nodes.get(&node_id).expect("Node does not exist");

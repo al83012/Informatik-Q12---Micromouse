@@ -615,7 +615,7 @@ pub fn init_loggers() {
                 .with_filter(FilterFn::new(|meta| {
                     // meta.target().contains("webs") || meta.target().eq("rec")
                     // meta.target().contains("dkp") || meta.target().eq("strat")
-                    meta.target().eq("test/sim/webs/display")
+                    meta.target().eq("test/sim/webs/display") || meta.target().eq("strat") || *meta.level() < Level::ERROR
                 })),
         )
     };

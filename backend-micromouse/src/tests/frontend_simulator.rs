@@ -16,11 +16,13 @@ use crate::{
             MeasurementOccurrence, MicromouseResponse, TransformedMovement,
         },
         website::{BatchedFrontendMessage, FrontendMessage, FrontendResponse},
-    }, map::{
+    },
+    map::{
         map::Map,
         measurement::{self, MeasurementValue},
         world_data::{self, WorldData},
-    }, strategy::{
+    },
+    strategy::{
         dyn_strategy_tree::{DynStrategyConfig, StrategyChangeCommand},
         strategies::{
             dbg_known_path::DbgKnownPathConfig,
@@ -32,7 +34,12 @@ use crate::{
         strategy::GoalPosition,
         strategy_tree::AbsolutePathId,
         visuals::{PathSegment, TreeVisualEvent},
-    }, transform::position::{MouseTransform, Position}, utils::{frontend_display::FrontendDisplay, hyperlink_logging::{LinkFileName, enter_process, process_span}},
+    },
+    transform::position::{MouseTransform, Position},
+    utils::{
+        frontend_display::FrontendDisplay,
+        hyperlink_logging::{enter_process, process_span, LinkFileName},
+    },
 };
 
 const SIZE: usize = super::TEST_MAP_SIZE;
@@ -110,12 +117,9 @@ impl FrontendSimulator {
                 continue;
             };
 
-
+            info!(target: "test/sim/webs/display", "RECEIVED FRONTEND MSG {frontend_msg_batch:#?}");
             self.display.update(&frontend_msg_batch);
             info!(target: "test/sim/webs/display", "Frontend Display: \n{}", self.display);
-
-
-            info!(target: "test/sim/webs", "RECEIVED FRONTEND MSG {frontend_msg_batch:#?}");
 
             for frontend_msg in frontend_msg_batch.0 {
                 match frontend_msg {

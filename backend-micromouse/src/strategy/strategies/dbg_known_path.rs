@@ -105,10 +105,14 @@ impl<const N: usize> Strategy<N> for DbgKnownPath<N> {
             },
         });
 
-        let Some(actions) = actions.collect::<Vec<_>>().non_empty() else {
+        let mut actions = actions.collect::<Vec<_>>();
+        let Some(last) = actions.last_mut() else {
             return StrategyComputationResult::Computed(Err(StrategyEndState::NoPossibleAction(String::from("The goal was not reached, but the path has not next action to perform; Should not happen"))));
         };
 
-        StrategyComputationResult::Computed(Ok(ComputedActions(actions)))
+        last.next_strategy_state = Some(self.clone());
+
+
+        StrategyComputationResult::Computed(Ok(ComputedActions(actions.non_empty().expect("Checked len >= 1"))))
     }
 }
