@@ -66,7 +66,7 @@ namespace Measurement {
         }
 
         namespace WallDetection {
-            constexpr int tolerancePercent = 10;
+            constexpr int tolerancePercent = 0;
 
 
            inline bool isWallLeft;

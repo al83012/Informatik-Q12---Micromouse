@@ -33,41 +33,41 @@ Esp32::initESP32();
 
 
  log_i(GREEN "# Setup done!");
- //DRIVECONTROL::forward(30, 5);
+ /* DEBUG: PID-Controller:
+ DRIVECONTROL::forward(30, 5);*/
 
+Measurement::IR::calibration::initCalibration(15);
+
+
+
+
+
+//DRIVECONTROL::simpleForward1(20, 5);
+//DRIVECONTROL::forward(20, 5);
 
 }
 
 void loop() {
  //Network::checkNetwork();
- delay(2000);
+ delay(500);
  log_d(".");
  TMP464::DbgPrintTemperatures();
  //Measurement::Sensors::reportTemperature();
  DRV8424::debugPrintEncoderCounts();
 
 
-
-/* 
-DEBUG: TEST IR-SENSORS
-
-Measurement::IR::refreshDistance(1);
 Measurement::IR::debugPrintRawDistance(1);
 
-Measurement::IR::refreshDistance(0);
 Measurement::IR::debugPrintRawDistance(0);
 
-Measurement::IR::refreshDistance(2);
 Measurement::IR::debugPrintRawDistance(2);
 
-Measurement::IR::refreshDistance(3);
 Measurement::IR::debugPrintRawDistance(3);
-*/
 
 
 
 
-Measurement::IR::calibration::initCalibration(10);
+
 Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
 
 

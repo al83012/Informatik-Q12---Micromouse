@@ -7,7 +7,7 @@ using namespace COLORS;
 
 namespace DRIVECONTROL {
      float kp = 0.6;
-     float ki = 0.1;
+     float ki = 0.0;
      float kd = 0.1;
 
      float integral = 0.0;
@@ -25,7 +25,8 @@ namespace DRIVECONTROL {
 
         unsigned long currentTime = millis();
         float dt = (currentTime - prevTime) / 1000.0; // Zeit in Sekunden
-
+        dt = constrain(dt, 0.001, 1.0);
+        log_i(GREEN "Constrained dt: %f seconds" RESET, dt);
         if (dt <= 0.0) return 0.0;
 
         // P
@@ -41,7 +42,7 @@ namespace DRIVECONTROL {
 
         prevError = error;
         prevTime = currentTime;
-        log_d("# (DRIVECONTROL) PID Computation: P=%f, I=%f, D=%f, Output=%f", pTerm, iTerm, dTerm, pTerm + iTerm + dTerm);
+        log_i("# (DRIVECONTROL) PID Computation: P=%f, I=%f, D=%f, Output=%f", pTerm, iTerm, dTerm, pTerm + iTerm + dTerm);
         return pTerm + iTerm + dTerm;
     }
 
@@ -58,9 +59,32 @@ namespace DRIVECONTROL {
         noInterrupts(); 
         DRV8424::encoderCount1 = 0;
         DRV8424::encoderCount2 = 0;
-        interrupts(); 
+        interrupts();   
         log_d("# (DRIVECONTROL) Encoders reset: encoderCount1=%ld, encoderCount2=%ld", DRV8424::encoderCount1, DRV8424::encoderCount2);
     }
+
+    void simpleForward1(float distanceCm, float baseSpeedPercentage) {
+        log_i("# (DRIVECONTROL) Moving (simple1) forward: Distance =" CYAN "%f cm, Base Speed =" MAGENTA "%f%%", distanceCm, baseSpeedPercentage);
+        long targetTicks = DRV8424::calculateTargetTicks(distanceCm);
+        log_i("# Target-ticks: %d", targetTicks);
+        resetEncoders();
+        while(true) {
+            long currentLeft = DRV8424::encoderCount1;
+            long currentRight = DRV8424::encoderCount2;
+
+            if(abs(currentLeft) >= targetTicks && abs(currentRight) >= targetTicks) {
+                log_i(GREEN "# Movement finished succesfuly!" RESET);
+                DRV8424::setSpeedPercentage1(0);
+                DRV8424::setSpeedPercentage2(0);
+                break;
+            }
+            DRV8424::setSpeedPercentage1(baseSpeedPercentage);
+            DRV8424::setSpeedPercentage2(baseSpeedPercentage);
+            
+
+        }
+
+    }    
 
     void forward(float distanceCm, float baseSpeedPercentage) {
         log_i("# (DRIVECONTROL) Moving forward: Distance =" CYAN "%f cm, Base Speed =" MAGENTA "%f%%", distanceCm, baseSpeedPercentage);
@@ -86,14 +110,14 @@ namespace DRIVECONTROL {
             
             DRV8424::debugPrintEncoderCounts();
            
-            float speedLeft = baseSpeedPercentage - correction;
-            float speedRight = baseSpeedPercentage + correction;
+            float speedLeft = baseSpeedPercentage - correction;     
+            float speedRight = baseSpeedPercentage + correction;    
 
-            speedLeft = constrain(speedLeft, 0, 100);
-            speedRight = constrain(speedRight, 0, 100);
+            speedLeft = constrain(speedLeft, 0, 10);   
+            speedRight = constrain(speedRight, 0, 10); 
 
-            DRV8424::setSpeedPercentage1(speedLeft);
-            DRV8424::setSpeedPercentage2(speedRight);
+            DRV8424::setSpeedPercentage1(speedLeft);    
+            DRV8424::setSpeedPercentage2(speedRight);   
 
             delay(10); 
         }
@@ -144,4 +168,4 @@ void backward(float distanceCm, float baseSpeedPercentage) {
     DRV8424::setSpeedPercentage2(0);
 }
 
-}
+}   

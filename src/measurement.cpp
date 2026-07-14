@@ -162,7 +162,6 @@ void Measurement::IR::refreshDistance(int channel) {
 
     refreshNoise(channel);
     Measurement::IR::Emitters::enableLED(channel);
-    delayMicroseconds(4);
     RawDistances_Unconverted[channel] = Measurement::IR::Receivers::readDistance(channel);
     Measurement::IR::Emitters::disableLED(channel);
     int delta = RawDistances_Unconverted[channel] - Noises[channel];
@@ -258,8 +257,8 @@ void Measurement::IR::calibration::initCalibration(int calibrationSteps) {
     wallThresholdFront = 0;
     absoluteWallThreshold = 0;
     log_d("# Initialized wall thresholds to 0");
-    log_i(RED "# CALIBRATION INITIALIZED: Please ensure that the robot is placed in a safe environment for calibration. The robot will measure distances to walls and set thresholds accordingly.");
-    log_i(RED "# Calibration will start in 10 seconds...");
+    log_i(RED "# CALIBRATION INITIALIZED: Please ensure that the robot is placed in a safe environment for calibration. The robot will measure distances to walls and set thresholds accordingly." RESET);
+    log_i(RED "# Calibration will start in 10 seconds..." RESET);
     delay(10000);
     log_i(GREEN "# Calibration started...");
     int totalLeft = 0;
@@ -267,7 +266,7 @@ void Measurement::IR::calibration::initCalibration(int calibrationSteps) {
     int totalFront = 0;
 
     for(int i = 0; i < calibrationSteps; i++) {
-        log_i(RED "# Calibration step" GREEN "%d of %d", i+1, calibrationSteps);
+        log_i(RED "# Calibration step" GREEN "%d" RESET "of" GREEN "%d" RESET, i+1, calibrationSteps);
         
         calibrateWallThresholdLeft();
         totalLeft += Measurement::IR::calibration::wallThresholdLeft;
@@ -338,7 +337,9 @@ bool Measurement::IR::WallDetection::RefreshWallFront() {
 
 void Measurement::IR::WallDetection::RefreshAllWalls() {
     RefreshWallLeft();
+    delay(50);
     RefreshWallRight();
+    delay(50);
     RefreshWallFront();
 }
 
@@ -346,7 +347,7 @@ void Measurement::IR::WallDetection::RefreshAllWalls() {
 void Measurement::IR::WallDetection::debugPrintWallDetectionStatus() {
     RefreshAllWalls();
     log_i("# Wall Detection Status:");
-    log_i("# Left Wall: " CYAN "%s" RESET, isWallLeft ? GREEN "Y" : RED "N");
-    log_i("# Right Wall: " CYAN "%s" RESET, isWallRight ? GREEN "Y" : RED "N");
-    log_i("# Front Wall: " CYAN "%s" RESET, isWallFront ? GREEN "Y" : RED "N");
+    log_i("# Left Wall: " CYAN "%s (%d / %d)" RESET, isWallLeft ? RED "N" : GREEN "Y", Measurement::IR::getDistance(Measurement::IR::CHANNEL_LEFT), Measurement::IR::calibration::wallThresholdLeft);
+    log_i("# Right Wall: " CYAN "%s (%d / %d)" RESET, isWallRight ? RED "N" : GREEN "Y", Measurement::IR::getDistance(Measurement::IR::CHANNEL_RIGHT), Measurement::IR::calibration::wallThresholdRight);
+    log_i("# Front Wall: " CYAN "%s (%d / %d" RESET, isWallFront ? RED "N" : GREEN "Y", Measurement::IR::getDistance(Measurement::IR::CHANNEL_FRONT1), Measurement::IR::calibration::wallThresholdFront);
 }

@@ -35,7 +35,7 @@ void DRV8424::init(int frequency) {
     TCAL6408::setDriverAwake(true);
 
     attachInterrupt(digitalPinToInterrupt(ENC_A1), DRV8424::readEncoder1, RISING);
-    attachInterrupt(digitalPinToInterrupt(ENC_A2), DRV8424::readEncoder2, RISING);
+    attachInterrupt(digitalPinToInterrupt(ENC_B1), DRV8424::readEncoder2, RISING);
 
     setFrequency(frequency);
   
@@ -47,9 +47,9 @@ bool DRV8424::assureSafeCurrent() {
 }
 
 void DRV8424::readEncoder1() {
-    bool encB1 = digitalRead(ENC_B1);
+    bool encA2 = digitalRead(ENC_A2);
 
-    if(encB1 == HIGH) {
+    if(encA2== HIGH) {
         encoderCount1++;
         direction1 = true;
     } else {
@@ -64,10 +64,10 @@ void DRV8424::readEncoder2() {
     bool encB2 = digitalRead(ENC_B2);
 
     if(encB2 == HIGH) {
-        encoderCount2++;
+        encoderCount2--;
         direction2 = true;
     } else {
-        encoderCount2--;
+        encoderCount2++;
         direction2 = false;
     }
 
