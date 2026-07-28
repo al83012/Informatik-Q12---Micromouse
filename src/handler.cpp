@@ -8,6 +8,7 @@
 #include "network.h"
 #include "simulation.h"
 #include "handler.h"
+#include "driveControl.h"
 
 using namespace websockets;
 using namespace std;
@@ -30,7 +31,7 @@ void Handler::handleEvent(WebsocketsEvent event, String data) {
 
 
 void Handler::movePassive(int cells) {
-    Simulation::sim_move(cells);  //REMOVE AFTER SIM
+    DRIVECONTROL::defaultForward(cells);
    log_d("# MV NO MSR > SRV");
 }
 
@@ -67,7 +68,7 @@ void Handler::moveActive(int cells, vector<Master::MeasurementTask>& activeTasks
 
       if (task.subStep == sub_step || Handler::HandleVars::MAX_SUB_STEPS) {
         int distance = measure(task.direction);
-        log_d("Distance: ");
+        log_d("# Distance: ");
         log_d("%d%", distance);
 
         string content;
@@ -104,7 +105,7 @@ void Handler::moveActive(int cells, vector<Master::MeasurementTask>& activeTasks
       }
     }
 
-    movePassive(1);
+    DRIVECONTROL::defaultForward(1);
   }
 }
 
@@ -191,7 +192,6 @@ void Handler::turnActive(int turns, vector<Master::MeasurementTask>& activeTasks
 
 void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
-  Master::GlobalVars::dir = Master::directions::posY;
 
 
 
@@ -212,6 +212,7 @@ void Handler::handleCommand(WebsocketsMessage WSmessage) {
 
 
   if (!Master::GlobalVars::desync_mode && !Master::GlobalVars::wait_restart_confirm) {
+    
     //Scanning for command type
     if (arguments[1].find("#") != string::npos) {
       log_d("# CMD RCV");

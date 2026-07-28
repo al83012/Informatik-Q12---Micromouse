@@ -169,3 +169,13 @@ void backward(float distanceCm, float baseSpeedPercentage) {
 }
 
 }   
+
+void DRIVECONTROL::defaultForward(int tiles) {
+    float distanceCm = tiles * DEFAULT_TILE_SIZE_CM;
+    forward(distanceCm, DEFAULT_BASE_SPEED_PERCENTAGE);
+}
+
+void DRIVECONTROL::defaultBackward(int tiles) {
+    float distanceCm = tiles * DEFAULT_TILE_SIZE_CM;
+    backward(distanceCm, DEFAULT_BASE_SPEED_PERCENTAGE);
+}
