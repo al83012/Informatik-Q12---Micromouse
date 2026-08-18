@@ -27,7 +27,7 @@ namespace DRIVECONTROL {
         float dt = (currentTime - prevTime) / 1000.0; // Zeit in Sekunden
         dt = constrain(dt, 0.001, 1.0);
         log_i(GREEN "Constrained dt: %f seconds" RESET, dt);
-        if (dt <= 0.0) return 0.0;
+        if (dt <= 0.0) return 0.0; // UNREACHABLE: constrain(dt, 0.001, 1.0); (Außerdem ist der Output 0.0 nicht passend)
 
         // P
         float pTerm = kp * error;
@@ -38,7 +38,7 @@ namespace DRIVECONTROL {
 
         // D
         float derivative = (error - prevError) / dt;
-        float dTerm = kd * derivative;
+        float dTerm = kd * derivative; // Vllt: Constrain auf dem dTerm; Sonst kann eine schnelle Anpassung des target- und damit des error- werts zu plötzlichen Spitzen führen
 
         prevError = error;
         prevTime = currentTime;
