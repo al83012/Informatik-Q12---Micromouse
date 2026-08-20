@@ -12,10 +12,12 @@
 #include "components/tmp464.h"
 #include "measurement.h"
 #include "Components/drv8424.h"
+#include "Components/vl53l4cd.h"
 #include "measurement.h"
 #include "driveControl.h"
 #include "i2ctool.h"
 #include "colors.h"
+#include <VL53L4CD.h>
 
 using namespace COLORS;
 
@@ -36,7 +38,7 @@ Esp32::initESP32();
  /* DEBUG: PID-Controller:
  DRIVECONTROL::forward(30, 5);*/
 
-Measurement::IR::calibration::initCalibration(15);
+//Measurement::IR::calibration::initCalibration(15);
 
 
 
@@ -54,22 +56,12 @@ void loop() {
  TMP464::DbgPrintTemperatures();
  //Measurement::Sensors::reportTemperature();
  DRV8424::debugPrintEncoderCounts();
-
-
-Measurement::IR::debugPrintRawDistance(1);
-
-Measurement::IR::debugPrintRawDistance(0);
-
-Measurement::IR::debugPrintRawDistance(2);
-
-Measurement::IR::debugPrintRawDistance(3);
-
-
-
-
-
-Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
-
+//Measurement::IR::debugPrintRawDistance(1)
+//Measurement::IR::debugPrintRawDistance(0);
+//Measurement::IR::debugPrintRawDistance(2);
+//Measurement::IR::debugPrintRawDistance(3);
+//Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
+//TOF::debugReadAllSensors();
 
 
 

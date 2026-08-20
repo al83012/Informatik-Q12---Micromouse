@@ -28,6 +28,9 @@ namespace ComponentVars {
 
     //SENSOR_PCB Initial Pin States
     constexpr uint8_t SENSOR_PCB_INITIAL_STATE = 0b00011111;
+    //SENSOR_PCB ToF_Input Pin States
+    constexpr uint8_t SENSOR_PCB_TOF_INPUT_STATE = 0b00011111;
+
 
     //MOTOR-DRIVER_CB  Pin Assignments
     constexpr uint8_t PIN_TMP_THERM = 0; // I
@@ -46,7 +49,7 @@ namespace ComponentVars {
 
      void init();
      void write_init_states();
-
+     void setToFToInput();
      uint8_t read_register_sensor(uint8_t registerAdress);
      uint8_t read_register_driver(uint8_t registerAdress);
     

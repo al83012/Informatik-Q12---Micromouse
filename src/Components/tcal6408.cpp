@@ -30,6 +30,11 @@ void TCAL6408::write_init_states() {
     log_d("# TCAL6408: Initial states set for Motor Driver PCB");
 }
 
+void TCAL6408::setToFToInput() {
+    write_register_sensor(ComponentVars::REG_CONFIG, ComponentVars::SENSOR_PCB_TOF_INPUT_STATE); 
+    log_d("# TCAL6408: ToF pins set to input mode");
+}
+
 uint8_t TCAL6408::read_register_driver(uint8_t reg) {
  uint8_t value;
  I2C1Read(ComponentVars::I2C_ADDRESS_0, reg, value);

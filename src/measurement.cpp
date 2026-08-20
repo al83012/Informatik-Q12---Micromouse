@@ -201,8 +201,8 @@ int Measurement::IR::getNoise(int channel) {
 }
 
 void Measurement::IR::debugPrintRawDistance(int channel) {
-    log_i("# Noise of channel" CYAN "%d : %d", channel, Noises[channel]);
-    log_i("# Raw value of channel" MAGENTA "%d : %d", channel, FinalDistances_Unconverted[channel]);
+    log_i("# Noise of channel" CYAN "%d : %d" RESET, channel, Noises[channel]);
+    log_i("# Raw value of channel" MAGENTA "%d : %d" RESET, channel, FinalDistances_Unconverted[channel]);
 
 } 
 
