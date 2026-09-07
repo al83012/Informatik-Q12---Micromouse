@@ -5,7 +5,7 @@
 
 
 // Time-of-Flight (ToF) Distance Sensor
-namespace TOF {
+namespace VL53L4CD_PHYSICAL {
     
     constexpr uint8_t sensorCount = 3;
    inline VL53L4CD sensors[sensorCount] = {VL53L4CD(), VL53L4CD(), VL53L4CD()};
@@ -14,6 +14,7 @@ namespace TOF {
    inline VL53L4CD sensorRight = sensors[2];
     void init();
     void debugReadAllSensors();
+    uint16_t debugReadSensor(int sensorIndex);
 
 
 }

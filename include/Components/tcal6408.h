@@ -27,9 +27,9 @@ namespace ComponentVars {
     constexpr uint8_t PIN_VL53_2_XSHUT = 7; // O
 
     //SENSOR_PCB Initial Pin States
-    constexpr uint8_t SENSOR_PCB_INITIAL_STATE = 0b00011111;
+    constexpr uint8_t SENSOR_PCB_INITIAL_STATE =   0b00011111;
     //SENSOR_PCB ToF_Input Pin States
-    constexpr uint8_t SENSOR_PCB_TOF_INPUT_STATE = 0b00011111;
+    constexpr uint8_t SENSOR_PCB_TOF_INPUT_STATE = 0b11111111;
 
 
     //MOTOR-DRIVER_CB  Pin Assignments

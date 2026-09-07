@@ -1,7 +1,6 @@
 #ifndef MASTER_H
 #define MASTER_H
 #include <String>
-#include "simulation.h"
 
 namespace Master {
 

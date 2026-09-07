@@ -6,9 +6,9 @@
 #include "master.h"
 #include "utility.h"
 #include "network.h"
-#include "simulation.h"
 #include "handler.h"
 #include "driveControl.h"
+#include "measurement.h"
 
 using namespace websockets;
 using namespace std;
@@ -37,19 +37,19 @@ void Handler::movePassive(int cells) {
 
 int Handler::measure(char dir) {
   if (dir == 'F') {
-    //read processed value of sensor -> return distance in walls
+    return Measurement::TOF::secureMeasurementFront();
   }
 
   if (dir == 'R') {
-    //read processed value of sensor -> return distance in walls
+    return Measurement::TOF::secureMeasurementRight();
   }
 
   if (dir == 'L') {
-    //read processed value of sensor -> return distance in walls
+    return Measurement::TOF::secureMeasurementLeft();
   }
 
 
-  return Simulation::sim_measure(dir);
+  return -1;
 }
 
 
@@ -127,7 +127,6 @@ void Handler::turnPassive(int turns) {
 
   }*/
   log_d("# TURN > SRV");
-  Simulation::sim_turn(turns);  //REMOVE AFTER SIM
 }
 
 

@@ -9,6 +9,7 @@
 #include "Components/tpl0102.h"
 #include "Components/vl53l4cd.h"
 #include "colors.h"
+#include "Components/vl53l4cd.h"
 
 using namespace COLORS;
 void Measurement::Sensors::e_sensor(SensorNames SensorName, std::string errorMessage) {
@@ -350,4 +351,78 @@ void Measurement::IR::WallDetection::debugPrintWallDetectionStatus() {
     log_i("# Left Wall: " CYAN "%s (%d / %d)" RESET, isWallLeft ? RED "N" : GREEN "Y", Measurement::IR::getDistance(Measurement::IR::CHANNEL_LEFT), Measurement::IR::calibration::wallThresholdLeft);
     log_i("# Right Wall: " CYAN "%s (%d / %d)" RESET, isWallRight ? RED "N" : GREEN "Y", Measurement::IR::getDistance(Measurement::IR::CHANNEL_RIGHT), Measurement::IR::calibration::wallThresholdRight);
     log_i("# Front Wall: " CYAN "%s (%d / %d" RESET, isWallFront ? RED "N" : GREEN "Y", Measurement::IR::getDistance(Measurement::IR::CHANNEL_FRONT1), Measurement::IR::calibration::wallThresholdFront);
+}
+
+void Measurement::TOF::updateWallStatus() {
+    distance_front = VL53L4CD_PHYSICAL::debugReadSensor(0);
+    distance_left = VL53L4CD_PHYSICAL::debugReadSensor(1);
+    distance_right = VL53L4CD_PHYSICAL::debugReadSensor(2);
+
+    isWallLeft = distance_left < ((DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10)/2 *(1 + Measurement::TOF::tolerancePercent / 100.0f));
+    isWallRight = distance_right < ((DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10)/2 *(1 + Measurement::TOF::tolerancePercent / 100.0f));
+    isWallFront = distance_front < ((DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10)/2 *(1 + Measurement::TOF::tolerancePercent / 100.0f));
+    distance_tiles_left = distance_left / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
+    distance_tiles_right = distance_right / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
+    distance_tiles_front = distance_front / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
+}
+
+void Measurement::TOF::debugPrintWallStatus() {
+    updateWallStatus();
+    log_i("# TOF Wall Detection Status:");
+    //log_i("# Left Wall: " CYAN "%s (%d mm) > %d Tiles" RESET, isWallLeft ? RED "N" : GREEN "Y", VL53L4CD_PHYSICAL::distance_left, distance_tiles_left);
+    //log_i("# Right Wall: " CYAN "%s (%d mm) > %d Tiles" RESET, isWallRight ? RED "N" : GREEN "Y", VL53L4CD_PHYSICAL::distance_right, distance_tiles_right);
+    log_i("# Front Wall: " CYAN "%s (%d mm) > %d Tiles" RESET, isWallFront ? GREEN "Y" : RED "N", distance_front, distance_tiles_front);
+}
+
+int Measurement::TOF::secureMeasurementFront() {
+    int measurements[5];
+    for(int i = 0; i < 5; i++) {
+        measurements[i] = VL53L4CD_PHYSICAL::debugReadSensor(0);
+        distance_front = measurements[i];
+        
+
+        delay(50);
+    }
+    std::sort(measurements, measurements + 5);
+    distance_tiles_front = measurements[2] / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
+    return measurements[2];
+}
+
+int Measurement::TOF::secureMeasurementLeft() {
+    int measurements[5];
+    for(int i = 0; i < 5; i++) {
+        measurements[i] = VL53L4CD_PHYSICAL::debugReadSensor(1);
+        distance_left = measurements[i];
+
+        delay(50);
+    }
+    std::sort(measurements, measurements + 5);
+    distance_tiles_left = measurements[2] / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
+    return measurements[2];
+}
+
+int Measurement::TOF::secureMeasurementRight() {
+    int measurements[5];
+    for(int i = 0; i < 5; i++) {
+        measurements[i] = VL53L4CD_PHYSICAL::debugReadSensor(2);
+        distance_right = measurements[i];
+
+        delay(50);
+    }
+    std::sort(measurements, measurements + 5);
+    distance_tiles_right = measurements[2] / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
+    return measurements[2];
+}
+
+void Measurement::TOF::debugPrintSecureMeasurements() {
+    int front = secureMeasurementFront();
+    int left = secureMeasurementLeft();
+    int right = secureMeasurementRight();
+
+    log_i("# Secure Measurements:");
+    log_i("# Front: " CYAN "%d mm" RESET, front);
+    log_i("# Front_Tiles: " CYAN "%d" RESET, distance_tiles_front);
+
+   // log_i("# Left: " CYAN "%d mm" RESET, left);
+   // log_i("# Right: " CYAN "%d mm" RESET, right);
 }

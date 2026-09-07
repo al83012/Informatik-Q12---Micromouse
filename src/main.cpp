@@ -30,7 +30,7 @@ Esp32::initESP32();
 
  I2CTOOL::I2CScanner();
 
- TPL0102::DbgPrintVoltages();
+// TPL0102::DbgPrintVoltages();
  TMP464::DbgPrintTemperatures(); 
 
 
@@ -61,7 +61,7 @@ void loop() {
 //Measurement::IR::debugPrintRawDistance(2);
 //Measurement::IR::debugPrintRawDistance(3);
 //Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
-//TOF::debugReadAllSensors();
+Measurement::TOF::debugPrintSecureMeasurements();
 
 
 

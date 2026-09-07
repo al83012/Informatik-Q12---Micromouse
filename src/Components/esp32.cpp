@@ -40,7 +40,7 @@ void Esp32::initSubComponents() {
     DRV8424::init(50000);
     FAN::init();
     Measurement::IR::init();
-    //TOF::init();
+    VL53L4CD_PHYSICAL::init();
 
 }
 

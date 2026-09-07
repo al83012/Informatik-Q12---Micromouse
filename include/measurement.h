@@ -2,6 +2,7 @@
 #define MEASUREMENT_H
 #include "string"
 #include "Arduino.h"
+#include "driveControl.h"
 
 namespace Measurement {
 
@@ -84,7 +85,32 @@ namespace Measurement {
         }
 
 
-    } 
+    }
+    
+    namespace TOF {
+        inline bool isWallFront;
+        inline bool isWallLeft;
+        inline bool isWallRight;
+        
+        inline uint16_t distance_front;
+        inline uint16_t distance_left;
+        inline uint16_t distance_right;
+
+        inline int distance_tiles_front;
+        inline int distance_tiles_left;
+        inline int distance_tiles_right;
+
+        void updateWallStatus();
+        void debugPrintWallStatus();
+        constexpr int tolerancePercent = 10;
+        
+        int secureMeasurementFront();
+        int secureMeasurementLeft();
+        int secureMeasurementRight();
+
+        void debugPrintSecureMeasurements();
+        
+    }
     
 
 
