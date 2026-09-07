@@ -1,12 +1,54 @@
+//DEBUG
+globalThis.fieldGrid = function (field) {
+    entire = "";
+    for (let y = 0; y < 10; y++) {
+        for (let i = 0; i < 3; i++) {
+            topr = "";
+
+            if (i === 0 || i === 2) {
+                for (let x = 0; x < 16; x++) {
+                    let col = field[x][y];
+
+                    if (col[i + 1]) {
+                        topr += " | ";
+                    } else {
+                        topr += "   ";
+                    }
+                }
+            } else {
+                for (let x = 0; x < 16; x++) {
+                    let col = field[x][y];
+
+                    if (col[2]) topr += "-";
+                    else topr += " ";
+
+                    topr += "@";
+
+                    if (col[0]) topr += "-";
+                    else topr += " ";
+                }
+            }
+
+            entire += topr + "\n";
+        }
+    }
+    return entire;
+}
+
+
+//NORMAL CODE STARTS HERE
+
+
+const { save } = require('./recorder.cjs');
+
 const { Action, Actions} = require('./Actions.js');
-
 const { BackendManager } = require('./BackendManager.js');
-const manager = new BackendManager();
 
+const manager = new BackendManager();
 const { Worker } = require('node:worker_threads');
 const { join, dirname } = require('node:path');
-const worker_path = join(__dirname, 'worker.js');
 
+const worker_path = join(__dirname, 'worker.js');
 //Worker doesn't work, idk why
 function runWorker(workerData) {
     return new Promise((resolve, reject) => {
@@ -62,12 +104,16 @@ function runWorker(workerData) {
             }
         });
     });
-}
 
+}
 async function loop_worker(manager) {
 //    await runWorker(manager);
     new Worker(worker_path, {manager,});
+
+
+
 }
+
 
 
 
@@ -75,10 +121,6 @@ class Options {
     static recon = true;
     static input = true;
 }
-
-
-
-
 /**Comment is deprecated -> moved to ".md"
  * Communication build with Backend
  * Sending:
@@ -105,18 +147,19 @@ function find_gateway() {
     int = int_f;
 };
 const {gateway_f, version_f, int_f} = gateway4sync();
-console.log("\x1b[33m[B] Found Gateway on: " + gateway_f + "; version: " + version_f + "; int: " + int_f + "");
 
+console.log("\x1b[33m[B] Found Gateway on: " + gateway_f + "; version: " + version_f + "; int: " + int_f + "");
 console.log("\x1b[33m[B] Requiring Websocket");
 const WebsocketClient = require('websocket').client;
 const back_port = 8090;
-const host = '192.168.137.1';
+const host = '127.0.0.1'//'192.168.137.1';
 console.log("\x1b[33m[B] Creating Client");
-const client = new WebsocketClient();
 
+const client = new WebsocketClient();
 function connect_backend() {
     console.log("\x1b[33m[B] Attempting Connection");
     client.connect("ws://"+host+":"+back_port);
+
 };
 
 client.on('connectFailed', (err) => {
@@ -139,7 +182,7 @@ client.on('connect', (conn) => {
     manager.backend_client = client;
     manager.f_sync.push(Actions.update_con_status(true));
 
-    conn.ping();
+    manager.b_sync(Actions.b_test());
 
     conn.on('error', (err) => {
         console.log("\x1b[33m[B] \x1b[31mImplement ERROR");
@@ -151,6 +194,7 @@ client.on('connect', (conn) => {
         console.log('\x1b[33m[B] Connection Closed');
         manager.set_backend(null);
         manager.f_sync.push(Actions.update_con_status(false));
+        save("log-" + Date.now() + ".json");
         connect_backend();
     });
     conn.on('message', (message) => {
@@ -160,10 +204,9 @@ client.on('connect', (conn) => {
         }
     });
 });
-
 console.log("\x1b[33m[B] Connecting to Backend");
-connect_backend();
 
+connect_backend();
 /*old deprecated due to protocol
 const net = require('net');
 const back_port = 8090; //which is from arne?
@@ -178,6 +221,7 @@ client.on('error', (err) => {console.log("Implement ERROR")})
         console.log('Reconnected successfully');
     });
 });*/ //for actual production
+
 /*
 client.connect( {port: back_port, host: host }, function () {
     console.log('Connected successfully to backend');
@@ -187,14 +231,13 @@ client.connect( {port: back_port, host: host }, function () {
 client.on('data', (data) => {
     manager.b_handleUpdate(data);
 });*/
-
 //retrieving lokal ip
 console.log("\x1b[34m[L] Retrieving IP");
+
 const { networkInterfaces } = require('os');
-
 const nets = networkInterfaces();
-const results = Object.create(null); // Or just '{}', an empty object
 
+const results = Object.create(null); // Or just '{}', an empty object
 for (const name of Object.keys(nets)) {
     for (const net of nets[name]) {
         // Skip over non-IPv4 and internal (i.e. 127.0.0.1) addresses
@@ -207,22 +250,23 @@ for (const name of Object.keys(nets)) {
             results[name].push(net.address);
         }
     }
+
+
 }
-
-
 //communication with frontend
 console.log("\x1b[32m[F] Requiring Express");
 const express = require('express');
 const app = express();
+
+
 const front_port = 3000;
 
-
 let actions = [];
-
 console.log("\x1b[32m[F] Creating Website host at: " + JSON.stringify(results));
 app.use(express.static("./../web_frontend"));
 app.use("/module", express.static("./../web_frontend/module"));
 app.use("/favicon.ico", express.static("./../web_frontend/favicon.ico"));
+
 app.use(express.json());
 
 app.get('/update', (req, res) => {
@@ -239,7 +283,7 @@ app.post('/action', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    res.redirect("/home.html");
+    res.redirect("/home_new.html");
 });
 
 app.post('/error', (req, res) => {
@@ -247,20 +291,24 @@ app.post('/error', (req, res) => {
     res.send("handled");
 });
 
+
 app.listen(front_port, () => console.log(`\x1b[32m[F] WebInterface listening on port ${front_port}!`));
-
-
 const readline = require("node:readline")
+
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
+const { Utils } = require('./Utils.ts');
 
 function input(string) {
     let parts = string.split(":");
     switch (parts[0]) {
         case "norecon":
             Options.recon = false;
+            break;
+        case "save":
+            save("log-" + Date.now() + ".json");
             break;
         case "b":
             if (parts.length >= 2) {
@@ -308,8 +356,65 @@ function input(string) {
                         if (parts.length === 4) {
                             manager.f_sync.push(Actions[parts[2]](manager.in_maze.discovered,...parts[3].split(",")));
                         }
+                        break;
+
                 }
             }
+            break;
+        default:
+            Utils.is(parts, "f:path:create:random", (rest) => {
+                /*let path = [];
+
+                let count = Math.floor(Math.random() * 5) + 1;
+
+                for (;count > 0; count--) {
+                    let dir = Math.floor(Math.random() * 2);
+                    let amount = Math.floor(Math.random() * 10) + 1;
+                    if (dir === 0) {
+                        if (path.length > 0) {
+                            if (path[path.length - 1][path[path.length-1].length-1] === "") {//TODO: complete test path generation with walker?
+
+                            }
+                        }
+                    } else if (dir === 1) {
+
+                    }
+                }*/
+
+                const target = { x: 8, y: 8 };
+
+                const path = [{ x: 0, y: 0 }];
+                const visited = new Set(["0,0"]);
+
+                while (path.at(-1).x !== 8 || path.at(-1).y !== 8) {
+                    const { x, y } = path.at(-1);
+
+                    const moves = [
+                        [1, 0], [-1, 0], [0, 1], [0, -1]
+                    ]
+                        .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
+                        .filter(p =>
+                            p.x >= 0 && p.x < 16 &&
+                            p.y >= 0 && p.y < 16 &&
+                            !visited.has(`${p.x},${p.y}`)
+                        )
+                        .sort(() => Math.random() - 0.5)
+                        .sort((a, b) =>
+                            Math.abs(a.x - target.x) + Math.abs(a.y - target.y) -
+                            Math.abs(b.x - target.x) - Math.abs(b.y - target.y)
+                        );
+
+                    if (moves.length) {
+                        path.push(moves[0]);
+                        visited.add(`${moves[0].x},${moves[0].y}`);
+                    } else {
+                        visited.delete(`${x},${y}`); //run into a non-solvable state
+                        path.pop();
+                    }
+                }
+
+
+            });
             break;
     }
 

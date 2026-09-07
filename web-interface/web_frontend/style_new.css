@@ -4,17 +4,24 @@ t23 {
     font-weight: bold;
 }
 
+e {
+    font-size: 1.3rem;
+    margin-left: 5px;
+    font-weight: bold;
+    color: var(--text-color);
+}
+
 :root {
     --controll_disabled: #52544D;
     --controll_enabled: #017fac;
-    --win_bg: #0f1119;
+    --win_bg: #120f14;
     /*--bg: #181F10;*/
     --bg: #0f0f12;
     --maze_bg: #0a0e1a;
     --bg_old: #0a0c12;
     --bg_path: #0765A0;
     --shadow_path: #4994C3;
-    --text-color: #7F3D41/*#6B2737;*/;
+    --text-color: #e15459 /*#6B2737;*/;
     --button-text-color: #D9C5B2;
     --square_size: 30px;
     --square_size_full: calc(var(--square_size) + var(--square_border_size)*2);
@@ -22,6 +29,11 @@ t23 {
     --arm: #00cfff;
     --arm-glow: rgba(0,207,255,0.6);
     --node: #00cfff;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    zoom: 0.9159;
 }
 
 body {
@@ -47,7 +59,7 @@ body {
     height: 100%;
     align-items: center;
     justify-content: center;
-    opacity: 0.6;
+    opacity: 0.8;
     background-color: var(--bg);
     z-index: 1000; /*to be on top of everything*/
 }
@@ -74,17 +86,29 @@ body {
     align-items: center;
     justify-content: space-between;
     flex-direction: row;
-    margin-top: 0;
+    margin-top: 3px;
     padding-top: 0;
     margin-bottom: 4px;
-    width: 100%;
+    width: 98%;
+    left: 1%;
     height: fit-content;
     /*background-image: linear-gradient(to right, #074fba, #0644a1);*/
-    background: var(--bg);
-    border-width: 1px;
+    background: var(--win_bg);
+    border-width: 2px;
+    border-radius: 20px;
     border-style: solid;
-    border-color: gray;
+    border-color: darkgray;
     box-shadow: darkgray 0 0 4px 0;
+}
+
+.bottom_container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: row;
+    margin-top: 10px;
+    width: 100%;
+    height: fit-content;
 }
 
 /*.header_small_container {
@@ -162,13 +186,15 @@ body {
 
     border-radius: 15px;
     border: darkgray 2px solid;
-    box-shadow: darkgray 0 0 3px 1px;
+    box-shadow: darkgray 0 0 1px 1px;
 
-    position: absolute;
+    margin-left: 10px;
+
+    /*position: absolute;
     right: 10px;
-    top: 20px;
+    top: 20px;*/
 
-    margin: 3px 0 4px 4px;
+    /*margin: 3px 0 4px 4px;*/
     padding: 4px 5px 4px 5px;
 
     color: var(--text-color);
@@ -180,10 +206,9 @@ body {
 
 .body_container {
     display: flex;
-    align-items: center;
     justify-content: center;
     flex-direction: row;
-    margin-top: 20px;
+    margin-top: 5px;
     width: 100%;
     height: 100%;
 }
@@ -194,6 +219,7 @@ body {
     flex-direction: column;
     width: fit-content;
     height: fit-content;
+    margin-left: 5px;
 }
 
 .algo_container {
@@ -204,10 +230,11 @@ body {
     width: fit-content;
     height: fit-content;
 
-    border: darkgray 1px solid;
-    border-radius: 7px;
+    border: darkgray 2px solid;
+    border-radius: 15px;
     box-shadow: darkgray 0 0 3px 0;
     background-color: var(--win_bg);
+    margin-right: 15px;
 }
 
 .algo_header {
@@ -215,11 +242,11 @@ body {
     align-items: center;
     justify-content: left;
     flex-direction: row;
-    width: 100%;
+    width: fit-content;
     height: fit-content;
-    border-bottom-width: 1px;
+    /*border-bottom-width: 1px;
     border-bottom-style: solid;
-    border-bottom-color: darkgray;
+    border-bottom-color: darkgray;*/
 }
 
 .algo_header_text {
@@ -234,16 +261,17 @@ body {
     align-items: flex-start;
     justify-content: left;
     flex-direction: column;
-    width: 300px;
+    width: fit-content;
     height: fit-content;
+    margin-right: 5px;
 }
 
 .algo_current {
     color: var(--text-color);
     font-weight: bold;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    margin-left: 15px;
+    margin-top: 7px;
+    margin-bottom: 7px;
+    margin-left: 5px;
     font-size: 1.5rem;
 
     border: darkgray 1px solid;
@@ -276,7 +304,7 @@ body {
     height: 500px;
     background-color: var(--win_bg);
 
-    z-index: 100;
+    z-index: 202;
 
     border: gray 2px solid;
     border-radius: 15px;
@@ -286,7 +314,7 @@ body {
 .pop_window_algorithm_dimmer {
     display: block;
     position: absolute;
-    z-index: 99;
+    z-index: 201;
     width: 100%;
     height: 100%;
 
@@ -337,19 +365,147 @@ body {
     text-indent: 10px;
 }
 
+
+.sensor_container {
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    justify-items: center;
+    width: fit-content;
+    height: fit-content;
+
+    margin-top: 5px;
+
+    border: darkgray 2px solid;
+    border-radius: 15px;
+
+    box-shadow: darkgray 0 0 2px 1px;
+}
+
+.sensor_header {
+    display: flex;
+    width: 95%;
+    height: fit-content;
+    justify-content: left;
+    flex-direction: row;
+
+    border-bottom-width: 1px;
+    border-bottom-style: solid;
+    border-bottom-color: darkgray;
+
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+
+    font-size: 1.4rem;
+    color: var(--text-color);
+    font-weight: bold;
+    padding-left: 10px;
+
+    background: var(--win_bg);
+}
+
+.sensor_body {
+    display: flex;
+    align-items: flex-start;
+    justify-items: left;
+    justify-content: left;
+    flex-direction: column;
+    width: 180px;
+    height: 590px;
+    background: var(--win_bg);
+    border-bottom-left-radius: 15px;
+    border-bottom-right-radius: 15px;
+}
+
+.left_container {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+}
+
+.graph_container {
+    position: relative;
+    display: flex;
+    width: 300px;
+    height: 230px;
+    margin-top: 5px;
+    margin-right: 2px;
+    border: darkgray 2px solid;
+    border-radius: 15px;
+    box-shadow: darkgray 0 0 3px 0px;
+    background: var(--win_bg);
+}
+
+.graph_container.small {
+    position: absolute;
+    z-index: 200;
+    width: 300px;
+    height: 230px;
+    top: 58.5%;
+    left: 4%;
+
+    transition: width 0.75s ease-in-out, height 0.75s ease-in-out, top 0.75s ease-in-out, left 0.75s ease-in-out, left 0.75s ease-in-out, position 0.1s ease-in-out 0.75s;
+}
+.graph_container.large {
+    position: absolute;
+    width: 70%;
+    height: 70%;
+    z-index: 200;
+    top: 15%;
+    left: 15%;
+
+    transition: width 0.75s ease-in-out, height 0.75s ease-in-out, top 0.75s ease-in-out, left 0.75s ease-in-out, left 0.75s ease-in-out;
+}
+
+.graph {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.graph_background {
+    display: none;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-color: var(--win_bg);
+    z-index: 199;
+    opacity: 0.5;
+    top: 0;
+    left: 0;
+}
+
+.graph_background.shown {
+    display: block;
+    opacity: 0.7;
+    transition: opacity 0.2s ease-in-out, display 0.2s ease-in-out 0.2s;
+}
+
+.graph_background.hidden {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out, display 0.2s ease-in-out 0.2s;
+}
+
 .debug_console_container {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
     width: fit-content;
-    height: fit-content;
+    height: 80%;
+
+    top: 0;
 
     border-color: darkgray;
-    border-width: 1px;
+    border-width: 2px;
     border-style: solid;
-    border-radius: 5px;
-    margin: 15px;
+    border-radius: 15px;
+    margin-right: 5px;
 
     background-color: var(--win_bg);
 
@@ -367,6 +523,12 @@ body {
     border-bottom-style: solid;
     border-bottom-color: darkgray;
     margin-top: 1px;
+    padding-top: 0;
+    border-top-radius: 15px;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+    -moz-border-radius-topleft: 15px;
+    -moz-border-radius-topright: 15px;
 
     background-color: var(--win_bg);
 }
@@ -374,8 +536,8 @@ body {
 .debug_console_header_dot {
     margin-left: 6px;
     border-radius: 30px;
-    border: 4px solid darkblue;
-    box-shadow: 0 0 2px 2px darkblue;
+    border: 4px solid blue;
+    box-shadow: 0 0 2px 2px blue;
     animation: fade 4s infinite;
 }
 
@@ -393,12 +555,14 @@ body {
     flex-direction: column;
     align-items: flex-start;
     width: 300px;
-    height: 250px;
-    background-color: #0a0e1a;
+    height: 340px;
+    background-color: var(--win_bg);
     border-radius: 5px;
+    border-bottom-left-radius: 15px;
+    border-bottom-right-radius: 15px;
     border-style: solid;
-    border-color: black;
-    border-width: 1px;
+    border-color: var(--win_bg);
+    border-width: 2px;
 
     overflow-x: hidden;
     overflow-y: scroll;
@@ -435,15 +599,15 @@ body {
 
 .maze_container {
     display: flex;
-    width: fit-content;/*calc(var(--square_size_full)*16);*/
-    height: fit-content;
+    width: 585px;/*calc(var(--square_size_full)*16);*/
+    height: 628px;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    background-color: #0f1119;
-    border-width: 1px;
+    background-color: var(--win_bg);
+    border-width: 2px;
     border-style: solid;
-    border-radius: 5px;
+    border-radius: 25px;
     border-color: darkgray;
     box-shadow: darkgray 0 0 3px 0;
 }
@@ -499,7 +663,7 @@ body {
     align-items: center;
     justify-content: center;
     background-color: red;
-    margin: 27px;
+    margin: 20px;
     box-shadow: darkslategray 0 0 5px 5px;
 }
 
@@ -756,12 +920,16 @@ body {
 .sys-wall_wall-right.off {
     opacity: 0;
     background: #000;
+
+    transition: opacity 0.2s ease-in, background 0.2s ease-in, box-shadow 0.2s ease-out;
 }
 
 .sys-wall_wall-right.on {
     background: var(--arm);
     opacity: 0.8;
     box-shadow: 0 0 2px var(--arm-glow);
+
+    transition: opacity 0.2s ease-in, background 0.2s ease-in, box-shadow 0.2s ease-in;
 }
 
 .sys-wall_wall-bottom {
@@ -796,7 +964,7 @@ body {
 
 .sys-mouse_wrapper {
     position: absolute;
-    z-index: 29; /*higher then the arm system*/
+    z-index: /*-1;*/29; /*higher then the arm system*/ /*-1 only for debug*/
     pointer-events: none;
     width: 544px;
     height: 544px;
@@ -827,10 +995,10 @@ body {
     flex-direction: column;
     width: fit-content;
     height: fit-content;
-    margin: 1rem 0;
+    /*margin: 1rem 0;*/
 
-    border: darkgray 1px solid;
-    border-radius: 7px;
+    border: darkgray 2px solid;
+    border-radius: 15px;
 
     box-shadow: darkgray 0 0 3px 0;
 

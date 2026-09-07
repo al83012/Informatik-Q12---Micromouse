@@ -29,8 +29,64 @@
             src="3d_model/out.glb"
             alt="A Test 3D Model"
             shadow-intensity="1"
-            camera-controls>
+            camera-controls
+            ar ar-modes="webxr"
+            id="model_viewer">
+            <div slot="hotspot-battery" class="anchor" data-surface="0 0 0 0 0 0"></div>
+            <svg id="lines" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" class="lineContainer">
+                <line class="annotation-line"></line>
+            </svg>
+
+            <div id="container">
+                <button id="battery" class="label">Battery</button>
+            </div>
         </model-viewer>
+        <script type="module">
+            const modelViewer = document.getElementById("model_viewer");
+            const lines = modelViewer.querySelectorAll('line');
+            let baseRect, batteryRect;
+
+            function onResize() {
+                const arStatus = modelViewer.getAttribute('ar-status');
+                baseRect = (arStatus == "not-presenting" || arStatus == "failed") ? modelViewer.getBoundingClientRect()
+                    : new DOMRect();
+
+                batteryRect = document.querySelector('#battery').getBoundingClientRect();
+            }
+
+            window.addEventListener("resize", onResize);
+
+            modelViewer.addEventListener("ar-status", (event) => {
+                lines.forEach((line) => {
+                    if (event.detail.status !== 'session-started') {
+                        element.classList.remove('hide');
+                    } else {
+                        element.classList.add('hide');
+                    }
+                });
+                onResize();
+            });
+
+            modelViewer.addEventListener("load", () => {
+                onResize();
+
+                function drawLine(svgLine, name, rect) {
+                    const hotspot = modelViewer.queryHotspot('hotspot-' + name);
+
+                    svgLine.setAttribute('x1', hotspot.canvasPosition.x);
+                    svgLine.setAttribute('y1', hotspot.canvasPosition.y);
+                    svgLine.setAttribute('x2', (rect.left + rect.width) / 2 - baseRect.left);
+                    svgLine.setAttribute('y2', rect.top + baseRect.top);
+                }
+
+                const startSVGRenderLoop = () => {
+                    drawLine(lines[0], 'battery', batteryRect);
+                    requestAnimationFrame(startSVGRenderLoop);
+                };
+
+                startSVGRenderLoop();
+            });
+        </script>
 
     </div>
 

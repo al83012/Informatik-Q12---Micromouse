@@ -20,10 +20,19 @@ export class Animation {
     duration;
     finished = false;
 
-    constructor(duration, object) {
-        this.duration = duration;
-        this.remaining_duration = duration;
-        this.object = object;
+    constructor(duration, object, ignore=false, debug ="") {
+        if (ignore) return;
+
+        if (object !== null) {
+            this.duration = duration;
+            this.remaining_duration = duration;
+            this.object = object;
+            this.has_animation = object?.has_animation ?? false;
+        } else {
+            console.log("[ERROR] -> Animation: object is null");
+            console.log(debug);
+            throw new Error("Animation: object is null");
+        }
     }
 
     execute() {};
@@ -297,12 +306,24 @@ export class AnimBorderColor extends Animation {
 }
 
 export class AnimCssChange extends Animation {
-    constructor(duration, object, items, replacement) {
-        super(duration, object);
-        this.log_name = object.className;
-        //console.log(this.log_name);
-        this.items = items;
-        this.replacement = replacement;
+    constructor(duration, object, items, replacement, debug = "DebugNotSet") {
+        if (object !== null) {
+            super(duration, object, false, debug);
+            if (this.has_animation) {
+                console.log("Possible collision with existing AnimCssChange: " + (object?.css_change_anim_repl ?? "no-anim"));
+            } else {
+                object.has_animation = true;
+                object.css_change_anim_repl = replacement;
+            }
+
+            this.log_name = object.className;
+            //console.log(this.log_name);
+            this.items = items;
+            this.replacement = replacement;
+        } else {
+            super(duration, null, false, debug);
+            this.has_animation = true;
+        }
     }
 
     execute() {
@@ -311,14 +332,15 @@ export class AnimCssChange extends Animation {
         }
 
         try {
-            if (this.duration === this.remaining_duration) {
-                for (let i = 0; i < this.items.length; i++) {
-                    if (this.object.className.includes(" " + this.items[i])) {
-                        this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
-                        break;
+            if (this.object !== null) {
+                if (this.duration === this.remaining_duration) {
+                    for (let i = 0; i < this.items.length; i++) {
+                        if (this.object.className.includes(" " + this.items[i])) {
+                            this.object.className = this.object.className.replace(" " + this.items[i], " " + this.replacement);
+                            break;
+                        }
                     }
                 }
-
             }
         } catch (e) {
             console.log("Error in AnimCssChange of tile: " + this.log_name);
@@ -517,10 +539,13 @@ export class AnimGroup extends Animation {
     animations = [];
     rem_animations = [];
 
-    constructor(delay) {
-        super(-1, null); //ignore
+    constructor(delay, action) {
+        super(-1, null, true); //ignore
         this.delay = delay;
         this.current_delay = delay;
+        if (action !== undefined) {
+            this.action = action;
+        }
     }
 
     add(animation) {
@@ -583,14 +608,17 @@ export class AnimGroup extends Animation {
 
         if (all_finished) {
             this.finished = true;
+            if (this.action !== undefined) {
+                this.action();
+            }
         }
 
         this.current_delay++;
     }
 }
 
-export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are all arms tied to respective coords
-    const anim_time = 5;
+export function generatePathAnimGroup(path_in/*: int[][]*/, tiles, ignore_group, fnc) { //tiles are all arms tied to respective coords
+    const anim_time = 2;
     let complete_group = -1, complete_time = 0;
     for (let doub = 0; doub < 2; doub++) {
         let path = path_in.map(inner => [...inner]);
@@ -599,16 +627,27 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
         let changed_group;
         let changed_group_time = 0;
 
+        let adder_group = new AnimGroup(0);
+        let adder_group_time_max = 0;
+
         for (let i = path.length - 1; i >= 0; i--) {
             let part = structuredClone(path[i]);
+            let is_group = (part.pop() === 0); //0: no ; 1: yes
             let type = part.pop() //0: same ; -1: remove ; +1: add
 
             let duration = 0; //add 5 to the end to make it seamless
             for (let j = 0; j < part.length; j += 2) {
+                //console.log("tiles: ");
+                //console.log(tiles);
+                //console.log("J: " + j);
+                //console.log("length: " + tiles[[part[j], part[j + 1]]].length);
+                //console.log("coords: " + part[j] + ", " + part[j + 1]);
                 duration += tiles[[part[j], part[j + 1]]].length * anim_time;
             }
+
+            //console.log("type: " + type);
             duration /= 3;
-            duration -= 10; //remove the last few child_times
+            duration -= anim_time; //remove the last few child_times
             complete_time += duration;
 
             /*console.log("type:" + type)
@@ -624,26 +663,32 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                         for (let k = 0; k < tiles[[part[j], part[j + 1]]].length; k++) {//for all arms in tiles for the coords
                             group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
                                 (doub === 0 ? ["on", "repl"] : ["highlight", "repl"]),
-                                (doub === 0 ? "highlight" : "on")));
+                                (doub === 0 ? "highlight" : "on"), "Error from NORMAL case"));
                             //tiles[[part[j], part[j+1]]][k].style.opacity = 0;
                             //FIXED: Bug where the last for animations are created but not executed
                             //fix: cant be displayed on page load, only with a timeout of 1000
                         }
                     }
-                    n_group = new AnimGroup(duration);
+                    /*n_group = new AnimGroup(duration);
                     n_group.add(group);
                     n_group.add(c_group);
-                    c_group = n_group;
+                    c_group = n_group;*/
                     break;
                 case 1:
                     for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
                         for (let k = 0; k < tiles[[part[j], part[j + 1]]].length; k++) {//for all arms in tiles for the coords
+                            //console.log("Accessing k=" + k);
+                            //console.log("repeat tiles:");
+                            //console.log(tiles);
+                            //console.log("Coords for specific tiles: " + [part[j], part[j + 1]]);
+                            //console.log("specific tiles:")
+                            //console.log(tiles[[part[j], part[j + 1]]]);
                             group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
-                                (doub === 0 ? ["on", "repl"] : ["add", "repl"]),
-                                (doub === 0 ? "add" : "on")));
+                                (doub === 0 ? ["on", "repl", "off"] : ["add", "repl", "off"]),
+                                (doub === 0 ? "add" : "on"), "Error from ADD case: " + tiles[[part[j], part[j + 1]]])); //TODO: change the tiles to the classNames from this list
                         }
                     }
-                    if (!was_change) {
+                    /*if (!was_change) {
                         changed_group = group;
                         changed_group_time = duration;
                         was_change = true;
@@ -656,17 +701,17 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                         n_group.add(c_group);
                         c_group = n_group;
                         was_change = false;
-                    }
+                    }*/
                     break;
                 case -1:
                     for (let j = 0; j < part.length; j += 2) { //loop trough all coords in +2 jumps
                         for (let k = 0; k < tiles[[part[j], part[j + 1]]].length; k++) {//for all arms in tiles for the coords
                             group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
                                 (doub === 0 ? ["on", "repl"] : ["remove", "repl"]),
-                                (doub === 0 ? "remove" : "repl")));
+                                (doub === 0 ? "remove" : "repl"), "Error from REMOVE case"));
                         }
                     }
-                    if (!was_change) {
+                    /*if (!was_change) {
                         changed_group = group;
                         changed_group_time = duration;
                         was_change = true;
@@ -679,8 +724,19 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
                         n_group.add(c_group);
                         c_group = n_group;
                         was_change = false;
-                    }
+                    }*/
                     break;
+            }
+
+            adder_group_time_max = Math.max(adder_group_time_max, duration);
+            adder_group.add(group);
+
+            if (!is_group) {
+                n_group = new AnimGroup(adder_group_time_max);
+                n_group.add(adder_group);
+                n_group.add(c_group);
+                c_group = n_group;
+                adder_group = new AnimGroup(0);
             }
 
 
@@ -694,7 +750,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles) { //tiles are
         }
 
         if (complete_group === -1) {
-            complete_group = new AnimGroup((complete_time-30 < 10 ? complete_time : complete_time-20));
+            complete_group = new AnimGroup(4, fnc); //new AnimGroup((complete_time-30 < 10 ? complete_time : complete_time-20), fnc);
         }
         complete_group.add(c_group);
     }
