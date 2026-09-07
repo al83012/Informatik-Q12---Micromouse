@@ -372,7 +372,27 @@ export class PathManager {
         return 3;
     }
 
-    static convertCompact(): {
+    static convert_FieldIndex_to_directionString(direction: number): string {
+        if (direction === 0) return "PosX";
+        if (direction === 1) return "PosY";
+        if (direction === 2) return "NegX";
+        return "NegY";
+    }
+
+    static is_wall(walls: [number, number, number, number][], x: number, y: number, direction: string): boolean {
+        let other_x = (direction === "PosX") ? (x+1) : ((direction === "NegX") ? (x-1) : x);
+        let other_y = (direction === "PosY") ? (y+1) : ((direction === "NegY") ? (y-1) : y);
+        return walls.some(value => value[0] === x && value[1] === y
+            && value[2] === other_x && value[3] === other_y);
+    }
+
+    static exists_wall(walls: [number, number, number, number][], x: number, y: number, nx: number, ny: number): boolean {
+        return walls.some(value =>
+            (value[0] === x && value[1] === y && value[2] === nx && value[3] === ny) ||
+            (value[0] === nx && value[1] === ny && value[2] === x && value[3] === y));
+    }
+
+    static convertCompact(walls: [number, number, number, number][]): {
         from: [number, number],
         to: [number, number],
         direction: string
@@ -414,7 +434,7 @@ export class PathManager {
                 for (let j = 0; j <= node.to[0] - node.from[0]; j++) {
                     field[node.from[0] + j][node.from[1]][0] = true;
                 }
-            } else {
+            } else if (node.to[0] - node.from[0] < 0) {
                 for (let j = 0; j >= node.to[0] - node.from[0]; j--) {
                     field[node.from[0] + j][node.from[1]][2] = true;
                 }
@@ -428,6 +448,7 @@ export class PathManager {
         let direction: string;
 
         let splits: [number, number, string][] = [[0,0, (field[0][0][0] ? "PosX" : (field[0][0][1] ? "PosY" : "-1"))]];
+        let comp_splits: [number, number, string][] = [];
 
         let paths: {
             from: [number, number],
@@ -435,7 +456,9 @@ export class PathManager {
             direction: string,
         }[] = [];
 
-        while(splits.length > 0) {              //field.some(x => x.some(y => y.some(v => v)))) { //are there any true left
+        //old walker code
+        /*
+        while(splits.length > 0 && false) {              //field.some(x => x.some(y => y.some(v => v)))) { //are there any true left
             let split = splits.shift();
             x = split[0];
             y = split[1];
@@ -453,11 +476,19 @@ export class PathManager {
                 direction: direction
             };
 
+            let will_break: boolean = false;
+
             if (direction === "-1") {
                 break;
             } else if (direction === "PosX") {
                 for (let j = 0; j <= 15-x; j++) {
-                    if (field[x+j][y][0]) {
+                    if (this.is_wall(walls, x+j, y, "PosX")) {
+                        if (some(some(field[x+j+1], [])[y], [false])[0]
+                                && !contains(splits, [x+j+1,y,"PosX"])) {
+                            splits.push([x + j + 1, y, "PosX"]);
+                        }
+                        will_break = true;
+                    } else if (field[x+j][y][0]) {
                         path.to[0] = x+j;
                         field[x+j][y][0] = false;
                     } else {
@@ -465,19 +496,26 @@ export class PathManager {
                     }
 
                     if (y < 15) {
-                        if (field[x + j][y][1]) {
+                        if (field[x + j][y][1] && !contains(splits, [x+j,y+1,"PosY"])) {
                             splits.push([x + j, y + 1, "PosY"]);
                         }
                     }
                     if (y > 0) {
-                        if (field[x + j][y][3]) {
+                        if (field[x + j][y][3] && !contains(splits, [x+j,y-1,"NegY"])) {
                             splits.push([x + j, y - 1, "NegY"]);
                         }
                     }
+                    if (will_break) break;
                 }
             } else if (direction === "NegX") {
                 for (let j = 0; j <= x; j++) {
-                    if (field[x-j][y][2]) {
+                    if (this.is_wall(walls, x-j, y, "NegX")) {
+                        if (some(some(field[x-j-1], [])[y], [false, false, false])[2]
+                            && !contains(splits, [x-j-1,y,"NegX"])) {
+                            splits.push([x-j-1, y, "NegX"]);
+                        }
+                        will_break = true;
+                    } else if (field[x-j][y][2]) {
                         path.to[0] = x-j;
                         field[x-j][y][2] = false;
                     } else {
@@ -485,19 +523,26 @@ export class PathManager {
                     }
 
                     if (y < 15) {
-                        if (field[x - j][y][1]) {
+                        if (field[x - j][y][1] && !contains(splits, [x-j,y+1,"PosY"])) {
                             splits.push([x - j, y + 1, "PosY"]);
                         }
                     }
                     if (y > 0) {
-                        if (field[x + j][y][3]) {
+                        if (field[x + j][y][3] && !contains(splits, [x-j,y-1,"NegY"])) {
                             splits.push([x - j, y - 1, "NegY"]);
                         }
                     }
+                    if (will_break) break;
                 }
             } else if (direction === "PosY") {
                 for (let j = 0; j <= 15-y; j++) {
-                    if (field[x][y+j][1]) {
+                    if (this.is_wall(walls, x, y+j, "PosY")) {
+                        if (some(some(field[x], [])[y+j+1], [false,false])[1]
+                            && !contains(splits, [x,y+j+1,"PosY"])) {
+                            splits.push([x, y+j+1, "PosY"]);
+                        }
+                        will_break = true;
+                    } else if (field[x][y+j][1]) {
                         path.to[1] = y+j;
                         field[x][y+j][1] = false;
                     } else {
@@ -505,19 +550,26 @@ export class PathManager {
                     }
 
                     if (x < 15) {
-                        if (field[x][y + j][0]) {
+                        if (field[x][y + j][0] && !contains(splits, [x+1,y+j,"PosX"])) {
                             splits.push([x + 1, y + j, "PosX"]);
                         }
                     }
                     if (x > 0) {
-                        if (field[x][y + j][2]) {
+                        if (field[x][y + j][2] && !contains(splits, [x-1,y+j,"NegX"])) {
                             splits.push([x - 1, y + j, "NegX"]);
                         }
                     }
+                    if (will_break) break;
                 }
             } else if (direction === "NegY") {
                 for (let j = 0; j <= y; j++) {
-                    if (field[x][y-j][3]) {
+                    if (this.is_wall(walls, x, y-j, "NegY")) {
+                        if (some(some(field[x], [])[y-j-1], [false,false,false,false])[3]
+                            && !contains(splits, [x,y-j-1,"NegY"])) {
+                            splits.push([x, y-j-1, "NegY"]);
+                        }
+                        will_break = true;
+                    } else if (field[x][y-j][3]) {
                         path.to[0] = y-j;
                         field[x][y-j][3] = false;
                     } else {
@@ -525,18 +577,104 @@ export class PathManager {
                     }
 
                     if (x < 15) {
-                        if (field[x][y - j][0]) {
+                        if (field[x][y - j][0] && !contains(splits, [x+1,y-j,"PosX"])) {
                             splits.push([x + 1, y - j, "PosX"]);
                         }
                     }
                     if (x > 0) {
-                        if (field[x][y - j][2]) {
+                        if (field[x][y - j][2] && !contains(splits, [x-1,y-j,"NegX"])) {
                             splits.push([x - 1, y - j, "NegX"]);
                         }
                     }
+                    if (will_break) break;
                 }
             }
 
+            paths.push(path);
+        }
+         */
+
+        //new walker code
+
+        let add_tangential = (func_nx: number, func_ny: number, func_flipped_dir: number) => {
+            if (field[func_nx][func_ny][func_flipped_dir]) {
+                if (!comp_splits.some(s => s[0] === func_nx && s[1] === func_ny &&
+                    s[2] === this.convert_FieldIndex_to_directionString(func_flipped_dir))) {
+                    //add split starting from next field, not current
+                    let next_split = getNextField(func_nx, func_ny, this.convert_FieldIndex_to_directionString(func_flipped_dir));
+
+                    if (!inBounds(next_split[0], 0, 15) || !inBounds(next_split[1], 0, 15)) return;
+                    if (this.exists_wall(walls, func_nx, func_ny, next_split[0], next_split[1])) return;
+                    if (!field[next_split[0]][next_split[1]][func_flipped_dir]) return;
+
+                    splits.push([next_split[0], next_split[1], this.convert_FieldIndex_to_directionString(func_flipped_dir)]);
+                }
+            }
+        }
+
+        while(splits.length > 0) {
+            let split: [number, number, string] = splits.shift();
+            comp_splits.push(split);
+
+            x = split[0];
+            y = split[1];
+            if (!inBounds(x, 0, 15) || !inBounds(y, 0, 15)) continue;
+            direction = split[2];
+
+            if (direction === "-1") break;
+
+            let path: {
+                from: [number, number],
+                to: [number, number],
+                direction: string,
+            } = {
+                from: [x, y],
+                to: [x, y],
+                direction: direction,
+            };
+
+            let nx = x;
+            let ny = y;
+
+            //check for tangential splits on same field
+            let flipped_dir = (this.convert_directionStr_to_FieldIndex(direction) + 1) % 4;
+            add_tangential(nx, ny, flipped_dir);
+
+            flipped_dir = (flipped_dir + 2) % 4;
+            add_tangential(nx, ny, flipped_dir);
+
+            while (true) {
+                let next = getNextField(nx, ny, direction);
+
+                if (!inBounds(next[0], 0, 15) || !inBounds(next[1], 0, 15)) break;
+
+                if (this.exists_wall(walls, nx, ny, next[0], next[1])) { //is wall between?
+                    break; //walker is not allowed to go through walls
+                    /*if (!comp_splits.some(s => s[0] === next[0] && s[1] === next[1] && s[2] === direction)) {
+                        splits.push([next[0], next[1], direction]);
+                    }
+                    break;*/
+                }
+
+                //no wall
+
+                nx = next[0];
+                ny = next[1];
+
+                //check for tangential paths
+                let flipped_dir = (this.convert_directionStr_to_FieldIndex(direction) + 1) % 4;
+                add_tangential(nx, ny, flipped_dir);
+
+                flipped_dir = (flipped_dir + 2) % 4;
+                add_tangential(nx, ny, flipped_dir);
+
+                //check if path continues
+                if (!field[nx][ny][this.convert_directionStr_to_FieldIndex(direction)]) {
+                    break;
+                } else {
+                    path.to = [nx, ny];
+                }
+            }
             paths.push(path);
         }
 
@@ -548,7 +686,8 @@ export class PathManager {
         to: [number, number],
         change: number,
         start_from: [number, number, string], //x, y, direction (n,s,e,w)
-    }[][] {
+    }[][]
+    {
         let unfold = [];
 
         let changes = getFilteredChanges(this.top_node_id, this.path_tree);
@@ -583,7 +722,8 @@ export class PathManager {
         to: [number, number],
         change: number,
         start_from: [number, number, string], //x, y, direction (n,s,e,w)
-    }[][] {
+    }[][]
+    {
         record({changes: changes}, "Call -> unfoldCompact");
         let unfolded: {
             from: [number, number],
@@ -845,7 +985,8 @@ export class PathManager {
         to: [number, number],
         change: number,
         start_from: [number, number, string]
-    }[] { //direction is 0=x or 1=y
+    }[]
+    { //direction is 0=x or 1=y
 
         let i_start = part.from[direction];
         let i_end = (!bidirectional) ? ((positive_split) ? from-1 : from+1) : ((positive_split) ? to+1 : to-1);
@@ -1138,3 +1279,42 @@ function filterOverlappingPaths(paths: PathData[]): PathData[] {
 //   [1, 0, 2, 0, 3, 0, 4, 0, 1, 1], // t: 1..4, overlaps [1,2]
 // ]);
 // => [[0,0,1,0,2,0,1,1], [3,0,4,0,1,1]]
+
+
+
+/*
+ * This Code is no longer written by AI
+ */
+function some(value, std) {
+    return (value === undefined || value === null) ? std : value;
+}
+
+function contains(list, value) {
+    return list.some(v => {
+        for (let i = 0; i < v.length; i++) {
+            if (v[i] !== value[i]) {
+                return false;
+            }
+        }
+        return true;
+    });
+}
+
+function inBounds(i, small, large): boolean {
+    return (small <= i) && (i <= large);
+}
+
+function getNextField(x: number, y: number, direction: string): [number, number] {
+    if (direction === "PosX") {
+        return [x + 1, y];
+    } else if (direction === "NegX") {
+        return [x - 1, y];
+    } else if (direction === "PosY") {
+        return [x, y + 1];
+    } else if (direction === "NegY") {
+        return [x, y - 1];
+    } else {
+        throw new Error("Invalid direction: " + direction);
+    }
+}
+

@@ -685,7 +685,7 @@ export function generatePathAnimGroup(path_in/*: int[][]*/, tiles, ignore_group,
                             //console.log(tiles[[part[j], part[j + 1]]]);
                             group.add(new AnimCssChange(anim_time, tiles[[part[j], part[j + 1]]][k],
                                 (doub === 0 ? ["on", "repl", "off"] : ["add", "repl", "off"]),
-                                (doub === 0 ? "add" : "on"), "Error from ADD case: " + JSON.stringify(tiles[[part[j], part[j + 1]]])));
+                                (doub === 0 ? "add" : "on"), "Error from ADD case: " + tiles[[part[j], part[j + 1]]])); //TODO: change the tiles to the classNames from this list
                         }
                     }
                     /*if (!was_change) {

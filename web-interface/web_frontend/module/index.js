@@ -537,6 +537,15 @@ function flipDirection(direction) {
     }
 }
 
+function coords_path_containes(path, x, y) {
+    for (let i = 0; i < path.length; i+=2) {
+        if (path[i] === x && path[i+1] === y) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function displaySimplePathChangeCompact(path) {
 
     let unfolded_coords_path = [];
@@ -547,12 +556,20 @@ function displaySimplePathChangeCompact(path) {
 
         if (part.direction === "PosX") {
             for (let j = 0; j <= part.to[0] - part.from[0]; j++) {
-                unfolded_coords_path.push(part.from[0] + j);
-                unfolded_coords_path.push(part.from[1]);
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0] + j, part.from[1]))) {
+                    unfolded_coords_path.push(part.from[0] + j);
+                    unfolded_coords_path.push(part.from[1]);
 
-                tiles[[part.from[0] + j, part.from[1]]] = [
-                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
-                ]
+                    if (tiles[[part.from[0] + j, part.from[1]]] === undefined) {
+                        tiles[[part.from[0] + j, part.from[1]]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        ]
+                    } else {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                    }
+                }
 
                 if (j === part.to[0] - part.from[0]) {
                     tiles[[part.from[0] + j, part.from[1]]].push(
@@ -562,7 +579,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0] + j, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
                         );
-                        tiles[[part.from[0] + j, part.from[1]]].push(
+                        if (tiles[[part.from[0]+j-1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0]+j-1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j - 1, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j - 1, part.from[1]]))
                         );
                     }
@@ -574,7 +594,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0] + j, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
                         );
-                        tiles[[part.from[0] + j, part.from[1]]].push(
+                        if (tiles[[part.from[0]+j-1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0]+j-1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j - 1, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j - 1, part.from[1]]))
                         );
                     }
@@ -589,12 +612,20 @@ function displaySimplePathChangeCompact(path) {
             }
         } else if (part.direction === "NegX") {
             for (let j = 0; j >= part.to[0] - part.from[0]; j--) {
-                unfolded_coords_path.push(part.from[0] + j);
-                unfolded_coords_path.push(part.from[1]);
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0] + j, part.from[1]))) {
+                    unfolded_coords_path.push(part.from[0] + j);
+                    unfolded_coords_path.push(part.from[1]);
 
-                tiles[[part.from[0] + j, part.from[1]]] = [
-                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
-                ]
+                    if (tiles[[part.from[0] + j, part.from[1]]] === undefined) {
+                        tiles[[part.from[0] + j, part.from[1]]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        ]
+                    } else {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                    }
+                }
 
                 if (j === part.to[0] - part.from[0]) {
                     tiles[[part.from[0] + j, part.from[1]]].push(
@@ -604,7 +635,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0] + j, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
                         );
-                        tiles[[part.from[0] + j, part.from[1]]].push(
+                        if (tiles[[part.from[0] + j + 1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0] + j + 1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j + 1, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j + 1, part.from[1]]))
                         );
                     }
@@ -616,7 +650,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0] + j, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
                         );
-                        tiles[[part.from[0] + j, part.from[1]]].push(
+                        if (tiles[[part.from[0] + j + 1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0] + j + 1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j + 1, part.from[1]]].push(
                             document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j + 1, part.from[1]]))
                         );
                     }
@@ -631,12 +668,20 @@ function displaySimplePathChangeCompact(path) {
             }
         } else if (part.direction === "PosY") {
             for (let j = 0; j <= part.to[1] - part.from[1]; j++) {
-                unfolded_coords_path.push(part.from[0]);
-                unfolded_coords_path.push(part.from[1] + j);
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0], part.from[1] + j))) {
+                    unfolded_coords_path.push(part.from[0]);
+                    unfolded_coords_path.push(part.from[1] + j);
 
-                tiles[[part.from[0], part.from[1] + j]] = [
-                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
-                ]
+                    if (tiles[[part.from[0], part.from[1] + j]] === undefined) {
+                        tiles[[part.from[0], part.from[1] + j]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        ]
+                    } else {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                    }
+                }
 
                 if (j === part.to[1] - part.from[1]) {
                     tiles[[part.from[0], part.from[1] + j]].push(
@@ -646,7 +691,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0], part.from[1] + j]].push(
                             document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
                         );
-                        tiles[[part.from[0], part.from[1] + j]].push(
+                        if (tiles[[part.from[0], part.from[1] + j - 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j - 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j - 1]].push(
                             document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j - 1]))
                         );
                     }
@@ -658,7 +706,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0], part.from[1] + j]].push(
                             document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
                         );
-                        tiles[[part.from[0], part.from[1] + j]].push(
+                        if (tiles[[part.from[0], part.from[1] + j - 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j - 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j - 1]].push(
                             document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j - 1]))
                         );
                     }
@@ -673,12 +724,20 @@ function displaySimplePathChangeCompact(path) {
             }
         } else if (part.direction === "NegY") {
             for (let j = 0; j >= part.to[1] - part.from[1]; j--) {
-                unfolded_coords_path.push(part.from[0]);
-                unfolded_coords_path.push(part.from[1] + j);
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0], part.from[1] + j))) {
+                    unfolded_coords_path.push(part.from[0]);
+                    unfolded_coords_path.push(part.from[1] + j);
 
-                tiles[[part.from[0], part.from[1] + j]] = [
-                    document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
-                ]
+                    if (tiles[[part.from[0], part.from[1] + j]] === undefined) {
+                        tiles[[part.from[0], part.from[1] + j]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        ]
+                    } else {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                    }
+                }
 
                 if (j === part.to[1] - part.from[1]) {
                     tiles[[part.from[0], part.from[1] + j]].push(
@@ -688,7 +747,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0], part.from[1] + j]].push(
                             document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
                         );
-                        tiles[[part.from[0], part.from[1] + j]].push(
+                        if (tiles[[part.from[0], part.from[1] + j + 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j + 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j + 1]].push(
                             document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j + 1]))
                         );
                     }
@@ -700,7 +762,10 @@ function displaySimplePathChangeCompact(path) {
                         tiles[[part.from[0], part.from[1] + j]].push(
                             document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
                         );
-                        tiles[[part.from[0], part.from[1] + j]].push(
+                        if (tiles[[part.from[0], part.from[1] + j + 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j + 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j + 1]].push(
                             document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j + 1]))
                         );
                     }
@@ -752,6 +817,7 @@ function displaySimplePathChangeCompact(path) {
             .forEach(value => {
                 removeRedGroup.add(new AnimCssChange(5, value, ["on", "highlighted"], "remove"));
                 removeGroup.add(new AnimCssChange(5, value, ["remove", "highlighted"], "repl"));
+                console.log("Removing: " + value.className);
             });
     }
 

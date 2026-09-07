@@ -1,3 +1,44 @@
+//DEBUG
+globalThis.fieldGrid = function (field) {
+    entire = "";
+    for (let y = 0; y < 10; y++) {
+        for (let i = 0; i < 3; i++) {
+            topr = "";
+
+            if (i === 0 || i === 2) {
+                for (let x = 0; x < 16; x++) {
+                    let col = field[x][y];
+
+                    if (col[i + 1]) {
+                        topr += " | ";
+                    } else {
+                        topr += "   ";
+                    }
+                }
+            } else {
+                for (let x = 0; x < 16; x++) {
+                    let col = field[x][y];
+
+                    if (col[2]) topr += "-";
+                    else topr += " ";
+
+                    topr += "@";
+
+                    if (col[0]) topr += "-";
+                    else topr += " ";
+                }
+            }
+
+            entire += topr + "\n";
+        }
+    }
+    return entire;
+}
+
+
+//NORMAL CODE STARTS HERE
+
+
 const { save } = require('./recorder.cjs');
 
 const { Action, Actions} = require('./Actions.js');
