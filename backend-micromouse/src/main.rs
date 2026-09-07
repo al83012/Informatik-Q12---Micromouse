@@ -1,12 +1,9 @@
-use crate::utils::logging::init_logging;
-
 pub mod comm;
 pub mod map;
-pub mod utils;
+pub mod process;
 pub mod strategy;
 pub mod transform;
-pub mod process;
-
+pub mod utils;
 
 #[cfg(test)]
 pub mod tests;
@@ -17,6 +14,4 @@ async fn main() {
 
     // tests::process_test_short::process_test_short();
     // tracing::info!(target = "main", "STARTUP");
-
-    
 }

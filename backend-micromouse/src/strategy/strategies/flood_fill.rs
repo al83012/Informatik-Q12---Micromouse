@@ -70,12 +70,14 @@ pub struct FlowFieldCell {
     enter_in_direction: Direction,
     total_cost: usize,
     fwd_streak: usize,
+    discovered: bool,
 }
 
 impl FlowFieldCell {
     pub const INF: Self = Self {
         enter_in_direction: Direction::PosX,
         total_cost: usize::MAX,
+        discovered: false,
         fwd_streak: 0,
     };
 }
@@ -273,6 +275,7 @@ impl<const N: usize> FloodFill<N> {
             enter_in_direction: flow_start.dir,
             total_cost: 0,
             fwd_streak: 0,
+            discovered: true,
         };
 
         let mut propagate = vec![flow_start.pos];
@@ -319,6 +322,7 @@ impl<const N: usize> FloodFill<N> {
                     }
                     trace!(target: "strat/ff", " --> to: {neighbor_pos} (cost = {})", cost);
                     propagate.push(neighbor_pos);
+                    neighbor.discovered = true;
                     neighbor.total_cost = cost;
                     neighbor.fwd_streak = if dir == cell.enter_in_direction {
                         cell.fwd_streak + 1
@@ -376,6 +380,11 @@ impl<const N: usize> FloodFill<N> {
                     .ok_or(StrategyEndState::NoPossibleAction(
                         "Goal is walled off from current position".to_string(),
                     ))?;
+            if !current_cell_flow.discovered {
+                return Err(StrategyEndState::NoPossibleAction(
+                    "Goal is walled off from current position".to_string(),
+                ));
+            }
             if current_cell_flow.total_cost == 0 {
                 debug!(target: "strat/ff", "Cost = 0 --> Found start");
                 let starting_dir = current_cell_flow.enter_in_direction;

@@ -6,7 +6,7 @@ use tokio::{
     task::spawn_blocking,
     time::{self, Instant, Sleep},
 };
-use tracing::{error, info, instrument, warn, Instrument};
+use tracing::{Instrument, error, info, instrument, warn};
 
 use crate::{
     comm::{
@@ -26,7 +26,7 @@ use crate::{
         visuals::{FrontendVisuals, TreeVisualEvent},
     },
     transform::position::Position,
-    utils::hyperlink_logging::{process_span, LinkFileName},
+    utils::hyperlink_logging::{LinkFileName, process_span},
 };
 
 pub struct Process<const N: usize> {
@@ -355,6 +355,9 @@ impl<const N: usize> Process<N> {
                     }
                     _ => {}
                 }
+                self.frontend_manager
+                    .send(FrontendMessage::ConfirmLastChange)
+                    .await;
             }
             FrontendResponse::Pause => {
                 self.micromouse_manager

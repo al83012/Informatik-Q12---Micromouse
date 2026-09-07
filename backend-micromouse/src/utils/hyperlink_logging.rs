@@ -11,17 +11,17 @@ use std::{
 use chrono::Local;
 use pathdiff::diff_paths;
 use tracing::{
+    Event, Level, Subscriber,
     field::{Field, Visit},
     span::{self, EnteredSpan},
-    Event, Level, Subscriber,
 };
-use tracing_subscriber::{fmt, layer::Context, registry::LookupSpan, EnvFilter, Layer};
+use tracing_subscriber::{EnvFilter, Layer, fmt, layer::Context, registry::LookupSpan};
 
 use crate::{
     comm::micromouse_message::CommandId,
     strategy::strategy_tree::{AbsoluteLayerId, AbsoluteNodeId, AbsolutePathId},
     utils::logging::{
-        level_bg_color, level_color, MessageVisitor, TestFormatter, BLACK, RESET_COLOR, STD_BG,
+        BLACK, MessageVisitor, RESET_COLOR, STD_BG, TestFormatter, level_bg_color, level_color,
     },
 };
 
@@ -615,7 +615,14 @@ pub fn init_loggers() {
                 .with_filter(FilterFn::new(|meta| {
                     // meta.target().contains("webs") || meta.target().eq("rec")
                     // meta.target().contains("dkp") || meta.target().eq("strat")
-                    meta.target().eq("test/sim/webs/display") || meta.target().eq("strat") || *meta.level() < Level::ERROR
+                    meta.target().contains("test/sim/webs")
+                        || meta.target().contains("tests/sim/webs")
+                        || meta.target().contains("proc")
+                        || meta.target().eq("strat")
+                        || meta.target().eq("strat/dfs")
+                        || meta.target().eq("strat/ff")
+                        || meta.target().eq("strat/dkp")
+                        || *meta.level() < Level::ERROR
                 })),
         )
     };

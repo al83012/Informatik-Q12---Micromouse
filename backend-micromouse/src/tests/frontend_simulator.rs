@@ -1,12 +1,12 @@
 use std::{
-    collections::{hash_map, HashMap},
+    collections::{HashMap, hash_map},
     time::Duration,
 };
 
 use futures_util::{SinkExt, StreamExt};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, instrument, span, warn, Instrument, Level};
-use tungstenite::{protocol::frame::coding::CloseCode, Message, Utf8Bytes};
+use tracing::{Instrument, Level, error, info, instrument, span, warn};
+use tungstenite::{Message, Utf8Bytes, protocol::frame::coding::CloseCode};
 
 use crate::{
     comm::{
@@ -38,7 +38,7 @@ use crate::{
     transform::position::{MouseTransform, Position},
     utils::{
         frontend_display::FrontendDisplay,
-        hyperlink_logging::{enter_process, process_span, LinkFileName},
+        hyperlink_logging::{LinkFileName, enter_process, process_span},
     },
 };
 
@@ -182,7 +182,7 @@ impl FrontendSimulator {
     }
 
     fn other_strategy(&mut self) -> String {
-        let current_strat_id = self.current_strat_id % 2;
+        let current_strat_id = self.current_strat_id % 4;
 
         let next: &DynStrategyConfig<10> = &[
             // DynStrategyConfig::DepthFirst(DepthFirstConfig {
@@ -196,16 +196,16 @@ impl FrontendSimulator {
             // DynStrategyConfig::DepthFirst(DepthFirstConfig {
             //     forward_first: true,
             // }),
-            DynStrategyConfig::DbgKnownPath(DbgKnownPathConfig {
-                move_cost: FFCost {
-                    base_value: 10,
-                    streak_reduction_factor: 0.5,
-                },
-                rotation_cost: FFCost {
-                    base_value: 15,
-                    streak_reduction_factor: 0.0,
-                },
-            }),
+            // DynStrategyConfig::DbgKnownPath(DbgKnownPathConfig {
+            //     move_cost: FFCost {
+            //         base_value: 10,
+            //         streak_reduction_factor: 0.5,
+            //     },
+            //     rotation_cost: FFCost {
+            //         base_value: 15,
+            //         streak_reduction_factor: 0.0,
+            //     },
+            // }),
             // DynStrategyConfig::FloodFill(FloodFillConfig {
             //     move_cost: FFCost {
             //         base_value: 10,
@@ -227,17 +227,33 @@ impl FrontendSimulator {
                     streak_reduction_factor: 0.0,
                 },
                 exploration_incentive: 0,
-            }), // DynStrategyConfig::DepthFirst(DepthFirstConfig {
-                //     path_ranking: PathRanking::TowardsGoal,
-                //     prune_dead_ends: true,
-                // }),
-                // DynStrategyConfig::FollowWall(FollowWallConfig {
-                //     follow_wall: WallDirection::Right,
-                //     measure_all: false,
-                // }),
+            }),
+            DynStrategyConfig::DepthFirst(DepthFirstConfig {
+                path_ranking: PathRanking::TowardsGoal,
+                prune_dead_ends: true,
+            }),
+            DynStrategyConfig::DbgKnownPath(DbgKnownPathConfig {
+                move_cost: FFCost {
+                    base_value: 10,
+                    streak_reduction_factor: 0.5,
+                },
+                rotation_cost: FFCost {
+                    base_value: 15,
+                    streak_reduction_factor: 0.0,
+                },
+            }),
+            DynStrategyConfig::FollowWall(FollowWallConfig {
+                follow_wall: WallDirection::Right,
+                measure_all: false,
+            }),
         ][current_strat_id];
 
-        let next_pos = [Position { x: 0, y: 0 }, Position { x: 8, y: 8 }][current_strat_id];
+        let next_pos = [
+            Position { x: 0, y: 0 },
+            Position { x: 8, y: 8 },
+            Position { x: 9, y: 0 },
+            Position { x: 0, y: 9 },
+        ][current_strat_id];
 
         let strat_change = StrategyChangeCommand {
             set_strategy: Some(next.clone()),
