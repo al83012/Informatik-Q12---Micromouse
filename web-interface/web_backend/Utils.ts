@@ -9,4 +9,14 @@ export class Utils {
             return true;
         });
     }
+
+    static is(arr: string[], cmd: string, f: {(rest: string[]): void}) {
+        let parts = cmd.split(":");
+        for (let i = 0; i < parts.length; i++) {
+            if (parts[i] !== arr[i]) {
+                return;
+            }
+        }
+        f(arr.slice(arr.length));
+    }
 }

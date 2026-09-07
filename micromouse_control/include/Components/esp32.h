@@ -1,6 +1,7 @@
 #ifndef esp32
 #define esp32
 #include <SPI.h>
+#include <Arduino.h>
 namespace Esp32 {
 
 

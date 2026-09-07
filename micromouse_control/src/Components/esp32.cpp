@@ -12,6 +12,7 @@
 #include "Components/tmp464.h"
 #include "Components/fan.h"
 #include "Components/iis2mdc.h"
+#include "Components/drv8424.h"
 #include "i2ctool.h"
 #include "spitool.h"
 #include "measurement.h"
@@ -31,13 +32,17 @@ void Esp32::initESP32() {
 }
 
 void Esp32::initSubComponents() {
-    /*TCAL6408::init();
-    BQ76905::init();*/
+    TCAL6408::init();
+    //BQ76905::init();
     TMP464::init();
     //IIS2MDC::init();
-    TPL0102::init(3.4); 
+    TPL0102::init(3.4, 0.7, 0.1); 
     //Fan::init();
     LSM6DSR::init();   
+    
+    DRV8424::init(50000);
+    Measurement::IR::init();
+
 }
 
 void Esp32::initPinStates() {
@@ -50,6 +55,8 @@ void Esp32::initPinStates() {
     pinMode(VL_1_INT, INPUT);
     pinMode(VL_2_INT, INPUT);
     pinMode(BQ_INT, INPUT);
+
+
     Measurement::IR::init();
 }
 

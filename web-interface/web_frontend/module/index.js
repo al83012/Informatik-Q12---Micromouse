@@ -4,6 +4,8 @@ let selected_square;
 let current_state = ["reset", "finished"];
 let goal = [15, 15]; //the coords for going somewhere (cmd point)
 
+let has_backend = true;
+
 
 import {
     AnimationHandler,
@@ -26,16 +28,24 @@ export class Index {
     static squares = {};
     static algorithms = [];
 
+    static ChartFunc;
+    static Chart;
+    static ChartData;
+
+    static pathUpdateIds = [];
+
     static eventLoad() {
         //creating error feedback to backend
-        window.onerror = function (e) {
-            let request = new XMLHttpRequest();
-            request.open("POST", document.location.origin + "/error");
-            request.setRequestHeader("Content-Type", "Application/json");
-            request.send(JSON.stringify({
-                error: e,
-                stack: e.stack,
-            }));
+        if (has_backend) {
+            window.onerror = function (e) {
+                let request = new XMLHttpRequest();
+                request.open("POST", document.location.origin + "/error");
+                request.setRequestHeader("Content-Type", "Application/json");
+                request.send(JSON.stringify({
+                    error: e,
+                    stack: e.stack,
+                }));
+            }
         }
 
         //move info-link_pill to respective position
@@ -44,6 +54,18 @@ export class Index {
         info_link_pill.onclick = function () {
             document.location.replace(document.location.origin + "/info/info.html");
             //document.location.reload();
+        }
+
+        let graph_container = document.getElementById("graph_container");
+        graph_container.onclick = function() {
+            let graph_container = document.getElementById("graph_container");
+            if (graph_container.className.includes("small")) {
+                graph_container.className = "graph_container large";
+                document.getElementById("graph_background").className = "graph_background shown";
+            } else {
+                graph_container.className = "graph_container small";
+                document.getElementById("graph_background").className = "graph_background hidden";
+            }
         }
 
 
@@ -80,12 +102,16 @@ export class Index {
 
         //creating the AnimationHandler
         Index.animHandler = new AnimationHandler();
-        window.setInterval(() => {
-            let request = new XMLHttpRequest();
-            request.addEventListener("load", function () {Index.handleUpdate(JSON.parse(this.responseText));});
-            request.open("GET", document.location.origin + "/update", true);
-            request.send();
-        }, 100);
+        if (has_backend) {
+            window.setInterval(() => {
+                let request = new XMLHttpRequest();
+                request.addEventListener("load", function () {
+                    Index.handleUpdate(JSON.parse(this.responseText));
+                });
+                request.open("GET", document.location.origin + "/update", true);
+                request.send();
+            }, 100);
+        }
         window.setInterval(() => {Index.animHandler.nextFrame();}, 10)
         
         //window.setTimeout(() => init_maze(), 1000); //the timeout is only for the test animation which had a bug
@@ -95,10 +121,61 @@ export class Index {
         //let borderAnim = new AnimBorderColor(100, Index.squares[[5, 5]], "darkblue", "cyan");
         //Index.animHandler.add(borderAnim);
 
-        let request = new XMLHttpRequest();
-        request.addEventListener("load", function () {console.log(this.responseText);Index.handleUpdate(JSON.parse(this.responseText));});
-        request.open("GET", document.location.origin + "/update_full");
-        request.send();
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.addEventListener("load", function () {
+                console.log(this.responseText);
+                Index.handleUpdate(JSON.parse(this.responseText));
+            });
+            request.open("GET", document.location.origin + "/update_full");
+            request.send();
+        }
+
+        this.ChartData = {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Temp 1',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [],
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        suggestedMax: 100,
+                        suggestedMin: 0,
+                    }
+                },
+                events: []
+            }
+        };
+
+        for (let i = 60; i >= 0; i--) {
+            this.ChartData.data.labels.push(i);
+            this.ChartData.data.datasets.forEach((data, i) => {data.data.push(0);});
+        }
+
+        this.ChartFunc();
+
+
+
+        /*window.onerror(
+        {
+            error: " Hallo Test" + window.visualViewport.scale,*/
+            /*innerWidth: window.innerWidth,
+            outerWidth: window.outerWidth,
+            visualViewport: window.visualViewport?.width,
+            scale: window.visualViewport?.scale,
+
+            stack: "",*/
+        /*});*/
+
+        document.documentElement.style.zoom = '1';//'0.9159';
+        //throw new Error(" " + window.visualViewport.scale);
     }
 
     static handleUpdate(response) {
@@ -113,7 +190,7 @@ export class Index {
                     add_message(data["message"]);
                     break;
                 case "update_sensor":
-                    update_sensors(data["sensor"], data["values"]);
+                    update_sensors(data["sensor"], data["value"]);
                     break;
                 case "add_algorithm":
                     add_algorithm(data["algorithm"]);
@@ -130,9 +207,18 @@ export class Index {
                     reset_maze(data["animation"] === "true");
                     break;
                 case "update_path":
-                    Index.animHandler.addImmediate(displayPathChange(data["path"]));
+                    //Index.pathUpdateIds += data["id"];
+                    /*console.log(data["path"]);
+                    Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], false));*/
+                    console.log(data["changes"]);
+                    //Index.animHandler.addImmediate(displayPathChangeCompact(data["changes"], data["id"]));
+                    Index.animHandler.addImmediate(displaySimplePathChangeCompact(data["changes"]));
+                    break;
+                case "complete_path":
+                    //Index.animHandler.addImmediate(displayPathChange(data["path"], data["id"], true));
                     break;
                 case "discover_tile":
+                    console.log(data);
                     if (data["others"] === true) {
                         discoverTile(data["x"], data["y"], data["directions"], data.other_tiles_x, data.other_tiles_y);
                     } else {
@@ -153,6 +239,13 @@ export class Index {
                 case "hide_loading":
                     Index.hide_loading_animation();
                     break;
+                case "discover_wall":
+                    console.log(data);
+                    let wall = document.getElementById("sys-wall_wall-" +
+                        data["x"] + ":" + data["y"] + "-" + data["x_other"] + ":" + data["y_other"]);
+                    console.log(wall === undefined);
+                    Index.animHandler.addImmediate(new AnimCssChange(10, wall, ["off"], "on"));
+                    break;
             }
         });
     }
@@ -160,14 +253,44 @@ export class Index {
     static buttonStartStop() {
         //play_reset_animation();
 
-        let request = new XMLHttpRequest();
-        request.open("POST", document.location.origin + "/action");
-        request.addEventListener("load", function () {});
-        request.setRequestHeader("Content-Type", "Application/json");
-        request.send(JSON.stringify({
-            action: "button_clicked",
-            button_id: 0,
-        }));
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.open("POST", document.location.origin + "/action");
+            request.addEventListener("load", function () {
+            });
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify({
+                action: "button_clicked",
+                button_id: 0,
+            }));
+        }
+
+        this.ChartFunc({
+            type: 'line',
+            data: {
+                labels: ['1', '2', '3', '4', '5', '6', '7', '5', '6', '7'],
+                datasets: [{
+                    label: 'Temp 1',
+                    backgroundColor: 'rgb(255, 99, 132)',
+                    borderColor: 'rgb(255, 99, 132)',
+                    data: [0, 10, 5, 2, 20, 30, 45],
+                },{
+                    label: 'Temp 2',
+                    backgroundColor: 'rgb(53, 162, 235)',
+                    borderColor: 'rgb(53, 162, 235)',
+                    data: [0, 30, 10, 13, 10, 15, 20],
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        suggestedMax: 45,
+                    }
+                },
+                events: []
+            }
+        });
 
         /*let pathGroup = new AnimGroup(5);
 
@@ -233,6 +356,17 @@ export class Index {
         document.getElementById("loading-container").style.display = "none";
         Index.animHandler.removeRepeating("loading_animation");
     }
+
+    static send(data) {
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.open("POST", document.location.origin + "/action");
+            request.addEventListener("load", function () {
+            });
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify(data));
+        }
+    }
 }
 
 function discoverTile(x, y, directions, x_other, y_other) {
@@ -250,12 +384,14 @@ function discoverTile(x, y, directions, x_other, y_other) {
 
             switch (x_other[i]-x) {
                 case 1:
-                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-e_" + co_crds_i([x+1, y])),
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-w_" + co_crds_i([x+1, y])),
                         ["undiscovered"], "discovered"));
                 break;
 
                 case -1:
-                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-w_" + co_crds_i([x-1, y])),
+                    /*console.log("Other: " + "sys-arm_arm-w_" + co_crds_i([x-1, y]) + " Exists: " +
+                        (document.getElementById("sys-arm_arm-w_" + co_crds_i([x-1, y])) !== null));*/
+                    group.add(new AnimCssChange(10, document.getElementById("sys-arm_arm-e_" + co_crds_i([x-1, y])),
                         ["undiscovered"], "discovered"));
                 break;
 
@@ -349,44 +485,698 @@ function init_maze() {
         wall_container.style.top = ((100/16)*coords[1]) + "%";
         wall_container.style.left = ((100/16)*coords[0]) + "%";
 
-        let wall_right = document.createElement("div");
-        wall_right.className = "sys-wall_wall-right";
-        wall_right.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" + (coords[0] + 1) + ":" + coords[1];
+        if (!(coords[0] === 15)) {
+            let wall_right = document.createElement("div");
+            wall_right.className = "sys-wall_wall-right off";
+            wall_right.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" +
+                (coords[0] + 1) + ":" + coords[1];
 
-        wall_container.appendChild(wall_right);
+            wall_container.appendChild(wall_right);
+        }
+
+        if (!(coords[1] === 15)) {
+            let wall_bottom = document.createElement("div");
+            wall_bottom.className = "sys-wall_wall-bottom off";
+            wall_bottom.id = "sys-wall_wall-" + coords[0] + ":" + coords[1] + "-" +
+                coords[0] + ":" + (coords[1] + 1);
+
+            wall_container.appendChild(wall_bottom);
+        }
+
         document.getElementById("maze_square_main").appendChild(wall_container);
     }
 
-    //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
+    //let animation = generatePathAnimGroup([[0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1,
+    // 5, 2, 5, 3, 5, 4, 5, 5, 0]], tiles);
     /*let path = [
-        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
-        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1],
-        [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1],
-        [9, 9, 9, 10, 10, 10, 0]
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0, 1],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 1, 1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 6, 9, 7, 9, 8, 9, -1, 0],
+        [9, 9, 9, 10, 10, 10, 0, 1]
     ];
     let animation = displayPathChange(path);
     let path_second = [
-        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0],
-        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 9, 9, 9, 10, 10, 10, -1],
-        [5, 6, 5, 7, 5, 8, 5, 9, 5, 10, 5, 11, 6, 11, 7, 11, 8, 11, 9, 11, 10, 11, 1]
+        [0, 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 5, 1, 5, 2, 5, 3, 5, 4, 5, 5, 0, 1],
+        [6, 5, 7, 5, 8, 5, 9, 5, 9, 6, 9, 7, 9, 8, 9, 9, 9, 10, 10, 10, -1, 1],
+        [5, 6, 5, 7, 5, 8, 5, 9, 5, 10, 5, 11, 6, 11, 7, 11, 8, 11, 9, 11, 10, 11, 1, 0]
     ];
     let animation_second = displayPathChange(path_second);
     Index.animHandler.add(animation);
     Index.animHandler.add(animation_second);*/
 }
 
-function displayPathChange(changed_path) {
+function flipDirection(direction) {
+    if (direction === "n") {
+        return "s";
+    } else if (direction === "s") {
+        return "n";
+    } else if (direction === "e") {
+        return "w";
+    } else if (direction === "w") {
+        return "e";
+    }
+}
+
+function coords_path_containes(path, x, y) {
+    for (let i = 0; i < path.length; i+=2) {
+        if (path[i] === x && path[i+1] === y) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function displaySimplePathChangeCompact(path) {
+
+    let unfolded_coords_path = [];
+    let tiles = [];
+
+    for (let g = 0; g < path.length; g++) {
+        let part = path[g];
+
+        if (part.direction === "PosX") {
+            for (let j = 0; j <= part.to[0] - part.from[0]; j++) {
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0] + j, part.from[1]))) {
+                    unfolded_coords_path.push(part.from[0] + j);
+                    unfolded_coords_path.push(part.from[1]);
+
+                    if (tiles[[part.from[0] + j, part.from[1]]] === undefined) {
+                        tiles[[part.from[0] + j, part.from[1]]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        ]
+                    } else {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                    }
+                }
+
+                if (j === part.to[0] - part.from[0]) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] > 0 && j === 0) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        if (tiles[[part.from[0]+j-1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0]+j-1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j - 1, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j - 1, part.from[1]]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] > 0) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        if (tiles[[part.from[0]+j-1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0]+j-1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j - 1, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j - 1, part.from[1]]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                }
+            }
+        } else if (part.direction === "NegX") {
+            for (let j = 0; j >= part.to[0] - part.from[0]; j--) {
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0] + j, part.from[1]))) {
+                    unfolded_coords_path.push(part.from[0] + j);
+                    unfolded_coords_path.push(part.from[1]);
+
+                    if (tiles[[part.from[0] + j, part.from[1]]] === undefined) {
+                        tiles[[part.from[0] + j, part.from[1]]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        ]
+                    } else {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                    }
+                }
+
+                if (j === part.to[0] - part.from[0]) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] < 15 && j === 0) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        if (tiles[[part.from[0] + j + 1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0] + j + 1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j + 1, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j + 1, part.from[1]]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    if (part.from[0] < 15) {
+                        tiles[[part.from[0] + j, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                        );
+                        if (tiles[[part.from[0] + j + 1, part.from[1]]] === undefined) {
+                            tiles[[part.from[0] + j + 1, part.from[1]]] = [];
+                        }
+                        tiles[[part.from[0] + j + 1, part.from[1]]].push(
+                            document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j + 1, part.from[1]]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-e_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                    tiles[[part.from[0] + j, part.from[1]]].push(
+                        document.getElementById("sys-arm_arm-w_" + co_crds_i([part.from[0] + j, part.from[1]]))
+                    );
+                }
+            }
+        } else if (part.direction === "PosY") {
+            for (let j = 0; j <= part.to[1] - part.from[1]; j++) {
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0], part.from[1] + j))) {
+                    unfolded_coords_path.push(part.from[0]);
+                    unfolded_coords_path.push(part.from[1] + j);
+
+                    if (tiles[[part.from[0], part.from[1] + j]] === undefined) {
+                        tiles[[part.from[0], part.from[1] + j]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        ]
+                    } else {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                    }
+                }
+
+                if (j === part.to[1] - part.from[1]) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] > 0 && j === 0) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        if (tiles[[part.from[0], part.from[1] + j - 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j - 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j - 1]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j - 1]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] > 0) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        if (tiles[[part.from[0], part.from[1] + j - 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j - 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j - 1]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j - 1]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                }
+            }
+        } else if (part.direction === "NegY") {
+            for (let j = 0; j >= part.to[1] - part.from[1]; j--) {
+                if (!(coords_path_containes(unfolded_coords_path, part.from[0], part.from[1] + j))) {
+                    unfolded_coords_path.push(part.from[0]);
+                    unfolded_coords_path.push(part.from[1] + j);
+
+                    if (tiles[[part.from[0], part.from[1] + j]] === undefined) {
+                        tiles[[part.from[0], part.from[1] + j]] = [
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        ]
+                    } else {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_node_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                    }
+                }
+
+                if (j === part.to[1] - part.from[1]) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] < 15 && j === 0) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        if (tiles[[part.from[0], part.from[1] + j + 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j + 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j + 1]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j + 1]))
+                        );
+                    }
+                } else if (j === 0) {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    if (part.from[1] < 15) {
+                        tiles[[part.from[0], part.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                        );
+                        if (tiles[[part.from[0], part.from[1] + j + 1]] === undefined) {
+                            tiles[[part.from[0], part.from[1] + j + 1]] = []
+                        }
+                        tiles[[part.from[0], part.from[1] + j + 1]].push(
+                            document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j + 1]))
+                        );
+                    }
+                } else {
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-s_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                    tiles[[part.from[0], part.from[1] + j]].push(
+                        document.getElementById("sys-arm_arm-n_" + co_crds_i([part.from[0], part.from[1] + j]))
+                    );
+                }
+            }
+        }
+    }
+    console.log(unfolded_coords_path);
+
+
+    unfolded_coords_path.push(1);
+    unfolded_coords_path.push(1);
+    let pathAnimGroup = generatePathAnimGroup([unfolded_coords_path], tiles, false);
+    unfolded_coords_path.pop();
+    unfolded_coords_path.pop();
+
+    let removeRedGroup = new AnimGroup(0);
+    let removeGroup = new AnimGroup(0);
+    let resetGroup = new AnimGroup(-1);
+    resetGroup.add(removeRedGroup);
+    resetGroup.add(removeGroup);
+
+    let remove_indecies = [];
+    for (let i = 0; i < 16*16; i++) {
+        remove_indecies.push(i);
+    }
+    for (let i = 0; i < unfolded_coords_path.length; i+=2) {
+        remove_indecies = remove_indecies.filter(value => value !== co_crds_i([unfolded_coords_path[i], unfolded_coords_path[i+1]]));
+
+        let index = co_crds_i([unfolded_coords_path[i], unfolded_coords_path[i+1]]);
+        let coords = convert_index_to_coords(index);
+
+        let allTiles = [
+            document.getElementById("sys-arm_node_" + index),
+            document.getElementById("sys-arm_arm-w_" + index),
+            document.getElementById("sys-arm_arm-e_" + index),
+            document.getElementById("sys-arm_arm-n_" + index),
+            document.getElementById("sys-arm_arm-s_" + index),
+        ];
+
+        allTiles.filter(value => value !== null).filter(value => !tiles[coords].some(t => t === value))
+            .forEach(value => {
+                removeRedGroup.add(new AnimCssChange(5, value, ["on", "highlighted"], "remove"));
+                removeGroup.add(new AnimCssChange(5, value, ["remove", "highlighted"], "repl"));
+                console.log("Removing: " + value.className);
+            });
+    }
+
+    //console.log(remove_indecies);
+    for (let i = 0; i < remove_indecies.length; i++) {
+        let index = remove_indecies[i];
+
+        let coords = convert_index_to_coords(index);
+        //console.log("Deleting: " + coords[0] + ":" + coords[1] + "");
+        removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_node_" + index), ["on", "highlighted"], "remove"));
+        removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_node_" + index), ["remove", "highlighted"], "repl"));
+        if (coords[0] > 0) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-w_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-w_" + index), ["remove", "highlighted"], "repl"));
+        }
+        if (coords[0] < 15) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-e_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-e_" + index), ["remove", "highlighted"], "repl"));
+        }
+        if (coords[1] > 0) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-n_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-n_" + index), ["remove", "highlighted"], "repl"));
+        }
+        if (coords[1] < 15) {
+            removeRedGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-s_" + index), ["on", "highlighted"], "remove"));
+            removeGroup.add(new AnimCssChange(5, document.getElementById("sys-arm_arm-s_" + index), ["remove", "highlighted"], "repl"));
+        }
+    }
+
+    let completeGroup = new AnimGroup(0);
+    completeGroup.add(pathAnimGroup);
+    completeGroup.add(resetGroup);
+
+    return completeGroup;
+}
+
+function displayPathChangeCompact(changes, id, ignore_group = false) {
+    Index.send({action: "path_update", id: id, state: "started"});
+
+    //unfold changes to coords path (int[][])
+    let unfolded_coords_path = [];
+    for (let g = 0; g < changes.length; g++) {
+        for (let i = 0; i < changes[g].length; i++) {
+            let part = [];
+            let change = changes[g][i];
+
+            if (change.to[0] - change.from[0] > 0) {
+                for (let j = 0; j <= change.to[0] - change.from[0]; j++) {
+                    part.push(change.from[0] + j);
+                    part.push(change.from[1]);
+                }
+            } else if (change.to[0] - change.from[0] < 0) {
+                for (let j = 0; j >= change.to[0] - change.from[0]; j--) {
+                    part.push(change.from[0] + j);
+                    part.push(change.from[1]);
+                }
+            } else if (change.to[1] - change.from[1] > 0) {
+                for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
+                    part.push(change.from[0]);
+                    part.push(change.from[1] + j);
+                }
+            } else if (change.to[1] - change.from[1] < 0) {
+                for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
+                    part.push(change.from[0]);
+                    part.push(change.from[1] + j);
+                }
+            }
+
+            part.push(change.change);
+            part.push((i === 0) ? 1 : 0);
+            unfolded_coords_path.push(part);
+        }
+    }
+
+    console.log("Unfolded Path: ");
+    console.log(unfolded_coords_path);
+
+    //generate tiles
+    //tiles: tiles[[x,y]] = HTMLElements[] ?
+    let calculateTiles = function (x, y, direction, pos, from_direction="-1") {
+        let _tiles = [];
+
+        _tiles.push(document.getElementById("sys-arm_node_" + co_crds_i([x, y])));
+
+        if (pos === -1) {
+            let from_x = ((from_direction === "w") ? x - 1 : ((from_direction === "e") ? x + 1 : x));
+            let from_y = ((from_direction === "n") ? y - 1 : ((from_direction === "s") ? y + 1 : y));
+            if (from_x < 0 || from_x > 15 || from_y < 0 || from_y > 15) {return _tiles;}
+
+            _tiles.push(document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([x, y])));
+            _tiles.push(document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([from_x, from_y])));
+        } else if (pos === 0) {
+            _tiles.push(document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([x, y])));
+            _tiles.push(document.getElementById("sys-arm_arm-" + flipDirection(direction) + "_" + co_crds_i([x, y])));
+        } else if (pos === 1) {
+            _tiles.push(document.getElementById("sys-arm_arm-" + flipDirection(direction) + "_" + co_crds_i([x, y])));
+        }
+
+        return _tiles;
+    }
+
+    let tiles = [];
+
+    for (let g = 0; g < changes.length; g++) {
+        for (let i = 0; i < changes[g].length; i++) {
+            let change = changes[g][i];
+            let direction = change.start_from[2];
+            let from_direction;
+            if (change.from[0] - change.start_from[0] < 0) {
+                from_direction = "w"; //NegX -> opposite side for the connection arm
+            } else if (change.from[0] - change.start_from[0] > 0) {
+                from_direction = "e";
+            } else if (change.from[1] - change.start_from[1] < 0) {
+                from_direction = "s"; //NegY -> opposite side for the connection arm
+            } else {
+                from_direction = "n";
+            }
+
+            if (direction === "n") {
+                for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
+                    tiles[[change.from[0], change.from[1] + j]] = calculateTiles(change.from[0], change.from[1] + j, direction,
+                        (j === 0) ? -1 : ((j === change.to[1] - change.from[1]) ? 1 : 0), from_direction);
+                }
+            } else if (direction === "s") {
+                for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
+                    tiles[[change.from[0], change.from[1] + j]] = calculateTiles(change.from[0], change.from[1] + j, direction,
+                        (j === 0) ? -1 : ((j === change.to[1] - change.from[1]) ? 1 : 0), from_direction);
+                }
+            } else if (direction === "e") {
+                for (let j = 0; j <= change.to[0] - change.from[0]; j++) {
+                    tiles[[change.from[0] + j, change.from[1]]] = calculateTiles(change.from[0] + j, change.from[1], direction,
+                        (j === 0) ? -1 : ((j === change.to[0] - change.from[0]) ? 1 : 0), from_direction);
+                }
+            } else {
+                for (let j = 0; j >= change.to[0] - change.from[0]; j--) {
+                    tiles[[change.from[0] + j, change.from[1]]] = calculateTiles(change.from[0] + j, change.from[1], direction,
+                        (j === 0) ? -1 : ((j === change.to[0] - change.from[0]) ? 1 : 0), from_direction);
+                }
+            }
+        }
+    }
+
+    /*for (let g = 0; g < changes.length; g++) {
+        for (let i = 0; i < changes[g].length; i++) {
+            let change = changes[g][i];
+
+            if (change.to[0] - change.from[0] > 0) {
+                for (let j = 0; j <= change.to[0] - change.from[0]; j++) {
+                    tiles[[change.from[0] + j, change.from[1]]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                    ];
+
+                    if (j === 0) {
+                        if (!(change.from[0] === change.start_from[0] && change.from[1] === change.start_from[1])) {
+                            let from_direction;
+                            if (change.from[0] - change.start_from[0] < 0) {
+                                from_direction = "w"; //NegX -> opposite side for the connection arm
+                            } else if (change.from[0] - change.start_from[0] > 0) {
+                                from_direction = "e";
+                            } else if (change.from[1] - change.start_from[1] < 0) {
+                                from_direction = "s"; //NegY -> opposite side for the connection arm
+                            } else {
+                                from_direction = "n";
+                            }
+                            tiles[[change.from[0], change.from[1]]].push(
+                                document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                            );
+
+                            tiles[[change.from[0], change.from[1]]].push(
+                                document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                            );
+                        }
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[0] - change.from[0]) {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    } else {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    }
+                }
+            } else if (change.to[0] - change.from[0] < 0) {
+                for (let j = 0; j >= change.to[0] - change.from[0]; j--) {
+                    tiles[[change.from[0] + j, change.from[1]]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                    ];
+
+                    if (j === 0) {
+                        let from_direction;
+                        if (change.from[0] - change.start_from[0] < 0) {
+                            from_direction = "w"; //NegX -> opposite side for the connection arm
+                        } else if (change.from[0] - change.start_from[0] > 0) {
+                            from_direction = "e";
+                        } else if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "s"; //NegY -> opposite side for the connection arm
+                        } else {
+                            from_direction = "n";
+                        }
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                        );
+
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[0] - change.from[0]) {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    } else {
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                        tiles[[change.from[0] + j, change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0] + j, change.from[1]]))
+                        );
+                    }
+                }
+            } else if (change.to[1] - change.from[1] > 0) {
+                for (let j = 0; j <= change.to[1] - change.from[1]; j++) {
+                    tiles[[change.from[0], change.from[1] + j]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0], change.from[1] + j]))
+                    ];
+
+                    if (j === 0) {
+                        let from_direction;
+                        if (change.from[0] - change.start_from[0] < 0) {
+                            from_direction = "w"; //NegX -> opposite side for the connection arm
+                        } else if (change.from[0] - change.start_from[0] > 0) {
+                            from_direction = "e";
+                        } else if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "s"; //NegY -> opposite side for the connection arm
+                        } else {
+                            from_direction = "n";
+                        }
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                        );
+
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[1] - change.from[1]) {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    } else {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    }
+                }
+            } else if (change.to[1] - change.from[1] < 0) {
+                for (let j = 0; j >= change.to[1] - change.from[1]; j--) {
+                    tiles[[change.from[0], change.from[1] + j]] = [
+                        document.getElementById("sys-arm_node_" + co_crds_i([change.from[0], change.from[1] + j]))
+                    ];
+
+                    if (j === 0) {
+                        let from_direction;
+                        if (change.from[0] - change.start_from[0] < 0) {
+                            from_direction = "w"; //NegX -> opposite side for the connection arm
+                        } else if (change.from[0] - change.start_from[0] > 0) {
+                            from_direction = "e";
+                        } else if (change.from[1] - change.start_from[1] < 0) {
+                            from_direction = "s"; //NegY -> opposite side for the connection arm
+                        } else {
+                            from_direction = "n";
+                        }
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + from_direction + "_" + co_crds_i([change.start_from[0], change.start_from[1]]))
+                        );
+
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(from_direction) + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+
+                        let direction = change.start_from[2];
+                        tiles[[change.from[0], change.from[1]]].push(
+                            document.getElementById("sys-arm_arm-" + direction + "_" + co_crds_i([change.from[0], change.from[1]]))
+                        );
+                    } else if (j === change.to[1] - change.from[1]) {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    } else {
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + change.start_from[2] + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                        tiles[[change.from[0], change.from[1] + j]].push(
+                            document.getElementById("sys-arm_arm-" + flipDirection(change.start_from[2]) + "_" + co_crds_i([change.from[0], change.from[1] + j]))
+                        );
+                    }
+                }
+            }
+        }
+    }*/
+
+    console.log("Tiles: ");
+    console.log(tiles);
+
+    if (unfolded_coords_path[0].length === 2 && unfolded_coords_path.length === 1) { //an empty path
+        Index.send({action: "path_update", id: id, state: "finished"});
+    }
+
+    return generatePathAnimGroup(unfolded_coords_path, tiles, ignore_group, ()=>{Index.send({action: "path_update", id: id, state: "finished"});});
+}
+
+
+function displayPathChange(path_data, id, ignore_group) {
+    /*if (Index.pathUpdateIds.some(e => e === id)) {
+        Index.send({action: "double_path_update", id: id});
+        return;
+    }*/
+    let uncomputed_path = path_data.data;
+    let changed_path = [];
+
+    for (let part of uncomputed_path) {
+        if (changed_path.some(e => e[e.length-4] === part[0] && e[e.length-3] === part[1])) {
+            part.shift();
+            part.shift();
+        }
+        changed_path.push(part);
+    }
+
+    Index.send({action: "path_update", id: id, state: "started"});
     let tiles = [];
     let group_points = [];
     for (let g = 0; g < changed_path.length; g++) {
-        group_points.push([changed_path[g][0], changed_path[g][1], changed_path[g][changed_path[g].length-1]]);
-        group_points.push([changed_path[g][changed_path[g].length-3], changed_path[g][changed_path[g].length-2],
-            changed_path[g][changed_path[g].length-1]]);
+        group_points.push([changed_path[g][0], changed_path[g][1], changed_path[g][changed_path[g].length-2]]);
+        group_points.push([changed_path[g][changed_path[g].length-4], changed_path[g][changed_path[g].length-3],
+            changed_path[g][changed_path[g].length-2]]);
 
         let group = changed_path[g];
         let prev = [group[0], group[1]];
         tiles[[prev[0], prev[1]]] = [document.getElementById("sys-arm_node_" + co_crds_i([prev[0], prev[1]]))];
-        for (let i = 2; i < group.length -1; i+=2) { //-1 to skip the group type
+        for (let i = 2; i < group.length -2; i+=2) { //-2 to skip the change type and is_new_group
             if (prev[0] < group[i]) {
                 tiles[[prev[0], prev[1]]].push(document.getElementById("sys-arm_arm-e_" + co_crds_i([prev[0], prev[1]])));
                 tiles[[group[i], group[i+1]]] = [
@@ -481,11 +1271,11 @@ function displayPathChange(changed_path) {
         }
     }
 
-    return generatePathAnimGroup(changed_path, tiles);
+    return generatePathAnimGroup(changed_path, tiles, ignore_group, ()=>{Index.send({action: "path_update", id: id, state: "finished"});});
 }
 
 //deprecated function
-//moved function to backend and awaiting server protocol to rewrite the function
+//moved function to backend and awaiting server protocol to rewrite the function,
 //according to data received from server
 function dep_displayPathChange(path_old, path_new) {
     let groups = [];
@@ -641,7 +1431,15 @@ function select_square(square) {
     square.style.borderColor = "orange";
 
     let borderAnim = new AnimBorderInner(20, square, 3, 1, 2, [0, 34, 34]);
-    Index.animHandler.addImmediate(borderAnim);
+    let tileAnim = new AnimSlideColor(20, square, "#0a0e1a", "#00e6ae"/*"#079eae"*/);
+    let shadowAnim = new AnimCssChange(20, square, ["unselected"], "selected");
+
+    let selectGroup = new AnimGroup(0);
+    selectGroup.add(borderAnim);
+    selectGroup.add(tileAnim);
+    selectGroup.add(shadowAnim);
+
+    Index.animHandler.addImmediate(selectGroup);
 
     current_state = ["point", "stopped"];
 }
@@ -650,15 +1448,22 @@ function unselect_square(square) {
     square.style.borderColor = "black";
 
     let borderAnim = new AnimBorderInner(20, square, 1, 3, 0, [2, 30, 30]);
-    Index.animHandler.addImmediate(borderAnim);
+    let shadowAnim = new AnimCssChange(20, square, ["selected"], "unselected");
+    let tileAnim = new AnimSlideColor(20, square, "#00e6ae", "#0a0e1a");
+
+    let unselectGroup = new AnimGroup(0);
+    unselectGroup.add(borderAnim);
+    unselectGroup.add(tileAnim);
+    unselectGroup.add(shadowAnim);
+
+    Index.animHandler.addImmediate(unselectGroup);
 
     current_state = ["reset", "finished"];
 }
 
-function update_sensors(sensor, value) {
-    let sensor_ele = document.getElementById(sensor);
-    sensor_ele.innerHTML = (sensor === "left" ? "Links: " : (sensor === "front" ? "Vorne: " : "Rechts: "));
-    sensor_ele.innerHTML = sensor_ele.innerHTML + value[0] + ":" + value[1];
+function update_sensors(sensorId, value) {
+    let sensor_ele = document.getElementById("sensor-" + sensorId);
+    sensor_ele.innerHTML = sensor_ele.getAttribute("content").replace("$", value);
 }
 
 function add_message(message) {
@@ -689,7 +1494,7 @@ function updateControls(button_id, state) {
     }
 }
 
-function updateControls_disalbed() {
+function updateControls_disabled() {
     let buttonStart = document.getElementsByClassName("button_start_stop")[0];
     let buttonPause = document.getElementsByClassName("button_pause")[0];
     let buttonReset = document.getElementsByClassName("button_reset")[0];
@@ -718,19 +1523,23 @@ function add_algorithm(algorithm) {
     algorithm_ele.className = "pop_window_algorithm_choice unselectable";
     algorithm_ele.innerHTML = algorithm;
     algorithm_ele.addEventListener("click", function () {
-        let request = new XMLHttpRequest();
-        request.addEventListener("load", function () {console.log(this.responseText);});
-        request.open("POST", document.location.origin + "/action");
-        request.setRequestHeader("Content-Type", "Application/json");
-        request.send(JSON.stringify({
-            action: "algorithm_selected",
-            algorithm: algorithm,
-        }));
+        if (has_backend) {
+            let request = new XMLHttpRequest();
+            request.addEventListener("load", function () {
+                console.log(this.responseText);
+            });
+            request.open("POST", document.location.origin + "/action");
+            request.setRequestHeader("Content-Type", "Application/json");
+            request.send(JSON.stringify({
+                action: "algorithm_selected",
+                algorithm: algorithm,
+            }));
+        }
         Index.closePopAlgo();
     });
     document.getElementById("algo_content").appendChild(algorithm_ele);
 }
 
 function math_pos(x) {
-    return x*(x<0?-1:1);
+    return (x<0?x*-1:x); //more efficient :) //x*(x<0?-1:1);
 }
