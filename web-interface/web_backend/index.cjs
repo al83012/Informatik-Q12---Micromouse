@@ -182,7 +182,10 @@ client.on('connect', (conn) => {
     manager.backend_client = client;
     manager.f_sync.push(Actions.update_con_status(true));
 
-    manager.b_sync(Actions.b_test());
+    //manager.b_sync(Actions.b_test()); //sending a test algorithm
+
+    //sending selected strategy
+    manager.b_send_selected_strategy();
 
     conn.on('error', (err) => {
         console.log("\x1b[33m[B] \x1b[31mImplement ERROR");
