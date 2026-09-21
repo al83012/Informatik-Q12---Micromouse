@@ -222,6 +222,23 @@ body {
     margin-left: 5px;
 }
 
+.faulhaber_logo_container {
+    display: flex;
+    flex-direction: column;
+    color: #002b53; /*text color of faulhaber*/
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    height: fit-content;
+
+    border: darkgray 2px solid;
+    border-radius: 8px;
+    box-shadow: darkgray 0 0 3px 0;
+    background-color: var(--win_bg);
+    margin-left: 15px;
+    padding: 7px;
+}
+
 .algo_container {
     display: flex;
     flex-direction: column;
