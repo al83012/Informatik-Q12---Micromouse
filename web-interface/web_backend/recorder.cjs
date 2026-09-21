@@ -3,8 +3,8 @@ const fs = require("fs");
 const history = [];
 const no_record = true;
 
-function record(vars, label = "") {
-    if (no_record) return;
+function record(vars, label = "", override_no_record = false) {
+    if (no_record && !override_no_record) return;
     const stack = new Error().stack.split("\n")[2];
 
     // Extract filename + line + column from stack trace
