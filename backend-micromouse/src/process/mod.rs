@@ -355,6 +355,7 @@ impl<const N: usize> Process<N> {
                     }
                     _ => {}
                 }
+                info!(target: "proc", "Sent confirm last change");
                 self.frontend_manager
                     .send(FrontendMessage::ConfirmLastChange)
                     .await;

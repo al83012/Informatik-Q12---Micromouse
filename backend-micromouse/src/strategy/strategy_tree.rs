@@ -7,7 +7,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, error, info, instrument, span, Level};
+use tracing::{Level, debug, error, info, instrument, span};
 use tracing_subscriber::Layer;
 
 use crate::{
@@ -230,7 +230,9 @@ pub enum NodeExpansionError {
         "Expected the node to be expandable, but it does not have the neccessary strategy data"
     )]
     ExpectedExpandable,
-    #[error("Expected the node to be expandable, but the strategy refused due to not having enough information")]
+    #[error(
+        "Expected the node to be expandable, but the strategy refused due to not having enough information"
+    )]
     ExpectedAlreadyExpandable,
 }
 
@@ -1124,7 +1126,9 @@ where
             let pos_x = node.on_basis_of_world.mouse.pos.x;
             let pos_y = node.on_basis_of_world.mouse.pos.y;
             let dir = node.on_basis_of_world.mouse.dir;
-            res = format!("{res}\n{indent} > {grafting_filter} {is_full} {is_eq} {is_sent} L{layer_id}N{node_id} at ({pos_x}|{pos_y})|{dir} {is_end}");
+            res = format!(
+                "{res}\n{indent} > {grafting_filter} {is_full} {is_eq} {is_sent} L{layer_id}N{node_id} at ({pos_x}|{pos_y})|{dir} {is_end}"
+            );
         }
         res
     }
@@ -1483,7 +1487,9 @@ where
         //
         // If there was a strategy-state associated with the from_node, this state will either stay
         // there (if the 2nd command is none) or move back 1
-        todo!("WE NEED TO DETERMINE, WHICH OUTCOMES MATCH THE ORIGINAL OUTCOMES; WHICH IS QUITE HARD -> NEED TO MATCH UP THE PARTIAL WORLDS");
+        todo!(
+            "WE NEED TO DETERMINE, WHICH OUTCOMES MATCH THE ORIGINAL OUTCOMES; WHICH IS QUITE HARD -> NEED TO MATCH UP THE PARTIAL WORLDS"
+        );
     }
     #[instrument(
         name = "move_node_back",
@@ -1678,6 +1684,15 @@ where
             ))
         }
         let grafting_layer = self.layers.remove(0);
+
+        for node in grafting_layer.nodes.values() {
+            if let Some(children) = node.children() {
+                for child in children.values() {
+                    info!(target: "strat", "Child of grafting_layer node: L{}N{} pruned", child.layer_id.0, child.node_id.0);
+                    self.visuals.remove_node(*child);
+                }
+            }
+        }
 
         info!(target: "strat", "Processing grafting layer L{}", grafting_layer.absolute_layer_id.0);
 
@@ -1939,10 +1954,14 @@ pub enum FinishRootError {
     ImpossibleRootAction(StrategyEndState),
     #[error("The root cannot have children and thus cannot have a successor")]
     SuccessorNotExpandable,
-    #[error("The root cannot yet have children due to not having enough information, but due to finishing the command, there is no more information available")]
+    #[error(
+        "The root cannot yet have children due to not having enough information, but due to finishing the command, there is no more information available"
+    )]
     SuccessorNotYetExpandable,
     // Either a valid end or a strategy error
-    #[error("The successor marks the end of this strategy's execution; Not really an error, just an info")]
+    #[error(
+        "The successor marks the end of this strategy's execution; Not really an error, just an info"
+    )]
     SuccessorIsEnd(StrategyEndState),
 }
 

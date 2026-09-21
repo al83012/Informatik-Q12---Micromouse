@@ -10,10 +10,10 @@ use futures_util::future::pending;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tokio::{
-    sync::{watch, Mutex, MutexGuard, RwLock, RwLockReadGuard},
+    sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, watch},
     time,
 };
-use tracing::{debug, error, info, instrument, span, warn, Instrument, Level};
+use tracing::{Instrument, Level, debug, error, info, instrument, span, warn};
 use tungstenite::{Message, Utf8Bytes};
 
 use crate::{
@@ -34,7 +34,7 @@ use crate::{
     },
     transform::position::MouseTransform,
     utils::{
-        hyperlink_logging::{process_span, LinkFileName},
+        hyperlink_logging::{LinkFileName, process_span},
         nonempty::{NonEmpty, PotentiallyNonEmpty},
     },
 };
