@@ -309,6 +309,7 @@ where
                     },
                 grafting_filter,
             } => {
+                visuals.debug("Strategy start after previous unfinished strategy");
                 info!(target: "strat", "Continue after doing");
                 // let num_of_unfinished_cmds = layers.len();
                 let node_count = sent_layers.iter().map(|l| l.node_count).sum::<usize>()
@@ -325,6 +326,11 @@ where
                     .map(StrategyTreeLayer::<N, S>::non_expandable_from_cleaned)
                     .collect::<Vec<_>>();
                 info!(target: "strat", "Took over {} layers + 1 Grafting layer", transformed_layers.len());
+
+                visuals.debug(format!(
+                    "Regrowing GRAFTING LAYER L{} -> Adding new strategy",
+                    { grafting_layer.layer_id.0 }
+                ));
 
                 let last_layer = grafting_layer
                     .nodes
@@ -390,6 +396,7 @@ where
                     visuals,
                 };
 
+                tree.visuals.debug("Initial Tree Expansion");
                 tree.expand_fully().map_err(TreeCreationError::from)?;
                 tree.update_equal_layers();
 
@@ -406,10 +413,14 @@ where
                         after_cmds: SentUnfinishedCommands::HasBlockingRoot { world },
                         grafting_filter,
                     } => {
+                        visuals.debug("Strategy start after blocking root");
                         info!(target: "strat", "Continue after blocking root");
                         grafting_filter.apply_on_world(&world)
                     }
-                    StrategyStart::DirectlyAtState(world) => world,
+                    StrategyStart::DirectlyAtState(world) => {
+                        visuals.debug("Strategy start without previous state");
+                        world
+                    }
                     _ => panic!("Covered previously"),
                 };
 
@@ -432,6 +443,7 @@ where
                     goal_position,
                     visuals,
                 };
+                res.visuals.debug("Adding initial node L0N0");
                 let first_node_id = res.add_node(
                     StrategyTreeNode::new_orphan(
                         PartialWorldData::from(starting_state),
@@ -442,6 +454,7 @@ where
 
                 // res.layer_mut(first_layer_id).expect("Checked").is_full = true;
 
+                res.visuals.debug("Initial expansion");
                 res.expand_fully().map_err(TreeCreationError::from)?;
                 res.update_equal_layers();
 
@@ -958,8 +971,13 @@ where
     )]
     pub fn finish_root(&mut self) -> Result<Vec<Command>, FinishRootError> {
         // println!("Finish root");
+
         let (_outcome_id, successor) = {
             let root_id = self.root_node();
+            self.visuals.debug(format!(
+                "Finishing root L{}N{}",
+                root_id.layer_id.0, root_id.node_id.0
+            ));
             info!(target: "strat", link_node_id = root_id.link(), "FINISHING NODE {root_id:?}");
             // WARN: Will not expand the root before getting its successor; Any successor should
             // already have been determined by the preceding measurements
@@ -992,11 +1010,11 @@ where
             match next_action_len {
                 0 => {
                     error!(target: "strat", link_node_id = root_id.link(), "ROOT does not have a successor");
+                    self.visuals.debug("Root has no successor");
                     return Err(FinishRootError::NoSuccessor);
                 }
                 1 => {
                     let (o, c) = potential_outcomes.iter().next().unwrap();
-                    info!(target: "strat", link_node_id = c.link(), "SUCCESSOR = {c:?}");
                     (*o, *c)
                 }
                 2.. => {
@@ -1008,6 +1026,11 @@ where
                 }
             }
         };
+
+        self.visuals.debug(format!(
+            "Successor = L{}N{}",
+            successor.layer_id.0, successor.node_id.0
+        ));
 
         let next_root_expansion_res = self.try_expand_node(successor);
         info!(target: "strat", link_node_id = successor.link(), "SUCCESSOR Expansion ~~> {next_root_expansion_res:?}");
@@ -1051,6 +1074,10 @@ where
         }
 
         let old_root_id = self.root_node();
+        self.visuals.debug(format!(
+            "Removing old root L{}N{}",
+            old_root_id.layer_id.0, old_root_id.node_id.0
+        ));
         self.visuals.remove_node(old_root_id);
         self.layers.remove(0);
 
@@ -1601,6 +1628,7 @@ where
     pub fn close(mut self) -> (FrontendVisuals, SentUnfinishedCommands<N>) {
         info!(target: "strat", "CLOSE");
         info!(target: "strat", "Of tree \n{}", self.tree_structure_str());
+        self.visuals.debug("Closing Tree");
         let highest_sent_layer = self.highest_sent_layer;
 
         //INFO: We also need to include the last layer which was not yet sent, but was expanded
@@ -1663,6 +1691,12 @@ where
                 .clone()
                 .into();
 
+            let root = self.root_node();
+            self.visuals.debug(format!(
+                "Closing tree after blocking root L{}N{}",
+                root.layer_id.0, root.node_id.0
+            ));
+
             return (
                 self.visuals,
                 SentUnfinishedCommands::HasBlockingRoot { world },
@@ -1685,10 +1719,19 @@ where
         }
         let grafting_layer = self.layers.remove(0);
 
+        self.visuals.debug(format!(
+            "Closing tree with GRAFTING LAYER L{}",
+            grafting_layer.absolute_layer_id.0
+        ));
+
         for node in grafting_layer.nodes.values() {
             if let Some(children) = node.children() {
                 for child in children.values() {
                     info!(target: "strat", "Child of grafting_layer node: L{}N{} pruned", child.layer_id.0, child.node_id.0);
+                    self.visuals.debug(format!(
+                        "Pruning deprecated child of grafting_layer: L{}N{} pruned",
+                        child.layer_id.0, child.node_id.0,
+                    ));
                     self.visuals.remove_node(*child);
                 }
             }

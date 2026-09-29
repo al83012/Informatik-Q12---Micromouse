@@ -6,7 +6,7 @@ use tokio::sync::mpsc::{Sender, UnboundedReceiver, UnboundedSender};
 use derive_more::with_trait::*;
 
 use crate::{
-    comm::website::FrontendResponse,
+    comm::website::{FrontendMessage, FrontendResponse},
     strategy::strategy_tree::{AbsoluteLayerId, AbsoluteNodeId, AbsolutePathId},
     transform::position::MouseTransform,
     utils::path::Path,
@@ -55,11 +55,11 @@ pub struct PathSegment {
 }
 
 pub struct FrontendVisuals {
-    event_sender: UnboundedSender<TreeVisualEvent>,
+    event_sender: UnboundedSender<FrontendMessage>,
 }
 
 impl FrontendVisuals {
-    pub async fn visual_event_channel() -> (Self, UnboundedReceiver<TreeVisualEvent>) {
+    pub async fn visual_event_channel() -> (Self, UnboundedReceiver<FrontendMessage>) {
         let (send, recv) = tokio::sync::mpsc::unbounded_channel();
         (Self { event_sender: send }, recv)
     }
@@ -70,37 +70,45 @@ impl FrontendVisuals {
         to_node: AbsoluteNodeId,
     ) {
         self.event_sender
-            .send(TreeVisualEvent::from(PathVisualEvent {
-                associated_node: from_node,
-                ty: PathVisualEventType::Create {
-                    path,
-                    leads_to_child_node: to_node,
+            .send(FrontendMessage::VisualEvent(TreeVisualEvent::from(
+                PathVisualEvent {
+                    associated_node: from_node,
+                    ty: PathVisualEventType::Create {
+                        path,
+                        leads_to_child_node: to_node,
+                    },
                 },
-            }))
+            )))
             .expect("Should be open during execution");
     }
 
     pub fn remove_node(&self, node: AbsoluteNodeId) {
         self.event_sender
-            .send(
+            .send(FrontendMessage::VisualEvent(
                 PathVisualEvent {
                     associated_node: node,
                     ty: PathVisualEventType::Remove,
                 }
                 .into(),
-            )
+            ))
             .expect("Should be open during execution");
     }
 
     pub fn prune_path(&self, from_including_node: AbsoluteNodeId) {
         self.event_sender
-            .send(
+            .send(FrontendMessage::VisualEvent(
                 PathVisualEvent {
                     associated_node: from_including_node,
                     ty: PathVisualEventType::Prune,
                 }
                 .into(),
-            )
+            ))
+            .expect("Should be open during execution");
+    }
+
+    pub fn debug(&self, message: impl Into<String>) {
+        self.event_sender
+            .send(FrontendMessage::Debug(message.into()))
             .expect("Should be open during execution");
     }
 }

@@ -34,7 +34,7 @@ pub struct Process<const N: usize> {
     frontend_manager: FrontendManager<N>,
     strategy_tree_manager: DynStrategyTreeManager<N>,
     blocked_cmd_queue: VecDeque<NonIndexMicromouseMessage>,
-    tree_visual_recv: UnboundedReceiver<TreeVisualEvent>,
+    tree_visual_recv: UnboundedReceiver<FrontendMessage>,
     queue_space_timeout_until: Instant,
 }
 
@@ -123,7 +123,7 @@ impl<const N: usize> Process<N> {
             let mut visual_event_buffer = vec![];
             let visual_events = self
                 .tree_visual_recv
-                .recv_many(&mut visual_event_buffer, 32);
+                .recv_many(&mut visual_event_buffer, 1024);
 
             tokio::select! {
                 cmd = sendable_cmd => {
@@ -161,7 +161,7 @@ impl<const N: usize> Process<N> {
                         if i >= visual_event_count {
                             break;
                         }
-                        self.frontend_manager.send(FrontendMessage::VisualEvent(event)).await;
+                        self.frontend_manager.send(event).await;
                     }
                 }
                 _ = tick.tick() => {
