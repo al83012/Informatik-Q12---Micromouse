@@ -2,10 +2,10 @@
 #define drivecontrol_h
 
 namespace DRIVECONTROL {
-    constexpr float DEFAULT_BASE_SPEED_PERCENTAGE = 15.0f;
+    constexpr float DEFAULT_BASE_SPEED_PERCENTAGE = 40.0f;
     constexpr float DEFAULT_TILE_SIZE_CM = 17.0f;
 
-    constexpr float DEFAULT_TURN_SPEED_PERCENTAGE = 7.0f;
+    constexpr float DEFAULT_TURN_SPEED_PERCENTAGE = 35.0f;
 
     void forward(float distanceCm, float baseSpeedPercentage);
     void backward(float distanceCm, float baseSpeedPercentage);
@@ -17,11 +17,12 @@ namespace DRIVECONTROL {
     void defaultForward(int tiles);
     void defaultBackward(int tiles);
 
-    void turnLeft(float angleDegrees, float baseSpeedPercentage);
-    void turnRight(float angleDegrees, float baseSpeedPercentage);
+    void turn(float targetAngleDeg, float turnSpeedPercentage);
 
     void defaultTurnLeft(int turns, float angleDegrees);
     void defaultTurnRight(int turns, float angleDegrees);
+
+    void correctAngle(float targetAngleDef, float correctionSpeedPercentage);
 }
 
 #endif

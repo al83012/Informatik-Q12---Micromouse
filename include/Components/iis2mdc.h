@@ -43,7 +43,7 @@ namespace ComponentVars {
     void softReset();
     void reboot();
     float readTemperature();
-
+    float getHeading();
 
 
 }

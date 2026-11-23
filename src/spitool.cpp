@@ -6,6 +6,8 @@
 
 
 void SPITOOL::init() {
+    pinMode(LSM_CS, OUTPUT);
+    digitalWrite(LSM_CS, HIGH);
     SPI.begin(SCLK, MISO, MOSI, LSM_CS);
 }
 

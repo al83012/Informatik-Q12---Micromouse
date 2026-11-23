@@ -13,12 +13,12 @@ namespace DRV8424 {
     extern uint8_t dutyCycle2;
     extern int frequency;
 
-    constexpr float maxCurrent = 0.3;
+    constexpr float maxCurrent = 0.7;
     constexpr float gearRatio = 2;
     constexpr float stepsPerRevolution_RAW = 32;
-    constexpr float wheelDiameterCm = 2.3;
+    constexpr float wheelDiameterCm = 2;
     constexpr float wheelCircumference = wheelDiameterCm * 3.14159;
-    constexpr float stepsPerRevolution = stepsPerRevolution_RAW * gearRatio;
+    constexpr float stepsPerRevolution = stepsPerRevolution_RAW / gearRatio;
  
     
     

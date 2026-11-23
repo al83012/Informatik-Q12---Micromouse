@@ -16,16 +16,16 @@ namespace ComponentVars {
  constexpr uint8_t REG_CTRL2_G = 0x11; 
  constexpr uint8_t REG_OUTX_L_G = 0x22;
  constexpr uint8_t REG_OUTX_L_A = 0x28;
-
+extern float gyroBiasZ;
 }
 
 struct Data {
-    int16_t accelX;
-    int16_t accelY;
-    int16_t accelZ;
-    int16_t gyroX;
-    int16_t gyroY; 
-    int16_t gyroZ;
+    float accelX;
+    float accelY;
+    float accelZ;
+    float gyroX;
+    float gyroY;
+    float gyroZ;
 };
 
 
@@ -33,14 +33,14 @@ struct Data {
     void configureResolution();
     Data readSensorData();
     void readDataBlock(uint8_t startRegister, uint8_t* buffer, size_t length);
+    void calibrateGyro(int samples);
+    float getAccelX();
+    float getAccelY();
+    float getAccelZ();
 
-    int16_t getAccelX();
-    int16_t getAccelY();
-    int16_t getAccelZ();
-
-    int16_t getGyroX();
-    int16_t getGyroY();
-    int16_t getGyroZ();
+    float getGyroX();
+    float getGyroY();
+    float getGyroZ();
 
 
 }

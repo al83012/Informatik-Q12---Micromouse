@@ -34,10 +34,10 @@ void Esp32::initSubComponents() {
     TCAL6408::init();
     //BQ76905::init();
     TMP464::init();
-    //IIS2MDC::init();
+    IIS2MDC::init();
     TPL0102::init(3.4, 0.7, 0.1); 
     LSM6DSR::init();   
-    DRV8424::init(50000);
+    DRV8424::init(20000);
     FAN::init();
     Measurement::IR::init();
     VL53L4CD_PHYSICAL::init();

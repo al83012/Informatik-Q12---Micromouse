@@ -9,9 +9,11 @@ using namespace SPITOOL;
 using namespace Measurement::Sensors;
 using namespace LSM6DSR;
 
+float LSM6DSR::ComponentVars::gyroBiasZ = 0.0f;
 
 void LSM6DSR::init() {
     uint8_t whoAmI = spi_readRegister(ComponentVars::REG_WHO_AM_I, LSM_CS);
+    log_i("# (LSM6DSR) WHO_AM_I returned: 0x%02X (Expected: 0x6B)", whoAmI);
     if (whoAmI != 0x6B) {
         log_e("# %s not found!", Measurement::Sensors::to_string(Measurement::Sensors::SensorNames::LSM6DSR_ACCELEROMETER_GYROSKOP));
     }
@@ -66,4 +68,18 @@ void LSM6DSR::configureResolution() {
     spi_writeRegister(ComponentVars::REG_CTRL2_G,  0b01101100, LSM_CS); // ODR 416 Hz, 2000 dps
 
     d_sensor(SensorNames::LSM6DSR_ACCELEROMETER_GYROSKOP, "resolution configured: +-4g for accelerometer, 2000 dps for gyroscope");
+}
+
+void LSM6DSR::calibrateGyro(int samples = 500) {
+    log_i("# (LSM6DSR) Calibrating gyro... Keep robot completely still!");
+    float sumZ = 0.0f;
+    
+    for (int i = 0; i < samples; i++) {
+        Data d = readSensorData();
+        sumZ += d.gyroZ;
+        delay(2); // ~2ms delay between samples
+    }
+    
+    ComponentVars::gyroBiasZ = sumZ / samples;
+    log_i("# (LSM6DSR) Gyro Z bias calibrated: %f dps", ComponentVars::gyroBiasZ);
 }

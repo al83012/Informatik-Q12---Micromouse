@@ -380,8 +380,6 @@ int Measurement::TOF::secureMeasurementFront() {
         measurements[i] = VL53L4CD_PHYSICAL::debugReadSensor(0);
         distance_front = measurements[i];
         
-
-        delay(50);
     }
     std::sort(measurements, measurements + 5);
     distance_tiles_front = measurements[2] / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
@@ -394,7 +392,6 @@ int Measurement::TOF::secureMeasurementLeft() {
         measurements[i] = VL53L4CD_PHYSICAL::debugReadSensor(1);
         distance_left = measurements[i];
 
-        delay(50);
     }
     std::sort(measurements, measurements + 5);
     distance_tiles_left = measurements[2] / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);
@@ -407,7 +404,6 @@ int Measurement::TOF::secureMeasurementRight() {
         measurements[i] = VL53L4CD_PHYSICAL::debugReadSensor(2);
         distance_right = measurements[i];
 
-        delay(50);
     }
     std::sort(measurements, measurements + 5);
     distance_tiles_right = measurements[2] / (DRIVECONTROL::DEFAULT_TILE_SIZE_CM*10);

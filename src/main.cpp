@@ -13,6 +13,7 @@
 #include "measurement.h"
 #include "Components/drv8424.h"
 #include "Components/vl53l4cd.h"
+#include "Components/lsm6dsr.h"
 #include "measurement.h"
 #include "driveControl.h"
 #include "i2ctool.h"
@@ -41,11 +42,17 @@ Esp32::initESP32();
 //Measurement::IR::calibration::initCalibration(15);
 
 
-
+LSM6DSR::calibrateGyro(500);
 
 
 //DRIVECONTROL::simpleForward1(20, 5);
-//DRIVECONTROL::forward(20, 5);
+DRIVECONTROL::defaultForward(3);
+DRIVECONTROL::turn(90, 15);
+DRIVECONTROL::defaultForward(3);
+DRIVECONTROL::turn(90, 15);
+DRIVECONTROL::defaultForward(3);
+DRIVECONTROL::turn(90, 15);
+DRIVECONTROL::defaultForward(3);
 
 }
 
@@ -55,7 +62,7 @@ void loop() {
  log_d(".");
  TMP464::DbgPrintTemperatures();
  //Measurement::Sensors::reportTemperature();
- DRV8424::debugPrintEncoderCounts();
+// DRV8424::debugPrintEncoderCounts();
 //Measurement::IR::debugPrintRawDistance(1)
 //Measurement::IR::debugPrintRawDistance(0);
 //Measurement::IR::debugPrintRawDistance(2);
@@ -63,7 +70,8 @@ void loop() {
 //Measurement::IR::WallDetection::debugPrintWallDetectionStatus();
 Measurement::TOF::debugPrintSecureMeasurements();
 
-
+LSM6DSR::Data sensorData = LSM6DSR::readSensorData();
+float correctedGyroZ = sensorData.gyroZ - LSM6DSR::ComponentVars::gyroBiasZ;
 
 
 
